@@ -12,8 +12,11 @@ import { defaultLocale } from "@/lib/i18n"
 import { getAllTags } from "@zlog/database"
 import { unstable_cache } from "next/cache"
 import { Analytics } from "@vercel/analytics/next"
+import { GoogleAnalytics } from "@next/third-parties/google"
 import { categoryKeys } from "@/lib/categories"
 import "./globals.css"
+
+const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim()
 
 export async function generateMetadata(): Promise<Metadata> {
   const site = await getSiteConfig()
@@ -124,6 +127,9 @@ export default async function RootLayout({
           </I18nProvider>
         </ThemeProvider>
         <Analytics />
+        {gaMeasurementId ? (
+          <GoogleAnalytics gaId={gaMeasurementId} />
+        ) : null}
       </body>
     </html>
   )

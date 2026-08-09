@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Card, CardAction, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { PostStats } from "@/components/admin/post-stats"
+import { TrafficAnalytics } from "@/components/admin/traffic-analytics"
 import { ContributionCalendar } from "@/components/admin/contribution-calendar"
 import { FormattedDate } from "@/components/blog/formatted-date"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -84,6 +85,30 @@ export default function AdminDashboardPage() {
     // causes no layout shift.
     return (
       <div className="flex flex-col gap-8 md:gap-10">
+        {/* Traffic — independent client fetch; skeleton mirrors its chrome */}
+        <section className="flex flex-col gap-5 md:gap-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Skeleton className="h-7 w-24" />
+            <Skeleton className="h-8 w-44 rounded-lg" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+            {[0, 1].map((i) => (
+              <div
+                key={i}
+                className="flex flex-col gap-4 rounded-xl bg-card py-4 ring-1 ring-foreground/10"
+              >
+                <div className="flex items-start justify-between px-4">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="size-8 rounded-lg" />
+                </div>
+                <div className="px-4">
+                  <Skeleton className="h-9 w-16" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="flex flex-col gap-5 md:gap-6">
           <Skeleton className="h-7 w-32" />
 
@@ -175,6 +200,8 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="flex flex-col gap-8 md:gap-10">
+      <TrafficAnalytics />
+
       {/* Statistics — stat cards + contribution calendar */}
       <section className="flex flex-col gap-5 md:gap-6">
         <h2 className="text-xl font-semibold tracking-tight">
