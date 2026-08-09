@@ -1,4 +1,7 @@
-import { BetaAnalyticsDataClient } from "@google-analytics/data"
+import { BetaAnalyticsDataClient, protos } from "@google-analytics/data"
+
+type BatchRunReportsResponse =
+  protos.google.analytics.data.v1beta.IBatchRunReportsResponse
 
 export type AnalyticsRange = "today" | "7d" | "28d"
 
@@ -130,7 +133,9 @@ export async function fetchAnalyticsReport(
   const dateRange = RANGES[range]
   const client = getClient()
 
-  let batch: Awaited<ReturnType<typeof client.batchRunReports>>[0]
+  // Do not use ReturnType<typeof client.batchRunReports> — the callback
+  // overloads make that resolve to void under TypeScript.
+  let batch: BatchRunReportsResponse
   try {
     ;[batch] = await client.batchRunReports({
       property,
