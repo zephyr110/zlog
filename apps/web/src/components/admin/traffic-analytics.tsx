@@ -68,7 +68,6 @@ export function TrafficAnalytics() {
 
   useEffect(() => {
     let cancelled = false
-    setState({ status: "loading" })
 
     async function load() {
       try {
@@ -96,7 +95,7 @@ export function TrafficAnalytics() {
       }
     }
 
-    load()
+    void load()
     return () => {
       cancelled = true
     }
@@ -119,7 +118,11 @@ export function TrafficAnalytics() {
             <button
               key={r}
               type="button"
-              onClick={() => setRange(r)}
+              onClick={() => {
+                if (r === range) return
+                setRange(r)
+                setState({ status: "loading" })
+              }}
               className={cn(
                 "cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
                 range === r

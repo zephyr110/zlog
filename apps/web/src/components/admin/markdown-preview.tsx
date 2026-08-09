@@ -34,6 +34,7 @@ export function MarkdownPreview({ content }: MarkdownPreviewProps) {
   useEffect(() => {
     const text = deferredContent.trim()
     if (!text) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset compile state when the deferred buffer clears
       setSource(null)
       setCompileError(false)
       setCompiling(false)

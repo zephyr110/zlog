@@ -26,7 +26,15 @@ export function useMediaLibrary() {
   // actually changes, so a stale debounce can't override a page/pageSize/
   // date change made within the debounce window.
   const debouncedInput = useDebouncedValue(searchInput, 400)
-  const [searchQuery, setSearchQuery] = useState("")
+  // Trimmed query is derived — no effect sync. When it changes, reset to
+  // page 1 during render (React’s recommended “adjust state when a prop
+  // changes” pattern) so a stale debounce can’t override a page jump.
+  const searchQuery = debouncedInput.trim()
+  const [prevSearchQuery, setPrevSearchQuery] = useState(searchQuery)
+  if (searchQuery !== prevSearchQuery) {
+    setPrevSearchQuery(searchQuery)
+    setPage(1)
+  }
   // API unreachable (static deployment, server error, network) — was
   // previously swallowed silently, leaving an empty library with no
   // explanation and a dead-feeling upload button. Boolean so the fetch
@@ -38,14 +46,6 @@ export function useMediaLibrary() {
   // Refetch indicator (page/filter changes) — distinct from `loading`,
   // which only covers the initial skeleton.
   const [refreshing, setRefreshing] = useState(false)
-
-  useEffect(() => {
-    const next = debouncedInput.trim()
-    if (next !== searchQuery) {
-      setSearchQuery(next)
-      setPage(1)
-    }
-  }, [debouncedInput, searchQuery])
 
   const fetchMedia = useCallback(
     async (targetPage: number) => {

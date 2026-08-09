@@ -9,9 +9,13 @@
     "export": "pnpm --filter @zlog/web export",
     "start": "pnpm --filter @zlog/web start",
     "lint": "pnpm --filter @zlog/web lint",
-    "create-admin": "node scripts/create-admin.mjs"
+    "typecheck": "pnpm --filter @zlog/web typecheck",
+    "check": "pnpm lint && pnpm typecheck",
+    "create-admin": "node scripts/create-admin.mjs",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
     "typescript": "^5"
   },
   "packageManager": "pnpm@11.14.0+sha512.66c1ac4c7d4762d6d7dde44c7f3e5a73591ed0a0806e751d4ed32d4f004f25b2285a906b1fd8a9e3e621df3b4e2858bf88e50e0cf626bedbe977fe434a5caf85"

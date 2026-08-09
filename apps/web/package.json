@@ -9,6 +9,7 @@
     "export": "node scripts/check-i18n.mjs && node scripts/toggle-force-static.mjs add && NEXT_EXPORT=true next build && node scripts/toggle-force-static.mjs remove",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "check:i18n": "node scripts/check-i18n.mjs"
   },
   "dependencies": {
