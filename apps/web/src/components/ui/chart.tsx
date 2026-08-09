@@ -202,7 +202,20 @@ function ChartTooltipContent({
           .map((item, index) => {
             const key = `${nameKey ?? item.name ?? item.dataKey ?? "value"}`
             const itemConfig = getPayloadConfigFromPayload(config, item, key)
-            const indicatorColor = color ?? item.payload?.fill ?? item.color
+            // Prefer solid fills. Area gradient fills are `url(#…)`, which
+            // cannot paint the indicator — fall back to series stroke /
+            // chart-config color (shadcn `var(--color-KEY)` pattern).
+            const payloadFill =
+              typeof item.payload?.fill === "string" &&
+              !item.payload.fill.startsWith("url(")
+                ? item.payload.fill
+                : undefined
+            const indicatorColor =
+              color ??
+              payloadFill ??
+              item.color ??
+              itemConfig?.color ??
+              `var(--color-${key})`
 
             return (
               <div

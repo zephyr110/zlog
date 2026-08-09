@@ -7,7 +7,6 @@ import {
   Area,
   BarChart,
   Bar,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -36,13 +35,13 @@ import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { resolveCategory, getCategoryLabel } from "@/lib/categories"
 import { type PostSummary } from "@zlog/database"
 
-/** shadcn chart palette — bars cycle chart-1…chart-5. */
+/** shadcn chart palette — bars cycle chart-1…chart-5 (token → --color-*). */
 const BAR_COLORS = [
-  "var(--color-chart-1)",
-  "var(--color-chart-2)",
-  "var(--color-chart-3)",
-  "var(--color-chart-4)",
-  "var(--color-chart-5)",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
 ]
 
 type TimeRange = "7d" | "30d" | "90d" | "all"
@@ -56,7 +55,8 @@ function buildChartConfig(label: string) {
   return {
     count: {
       label,
-      color: "var(--color-chart-2)",
+      // ChartStyle exposes this as --color-count for series + tooltip.
+      color: "var(--chart-2)",
     },
   }
 }
@@ -166,6 +166,11 @@ export function PostStats({ posts }: PostStatsProps) {
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 8)
+      .map((row, index) => ({
+        ...row,
+        // Payload fill so ChartTooltipContent indicator matches the bar.
+        fill: BAR_COLORS[index % BAR_COLORS.length],
+      }))
   }, [topicFiltered, t])
 
   const renderTimeRangeSelect = (
@@ -212,12 +217,12 @@ export function PostStats({ posts }: PostStatsProps) {
                   <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
                     <stop
                       offset="5%"
-                      stopColor="var(--color-chart-2)"
+                      stopColor="var(--color-count)"
                       stopOpacity={0.3}
                     />
                     <stop
                       offset="95%"
-                      stopColor="var(--color-chart-2)"
+                      stopColor="var(--color-count)"
                       stopOpacity={0.02}
                     />
                   </linearGradient>
@@ -249,7 +254,7 @@ export function PostStats({ posts }: PostStatsProps) {
                 <Area
                   type="monotone"
                   dataKey="count"
-                  stroke="var(--color-chart-2)"
+                  stroke="var(--color-count)"
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#colorCount)"
@@ -303,16 +308,11 @@ export function PostStats({ posts }: PostStatsProps) {
                 />
                 <ChartTooltip
                   cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-                  content={<ChartTooltipContent />}
+                  content={<ChartTooltipContent indicator="dot" />}
                 />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={20}>
-                  {topicData.map((entry, index) => (
-                    <Cell
-                      key={entry.topic}
-                      fill={BAR_COLORS[index % BAR_COLORS.length]}
-                    />
-                  ))}
-                </Bar>
+                {/* Per-row `fill` on topicData drives both the bar and the
+                    tooltip indicator (shadcn chart-data fill pattern). */}
+                <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={20} />
               </BarChart>
             </ChartContainer>
           )}

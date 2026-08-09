@@ -1,6 +1,12 @@
 "use client"
 
-import { useMemo, useState, useEffect, useRef } from "react"
+import {
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+  type CSSProperties,
+} from "react"
 import { useT } from "@/components/layout/trans"
 import { useLocale } from "@/components/layout/i18n-provider"
 import {
@@ -18,13 +24,14 @@ interface ContributionCalendarProps {
 }
 
 const CELL_GAP = 3
-// GitHub-style levels: 0 = none, 4 = heaviest
-const LEVEL_CLASSES = [
-  "bg-muted/50 dark:bg-muted/20",
-  "bg-emerald-200 dark:bg-[#0e4429]",
-  "bg-emerald-400 dark:bg-[#006d32]",
-  "bg-emerald-600 dark:bg-[#26a641]",
-  "bg-emerald-700 dark:bg-[#39d353]",
+// Intensity levels use the shadcn chart-2 token (same family as the
+// posts-over-time series) so cells and tooltip indicators share one palette.
+const LEVEL_COLORS = [
+  "color-mix(in oklch, var(--muted) 70%, transparent)",
+  "color-mix(in oklch, var(--chart-2) 28%, var(--muted))",
+  "color-mix(in oklch, var(--chart-2) 48%, var(--muted))",
+  "color-mix(in oklch, var(--chart-2) 72%, transparent)",
+  "var(--chart-2)",
 ]
 
 function getLevel(count: number): number {
@@ -268,9 +275,9 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
                       "aspect-square w-full rounded-[3px] transition-all",
                       isFuture
                         ? "opacity-30"
-                        : "hover:ring-2 hover:ring-primary/40 hover:ring-offset-1 hover:ring-offset-card",
-                      LEVEL_CLASSES[level]
+                        : "hover:ring-2 hover:ring-primary/40 hover:ring-offset-1 hover:ring-offset-card"
                     )}
+                    style={{ backgroundColor: LEVEL_COLORS[level] }}
                   />
                 )
               })}
@@ -278,9 +285,8 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
           ))}
         </div>
 
-        {/* Tooltip — styled like the shadcn chart tooltip: label (date)
-            on top, value row below, theme-aware surface. Anchored by
-            alignment so the card's overflow-hidden can't clip it. */}
+        {/* Tooltip — same shell + indicator as ChartTooltipContent
+            (dot: size-2.5, rounded-[2px], border/bg via --color-*). */}
         {tooltip && (
           <div
             className={cn(
@@ -295,17 +301,20 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
               <div className="font-medium">
                 {monthFmt.format(new Date(`${tooltip.date}T00:00:00`))}
               </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className={cn(
-                    "size-2.5 shrink-0 rounded-[2px] border",
-                    LEVEL_CLASSES[getLevel(tooltip.count)]
-                  )}
+              <div className="flex w-full items-center gap-2">
+                <div
+                  className="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
+                  style={
+                    {
+                      "--color-bg": LEVEL_COLORS[getLevel(tooltip.count)],
+                      "--color-border": LEVEL_COLORS[getLevel(tooltip.count)],
+                    } as CSSProperties
+                  }
                 />
                 <span className="text-muted-foreground">
                   {t("admin.posts")}
                 </span>
-                <span className="ml-auto font-mono font-medium tabular-nums text-foreground">
+                <span className="ml-auto font-mono font-medium text-foreground tabular-nums">
                   {tooltip.count}
                 </span>
               </div>
@@ -317,8 +326,12 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
       {/* Legend */}
       <div className="mt-2.5 flex items-center justify-end gap-1.5 text-[10px] text-muted-foreground/70">
         <span>{t("admin.contributionLess")}</span>
-        {LEVEL_CLASSES.map((cls, i) => (
-          <span key={i} className={cn("size-2.5 rounded-[3px]", cls)} />
+        {LEVEL_COLORS.map((color, i) => (
+          <span
+            key={i}
+            className="size-2.5 rounded-[2px]"
+            style={{ backgroundColor: color }}
+          />
         ))}
         <span>{t("admin.contributionMore")}</span>
       </div>
