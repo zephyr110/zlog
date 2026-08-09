@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { HeaderActions } from "@/components/admin/header-actions"
 import { PaginationBar } from "@/components/admin/pagination-bar"
 import { ConfirmDeleteDialog } from "@/components/admin/confirm-delete-dialog"
@@ -407,7 +406,7 @@ export default function AdminMediaPage() {
         </div>
       )}
 
-      <div className="relative min-h-0 flex-1 overflow-y-auto">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
       {loading ? (
         // Skeletons mirror the real card/row layout so the page doesn't
         // jump when the data lands.
@@ -417,11 +416,15 @@ export default function AdminMediaPage() {
           <MediaListSkeleton />
         )
       ) : files.length === 0 ? (
-        <Card>
-          <CardContent className="p-0">
-            <AdminBlockEmpty className="min-h-64" />
-          </CardContent>
-        </Card>
+        // Genuine empty already shows the drop zone above — only render
+        // the fill-and-center empty here for filtered/error empties so
+        // the placeholder sits in the middle of the remaining viewport
+        // (same pattern as the posts table filter empty).
+        searchQuery || dateFrom || dateTo || apiError ? (
+          <div className="flex min-h-0 flex-1 flex-col rounded-xl border bg-card">
+            <AdminBlockEmpty className="min-h-0 flex-1" />
+          </div>
+        ) : null
       ) : viewMode === "grid" ? (
         <MediaGrid
           files={files}

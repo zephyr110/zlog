@@ -165,8 +165,8 @@ export default function AdminCommentsPage() {
           </div>
         </div>
       ) : comments.length === 0 ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center rounded-xl bg-card ring-1 ring-foreground/10">
-          <AdminBlockEmpty className="min-h-64" />
+        <div className="flex min-h-0 flex-1 flex-col rounded-xl bg-card ring-1 ring-foreground/10">
+          <AdminBlockEmpty className="min-h-0 flex-1" />
         </div>
       ) : (
         <>

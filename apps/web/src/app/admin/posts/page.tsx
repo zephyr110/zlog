@@ -247,8 +247,8 @@ function AdminPostsContent() {
       </HeaderActions>
 
       {posts.length === 0 ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center rounded-xl bg-card ring-1 ring-foreground/10">
-          <AdminBlockEmpty className="min-h-64" />
+        <div className="flex min-h-0 flex-1 flex-col rounded-xl bg-card ring-1 ring-foreground/10">
+          <AdminBlockEmpty className="min-h-0 flex-1" />
         </div>
       ) : (
         <>
@@ -330,14 +330,24 @@ function AdminPostsContent() {
             )}
           </div>
 
-          {/* Outer flex-1 fills space above the pinned PaginationBar. The
-              table's own container also scrolls vertically (max-h-full) —
-              the sticky thead pins against THAT scrollport, since the
-              inner container is its nearest scrolling ancestor. */}
-          <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border bg-card">
+          {/* Outer flex-1 fills space above the pinned PaginationBar.
+              Empty: flex column so the no-data block fills below thead
+              and centers. With rows: inner table container scrolls and
+              sticky thead pins against that scrollport. */}
+          <div
+            className={
+              paginatedPosts.length === 0
+                ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card"
+                : "min-h-0 flex-1 overflow-y-auto rounded-xl border bg-card"
+            }
+          >
             <Table
               className="table-fixed"
-              containerClassName="max-h-full overflow-y-auto"
+              containerClassName={
+                paginatedPosts.length === 0
+                  ? "shrink-0 overflow-x-auto"
+                  : "max-h-full overflow-y-auto"
+              }
             >
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
@@ -357,23 +367,20 @@ function AdminPostsContent() {
                   </TableHead>
                 </TableRow>
               </TableHeader>
+              {paginatedPosts.length > 0 ? (
               <TableBody>
-                {paginatedPosts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="p-0">
-                      <AdminBlockEmpty className="min-h-48" />
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedPosts.map((post) => (
+                  {paginatedPosts.map((post) => (
                     <TableRow key={post.slug}>
-                      <TableCell className="min-w-0 font-medium">
+                      {/* Title / Pin / Date / Tags share foreground + text-sm;
+                          title uses weight alone for hierarchy. Status stays
+                          a colored badge; empty pin/tag overflow stay muted. */}
+                      <TableCell className="min-w-0">
                         <Link
                           href={`/admin/posts/edit?slug=${encodeURIComponent(
                             post.slug
                           )}`}
                           title={post.title}
-                          className="block truncate hover:text-primary transition-colors"
+                          className="block truncate text-sm font-medium text-foreground transition-colors hover:text-primary"
                         >
                           {post.title}
                         </Link>
@@ -392,14 +399,14 @@ function AdminPostsContent() {
                             : (t("admin.publishedStatus"))}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-center text-muted-foreground">
+                      <TableCell className="text-center">
                         {post.pinnedAt ? (
                           <span
                             title={t("admin.pinned")}
-                            className="inline-flex"
+                            className="inline-flex text-foreground"
                           >
                             <Pin
-                              size={15}
+                              className="size-3.5"
                               strokeWidth={2}
                               aria-label={t("admin.pinned")}
                             />
@@ -407,14 +414,14 @@ function AdminPostsContent() {
                         ) : (
                           <span
                             title={t("admin.notPinned")}
-                            className="inline-flex opacity-35"
+                            className="inline-flex text-sm text-muted-foreground"
                             aria-label={t("admin.notPinned")}
                           >
                             —
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
+                      <TableCell className="whitespace-nowrap text-sm tabular-nums text-foreground">
                         {/* UTC dates — format in UTC so every admin sees
                             the authored date, not the previous day. */}
                         {new Date(post.date).toLocaleDateString(undefined, {
@@ -422,12 +429,12 @@ function AdminPostsContent() {
                         })}
                       </TableCell>
                       <TableCell className="min-w-0">
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap items-center gap-1">
                           {post.tags.slice(0, 3).map((tag) => (
                             <Badge
                               key={tag}
                               variant="outline"
-                              className="max-w-full truncate text-xs font-normal"
+                              className="max-w-full truncate font-normal text-foreground"
                             >
                               {tag}
                             </Badge>
@@ -503,10 +510,13 @@ function AdminPostsContent() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
+                  ))}
               </TableBody>
+              ) : null}
             </Table>
+            {paginatedPosts.length === 0 ? (
+              <AdminBlockEmpty className="min-h-0 flex-1" />
+            ) : null}
           </div>
 
           {/* Pagination — shared with the media library */}
