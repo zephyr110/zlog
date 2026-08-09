@@ -1,7 +1,4 @@
-import { BetaAnalyticsDataClient, protos } from "@google-analytics/data"
-
-type BatchRunReportsResponse =
-  protos.google.analytics.data.v1beta.IBatchRunReportsResponse
+import { GoogleAuth } from "google-auth-library"
 
 export type AnalyticsRange = "today" | "7d" | "28d"
 
@@ -33,10 +30,29 @@ const RANGES: Record<AnalyticsRange, { startDate: string; endDate: string }> = {
 }
 
 const CACHE_TTL_MS = 10 * 60 * 1000
+const GA_SCOPE = "https://www.googleapis.com/auth/analytics.readonly"
 
 type CacheEntry = { expires: number; report: AnalyticsReport }
 
 const reportCache = new Map<AnalyticsRange, CacheEntry>()
+
+type GaRow = {
+  dimensionValues?: { value?: string | null }[] | null
+  metricValues?: { value?: string | null }[] | null
+}
+
+type GaReport = { rows?: GaRow[] | null }
+
+type BatchRunReportsResponse = { reports?: GaReport[] | null }
+
+type RunReportRequest = {
+  dateRanges: { startDate: string; endDate: string }[]
+  metrics: { name: string }[]
+  dimensions?: { name: string }[]
+  orderBys?: { metric: { metricName: string }; desc?: boolean }[]
+  /** GA REST encodes int64 limit as a string. */
+  limit?: string
+}
 
 export function parseAnalyticsRange(raw: string | null): AnalyticsRange {
   if (raw === "today" || raw === "7d" || raw === "28d") return raw
@@ -59,32 +75,13 @@ function normalizePrivateKey(raw: string): string {
   return key
 }
 
-function getClient(): BetaAnalyticsDataClient {
-  const clientEmail = process.env.GA_CLIENT_EMAIL!.trim()
-  const privateKey = normalizePrivateKey(process.env.GA_PRIVATE_KEY!)
-  return new BetaAnalyticsDataClient({
-    credentials: {
-      client_email: clientEmail,
-      private_key: privateKey,
-    },
-    // REST avoids gRPC "Waiting for LB pick" failures on restricted networks.
-    fallback: "rest",
-  })
-}
-
-function metricValue(
-  row: { metricValues?: { value?: string | null }[] | null } | null | undefined,
-  index: number
-): number {
+function metricValue(row: GaRow | null | undefined, index: number): number {
   const raw = row?.metricValues?.[index]?.value
   const n = Number(raw ?? 0)
   return Number.isFinite(n) ? n : 0
 }
 
-function dimValue(
-  row: { dimensionValues?: { value?: string | null }[] | null } | null | undefined,
-  index: number
-): string {
+function dimValue(row: GaRow | null | undefined, index: number): string {
   return row?.dimensionValues?.[index]?.value?.trim() || "(not set)"
 }
 
@@ -114,8 +111,9 @@ function classifyGaError(err: unknown): AnalyticsFetchError {
   // missing GA property Viewer — both surface as PERMISSION_DENIED / 403.
   if (
     code === "7" ||
+    code === "403" ||
     status === "PERMISSION_DENIED" ||
-    /PERMISSION_DENIED|SERVICE_DISABLED|has not been used in project|does not have sufficient permissions|Caller does not have/i.test(
+    /PERMISSION_DENIED|SERVICE_DISABLED|has not been used in project|does not have sufficient permissions|Caller does not have|User does not have sufficient permissions/i.test(
       blob
     ) ||
     (/\b403\b/.test(blob) && /permission|denied|forbidden|disabled/i.test(blob))
@@ -130,6 +128,60 @@ function classifyGaError(err: unknown): AnalyticsFetchError {
   return new AnalyticsFetchError("unavailable", message.slice(0, 200))
 }
 
+async function getAccessToken(): Promise<string> {
+  const auth = new GoogleAuth({
+    credentials: {
+      client_email: process.env.GA_CLIENT_EMAIL!.trim(),
+      private_key: normalizePrivateKey(process.env.GA_PRIVATE_KEY!),
+    },
+    scopes: [GA_SCOPE],
+  })
+  const client = await auth.getClient()
+  const { token } = await client.getAccessToken()
+  if (!token) {
+    throw new AnalyticsFetchError("unavailable", "Failed to obtain Google access token")
+  }
+  return token
+}
+
+/**
+ * Call GA4 Data API over plain HTTPS JSON.
+ * Avoids `@google-analytics/data` REST fallback, which throws
+ * `toProto3JSON: don't know how to convert value 10` for int64 `limit`
+ * on Vercel’s Node runtime.
+ */
+async function batchRunReports(
+  property: string,
+  requests: RunReportRequest[]
+): Promise<BatchRunReportsResponse> {
+  const token = await getAccessToken()
+  const res = await fetch(
+    `https://analyticsdata.googleapis.com/v1beta/${property}:batchRunReports`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ requests }),
+    }
+  )
+  const text = await res.text()
+  if (!res.ok) {
+    let status = ""
+    try {
+      status = String((JSON.parse(text) as { error?: { status?: string } }).error?.status ?? "")
+    } catch {
+      /* ignore */
+    }
+    throw Object.assign(new Error(text.slice(0, 500)), {
+      code: String(res.status),
+      status,
+    })
+  }
+  return JSON.parse(text) as BatchRunReportsResponse
+}
+
 /** Fetch GA4 report for a range (cached ~10 minutes). */
 export async function fetchAnalyticsReport(
   range: AnalyticsRange
@@ -140,48 +192,42 @@ export async function fetchAnalyticsReport(
   const propertyId = process.env.GA_PROPERTY_ID!.trim()
   const property = `properties/${propertyId}`
   const dateRange = RANGES[range]
-  const client = getClient()
 
-  // Do not use ReturnType<typeof client.batchRunReports> — the callback
-  // overloads make that resolve to void under TypeScript.
   let batch: BatchRunReportsResponse
   try {
-    ;[batch] = await client.batchRunReports({
-      property,
-      requests: [
-        {
-          dateRanges: [dateRange],
-          metrics: [{ name: "activeUsers" }, { name: "screenPageViews" }],
-        },
-        {
-          dateRanges: [dateRange],
-          dimensions: [{ name: "pagePath" }],
-          metrics: [{ name: "screenPageViews" }],
-          orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
-          limit: 10,
-        },
-        {
-          dateRanges: [dateRange],
-          dimensions: [{ name: "sessionDefaultChannelGroup" }],
-          metrics: [{ name: "activeUsers" }],
-          orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
-          limit: 10,
-        },
-        {
-          dateRanges: [dateRange],
-          dimensions: [{ name: "deviceCategory" }],
-          metrics: [{ name: "activeUsers" }],
-          orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
-        },
-        {
-          dateRanges: [dateRange],
-          dimensions: [{ name: "country" }],
-          metrics: [{ name: "activeUsers" }],
-          orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
-          limit: 10,
-        },
-      ],
-    })
+    batch = await batchRunReports(property, [
+      {
+        dateRanges: [dateRange],
+        metrics: [{ name: "activeUsers" }, { name: "screenPageViews" }],
+      },
+      {
+        dateRanges: [dateRange],
+        dimensions: [{ name: "pagePath" }],
+        metrics: [{ name: "screenPageViews" }],
+        orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
+        limit: "10",
+      },
+      {
+        dateRanges: [dateRange],
+        dimensions: [{ name: "sessionDefaultChannelGroup" }],
+        metrics: [{ name: "activeUsers" }],
+        orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+        limit: "10",
+      },
+      {
+        dateRanges: [dateRange],
+        dimensions: [{ name: "deviceCategory" }],
+        metrics: [{ name: "activeUsers" }],
+        orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+      },
+      {
+        dateRanges: [dateRange],
+        dimensions: [{ name: "country" }],
+        metrics: [{ name: "activeUsers" }],
+        orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+        limit: "10",
+      },
+    ])
   } catch (err) {
     throw classifyGaError(err)
   }
