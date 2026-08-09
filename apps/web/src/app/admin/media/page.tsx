@@ -12,7 +12,8 @@ import { MediaList, MediaListSkeleton } from "@/components/admin/media-list"
 import { Input } from "@/components/ui/input"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
-import { ImageIcon, Upload, LayoutGrid, List, X, Search, TriangleAlert } from "lucide-react"
+import { Upload, LayoutGrid, List, X, Search, TriangleAlert } from "lucide-react"
+import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { useLocale } from "@/components/layout/i18n-provider"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { IconButton } from "@/components/ui/icon-button"
@@ -417,20 +418,8 @@ export default function AdminMediaPage() {
         )
       ) : files.length === 0 ? (
         <Card>
-          <CardContent className="py-20 text-center">
-            <div className="mb-4">
-              <ImageIcon size={48} className="mx-auto text-muted-foreground" aria-hidden="true" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">
-              {searchQuery || dateFrom || dateTo
-                ? (t("admin.noMatchMedia"))
-                : (t("admin.noImages"))}
-            </h3>
-            <p className="text-muted-foreground mb-4">
-              {searchQuery || dateFrom || dateTo
-                ? (t("admin.noMatchMediaDesc"))
-                : (t("admin.noImagesDesc"))}
-            </p>
+          <CardContent className="p-0">
+            <AdminBlockEmpty className="min-h-64" />
           </CardContent>
         </Card>
       ) : viewMode === "grid" ? (

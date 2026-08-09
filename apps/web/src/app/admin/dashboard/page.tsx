@@ -8,13 +8,13 @@ import { TrafficAnalytics } from "@/components/admin/traffic-analytics"
 import { ContributionCalendar } from "@/components/admin/contribution-calendar"
 import { FormattedDate } from "@/components/blog/formatted-date"
 import { Skeleton } from "@/components/ui/skeleton"
-import { EmptyState } from "@/components/ui/empty-state"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
 import { fetchAdminPosts } from "@/lib/admin-posts"
 import { useCommentUnread } from "@/components/admin/comment-unread"
 import { cn } from "@/lib/utils"
 import { FileText, PenLine, Clock, Tag, MessageSquare } from "lucide-react"
+import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { type PostSummary } from "@zlog/database"
 
 export default function AdminDashboardPage() {
@@ -79,36 +79,10 @@ export default function AdminDashboardPage() {
   ]
 
   if (loading) {
-    // Mirrors the loaded layout 1:1 — Statistics (title + stat cards +
-    // calendar card), the two chart cards, then recent posts — same grid
-    // columns, card chrome, and content heights so the swap to real data
-    // causes no layout shift.
+    // Mirrors the loaded layout 1:1 — Statistics, Insights charts, Traffic
+    // (above recent posts), then recent posts.
     return (
       <div className="flex flex-col gap-8 md:gap-10">
-        {/* Traffic — independent client fetch; skeleton mirrors its chrome */}
-        <section className="flex flex-col gap-5 md:gap-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Skeleton className="h-7 w-24" />
-            <Skeleton className="h-8 w-44 rounded-lg" />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
-            {[0, 1].map((i) => (
-              <div
-                key={i}
-                className="flex flex-col gap-4 rounded-xl bg-card py-4 ring-1 ring-foreground/10"
-              >
-                <div className="flex items-start justify-between px-4">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="size-8 rounded-lg" />
-                </div>
-                <div className="px-4">
-                  <Skeleton className="h-9 w-16" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
         <section className="flex flex-col gap-5 md:gap-6">
           <Skeleton className="h-7 w-32" />
 
@@ -173,6 +147,47 @@ export default function AdminDashboardPage() {
           </div>
         </section>
 
+        {/* Traffic — mirrors TrafficAnalytics chrome (header + 2 totals + 4 panels) */}
+        <section className="flex flex-col gap-5 md:gap-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Skeleton className="h-7 w-24" />
+            <Skeleton className="h-8 w-44 rounded-lg" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+            {[0, 1].map((i) => (
+              <div
+                key={i}
+                className="flex flex-col gap-4 rounded-xl bg-card py-4 ring-1 ring-foreground/10"
+              >
+                <div className="flex items-start justify-between px-4">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="size-8 rounded-lg" />
+                </div>
+                <div className="px-4">
+                  <Skeleton className="h-9 w-16" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="flex flex-col gap-3 rounded-xl bg-card py-4 ring-1 ring-foreground/10"
+              >
+                <div className="px-4">
+                  <Skeleton className="h-4 w-28" />
+                </div>
+                <div className="flex flex-col gap-3 px-4 pb-2">
+                  {Array.from({ length: 4 }).map((_, j) => (
+                    <Skeleton key={j} className="h-6 w-full" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Recent posts — section header + list */}
         <div className="flex flex-col gap-5">
           <div className="flex items-center justify-between">
@@ -180,7 +195,7 @@ export default function AdminDashboardPage() {
             <Skeleton className="h-4 w-16" />
           </div>
           <div className="flex flex-col gap-3">
-            {Array.from({ length: 5 }).map((_, i) => (
+            {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
                 className="flex items-center justify-between rounded-xl bg-card px-4 py-4 ring-1 ring-foreground/10"
@@ -200,8 +215,6 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="flex flex-col gap-8 md:gap-10">
-      <TrafficAnalytics />
-
       {/* Statistics — stat cards + contribution calendar */}
       <section className="flex flex-col gap-5 md:gap-6">
         <h2 className="text-xl font-semibold tracking-tight">
@@ -276,6 +289,8 @@ export default function AdminDashboardPage() {
         <PostStats posts={posts} />
       </section>
 
+      <TrafficAnalytics />
+
       {/* Recent Posts */}
       <div className="flex flex-col gap-5">
         <div className="flex items-center justify-between gap-4">
@@ -291,22 +306,12 @@ export default function AdminDashboardPage() {
           </Link>
         </div>
         {posts.length === 0 ? (
-          <EmptyState
-            icon={<FileText size={32} className="text-muted-foreground" />}
-            title={t("admin.noPostsYet")}
-            description={t("admin.noPostsYetDesc")}
-            action={
-              <Link
-                href="/admin/posts/new"
-                className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/80"
-              >
-                {t("admin.createFirstPost")}
-              </Link>
-            }
-          />
+          <div className="rounded-xl bg-card ring-1 ring-foreground/10">
+            <AdminBlockEmpty className="min-h-48" />
+          </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {posts.slice(0, 5).map((post) => (
+            {posts.slice(0, 3).map((post) => (
               <Card
                 key={post.slug}
                 className="transition-colors hover:border-primary/10"

@@ -19,8 +19,9 @@ import { Spinner } from "@/components/ui/spinner"
 import { apiFetch } from "@/lib/api-client"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
-import { ImageIcon, Upload } from "lucide-react"
+import { Upload } from "lucide-react"
 import type { MediaFile } from "@/components/admin/media-lightbox"
+import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import {
   UPLOAD_ACCEPT,
   uploadImageFile,
@@ -284,25 +285,7 @@ export function MediaPickerDialog({
         ) : loading ? (
           <Spinner size="md" fill className="min-h-64" />
         ) : files.length === 0 ? (
-          <div className="py-16 text-center">
-            <ImageIcon
-              size={40}
-              className="mx-auto text-muted-foreground mb-3"
-              aria-hidden="true"
-            />
-            <p className="text-muted-foreground text-sm mb-2">
-              {t("admin.noImages")}
-            </p>
-            {/* Hard navigation on purpose: fires the editor's beforeunload
-                unsaved-changes guard when navigating away with edits. */}
-            <a
-              href="/admin/media"
-              onClick={() => onOpenChange(false)}
-              className="text-primary text-sm hover:underline"
-            >
-              {t("admin.goToMedia")}
-            </a>
-          </div>
+          <AdminBlockEmpty className="min-h-64" />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {files.map((file) => (

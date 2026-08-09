@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
 import {
+  AnalyticsFetchError,
   fetchAnalyticsReport,
   isGaConfigured,
   parseAnalyticsRange,
@@ -29,9 +30,15 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (err) {
-    console.error("[analytics]", err instanceof Error ? err.message : err)
+    const kind =
+      err instanceof AnalyticsFetchError ? err.kind : "unavailable"
+    console.error(
+      "[analytics]",
+      kind,
+      err instanceof Error ? err.message : err
+    )
     return NextResponse.json(
-      { configured: true, error: "Analytics unavailable" },
+      { configured: true, error: kind },
       { status: 502 }
     )
   }

@@ -5,6 +5,7 @@ import { Users, Eye } from "lucide-react"
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/ui/empty-state"
+import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { useT } from "@/components/layout/trans"
 import { apiFetch } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
@@ -12,11 +13,20 @@ import type { AnalyticsRange, AnalyticsReport } from "@/lib/ga-analytics"
 
 const RANGES: AnalyticsRange[] = ["today", "7d", "28d"]
 
+type ErrorKind = "timeout" | "permission" | "unavailable"
+
 type FetchState =
   | { status: "loading" }
   | { status: "unconfigured" }
-  | { status: "error" }
+  | { status: "error"; kind: ErrorKind }
   | { status: "ok"; data: AnalyticsReport }
+
+function parseErrorKind(raw: unknown): ErrorKind {
+  if (raw === "timeout" || raw === "permission" || raw === "unavailable") {
+    return raw
+  }
+  return "unavailable"
+}
 
 function RankList({
   rows,
@@ -24,15 +34,13 @@ function RankList({
   rows: { label: string; value: number }[]
 }) {
   if (rows.length === 0) {
-    return (
-      <p className="px-4 py-6 text-sm text-muted-foreground">—</p>
-    )
+    return <AdminBlockEmpty className="min-h-0 flex-1" />
   }
   const max = Math.max(...rows.map((r) => r.value), 1)
   return (
     <ul className="flex flex-col gap-2.5 px-4 pb-4">
-      {rows.map((row) => (
-        <li key={row.label} className="flex flex-col gap-1">
+      {rows.map((row, i) => (
+        <li key={`${row.label}-${i}`} className="flex flex-col gap-1">
           <div className="flex items-baseline justify-between gap-3 text-sm">
             <span className="min-w-0 truncate font-medium" title={row.label}>
               {row.label}
@@ -71,13 +79,20 @@ export function TrafficAnalytics() {
           return
         }
         if (!res.ok) {
-          setState({ status: "error" })
+          let kind: ErrorKind = "unavailable"
+          try {
+            const body = (await res.json()) as { error?: unknown }
+            kind = parseErrorKind(body.error)
+          } catch {
+            /* ignore */
+          }
+          if (!cancelled) setState({ status: "error", kind })
           return
         }
         const data = (await res.json()) as AnalyticsReport
-        setState({ status: "ok", data })
+        if (!cancelled) setState({ status: "ok", data })
       } catch {
-        if (!cancelled) setState({ status: "error" })
+        if (!cancelled) setState({ status: "error", kind: "timeout" })
       }
     }
 
@@ -129,8 +144,20 @@ export function TrafficAnalytics() {
       ) : state.status === "error" ? (
         <EmptyState
           className="rounded-xl bg-card py-12 ring-1 ring-foreground/10"
-          title={t("admin.analyticsLoadFailed")}
-          description={t("admin.analyticsLoadFailedDesc")}
+          title={
+            state.kind === "timeout"
+              ? t("admin.analyticsTimeout")
+              : state.kind === "permission"
+                ? t("admin.analyticsPermission")
+                : t("admin.analyticsLoadFailed")
+          }
+          description={
+            state.kind === "timeout"
+              ? t("admin.analyticsTimeoutDesc")
+              : state.kind === "permission"
+                ? t("admin.analyticsPermissionDesc")
+                : t("admin.analyticsLoadFailedDesc")
+          }
         />
       ) : (
         <>
@@ -172,58 +199,49 @@ export function TrafficAnalytics() {
           </div>
 
           <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
-            <Card className="py-4">
-              <CardHeader className="px-4">
-                <CardTitle className="text-sm font-medium">
-                  {t("admin.analyticsTopPages")}
-                </CardTitle>
-              </CardHeader>
-              <RankList
-                rows={state.data.topPages.map((p) => ({
-                  label: p.path,
-                  value: p.views,
-                }))}
-              />
-            </Card>
-            <Card className="py-4">
-              <CardHeader className="px-4">
-                <CardTitle className="text-sm font-medium">
-                  {t("admin.analyticsSources")}
-                </CardTitle>
-              </CardHeader>
-              <RankList
-                rows={state.data.sources.map((s) => ({
-                  label: s.source,
-                  value: s.users,
-                }))}
-              />
-            </Card>
-            <Card className="py-4">
-              <CardHeader className="px-4">
-                <CardTitle className="text-sm font-medium">
-                  {t("admin.analyticsDevices")}
-                </CardTitle>
-              </CardHeader>
-              <RankList
-                rows={state.data.devices.map((d) => ({
-                  label: d.device,
-                  value: d.users,
-                }))}
-              />
-            </Card>
-            <Card className="py-4">
-              <CardHeader className="px-4">
-                <CardTitle className="text-sm font-medium">
-                  {t("admin.analyticsCountries")}
-                </CardTitle>
-              </CardHeader>
-              <RankList
-                rows={state.data.countries.map((c) => ({
-                  label: c.country,
-                  value: c.users,
-                }))}
-              />
-            </Card>
+            {(
+              [
+                {
+                  title: t("admin.analyticsTopPages"),
+                  rows: state.data.topPages.map((p) => ({
+                    label: p.path,
+                    value: p.views,
+                  })),
+                },
+                {
+                  title: t("admin.analyticsSources"),
+                  rows: state.data.sources.map((s) => ({
+                    label: s.source,
+                    value: s.users,
+                  })),
+                },
+                {
+                  title: t("admin.analyticsDevices"),
+                  rows: state.data.devices.map((d) => ({
+                    label: d.device,
+                    value: d.users,
+                  })),
+                },
+                {
+                  title: t("admin.analyticsCountries"),
+                  rows: state.data.countries.map((c) => ({
+                    label: c.country,
+                    value: c.users,
+                  })),
+                },
+              ] as const
+            ).map((panel) => (
+              <Card key={panel.title} className="flex flex-col py-4">
+                <CardHeader className="px-4">
+                  <CardTitle className="text-sm font-medium">
+                    {panel.title}
+                  </CardTitle>
+                </CardHeader>
+                <div className="flex min-h-40 flex-1 flex-col">
+                  <RankList rows={panel.rows} />
+                </div>
+              </Card>
+            ))}
           </div>
         </>
       )}

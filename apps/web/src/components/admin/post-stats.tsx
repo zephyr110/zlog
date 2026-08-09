@@ -32,6 +32,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 import { useT } from "@/components/layout/trans"
+import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { resolveCategory, getCategoryLabel } from "@/lib/categories"
 import { type PostSummary } from "@zlog/database"
 
@@ -200,9 +201,7 @@ export function PostStats({ posts }: PostStatsProps) {
         </CardHeader>
         <CardContent className="pt-0">
           {timelineData.length === 0 ? (
-            <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-              {t("admin.noDataForRange")}
-            </div>
+            <AdminBlockEmpty className="h-[240px] py-0" />
           ) : (
             <ChartContainer
               config={chartConfig}
@@ -271,9 +270,7 @@ export function PostStats({ posts }: PostStatsProps) {
         </CardHeader>
         <CardContent className="pt-0">
           {topicData.length === 0 ? (
-            <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-              {t("admin.noTopics")}
-            </div>
+            <AdminBlockEmpty className="h-[240px] py-0" />
           ) : (
             <ChartContainer
               config={chartConfig}

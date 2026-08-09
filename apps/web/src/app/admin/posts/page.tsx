@@ -3,13 +3,13 @@
 import { useEffect, useState, useMemo, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Ellipsis, Search, FileText, SquarePen, Eye, Globe, FilePen, Trash2, Pin } from "lucide-react"
+import { Ellipsis, Search, SquarePen, Eye, Globe, FilePen, Trash2, Pin } from "lucide-react"
 import { TableSkeleton } from "@/components/ui/loading"
 import { Skeleton } from "@/components/ui/skeleton"
 import { HeaderActions } from "@/components/admin/header-actions"
 import { PaginationBar } from "@/components/admin/pagination-bar"
 import { ConfirmDeleteDialog } from "@/components/admin/confirm-delete-dialog"
-import { EmptyState } from "@/components/ui/empty-state"
+import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -247,19 +247,9 @@ function AdminPostsContent() {
       </HeaderActions>
 
       {posts.length === 0 ? (
-        <EmptyState
-          icon={<FileText size={32} className="text-muted-foreground" />}
-          title={t("admin.noPostsYet")}
-          description={t("admin.noPostsYetDesc")}
-          action={
-            <Link
-              href="/admin/posts/new"
-              className="inline-flex h-9 items-center rounded-lg bg-primary text-primary-foreground text-sm font-medium px-3 hover:bg-primary/80"
-            >
-              {t("admin.createFirstPost")}
-            </Link>
-          }
-        />
+        <div className="flex min-h-0 flex-1 items-center justify-center rounded-xl bg-card ring-1 ring-foreground/10">
+          <AdminBlockEmpty className="min-h-64" />
+        </div>
       ) : (
         <>
           {/* Search & Filter */}
@@ -370,8 +360,8 @@ function AdminPostsContent() {
               <TableBody>
                 {paginatedPosts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-16 text-center text-muted-foreground">
-                      {t("admin.noMatchSearch")}
+                    <TableCell colSpan={6} className="p-0">
+                      <AdminBlockEmpty className="min-h-48" />
                     </TableCell>
                   </TableRow>
                 ) : (

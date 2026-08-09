@@ -12,6 +12,17 @@ export type AnalyticsReport = {
   countries: { country: string; users: number }[]
 }
 
+export type AnalyticsFetchErrorKind = "timeout" | "permission" | "unavailable"
+
+export class AnalyticsFetchError extends Error {
+  kind: AnalyticsFetchErrorKind
+  constructor(kind: AnalyticsFetchErrorKind, message: string) {
+    super(message)
+    this.kind = kind
+    this.name = "AnalyticsFetchError"
+  }
+}
+
 const RANGES: Record<AnalyticsRange, { startDate: string; endDate: string }> = {
   today: { startDate: "today", endDate: "today" },
   "7d": { startDate: "7daysAgo", endDate: "today" },
@@ -37,14 +48,24 @@ export function isGaConfigured(): boolean {
   )
 }
 
+function normalizePrivateKey(raw: string): string {
+  // .env often stores PEM with literal \n; some editors paste real newlines.
+  let key = raw.trim().replace(/^["']|["']$/g, "")
+  key = key.replace(/\\n/g, "\n")
+  if (!key.endsWith("\n")) key += "\n"
+  return key
+}
+
 function getClient(): BetaAnalyticsDataClient {
   const clientEmail = process.env.GA_CLIENT_EMAIL!.trim()
-  const privateKey = process.env.GA_PRIVATE_KEY!.replace(/\\n/g, "\n")
+  const privateKey = normalizePrivateKey(process.env.GA_PRIVATE_KEY!)
   return new BetaAnalyticsDataClient({
     credentials: {
       client_email: clientEmail,
       private_key: privateKey,
     },
+    // REST avoids gRPC "Waiting for LB pick" failures on restricted networks.
+    fallback: "rest",
   })
 }
 
@@ -64,6 +85,39 @@ function dimValue(
   return row?.dimensionValues?.[index]?.value?.trim() || "(not set)"
 }
 
+function classifyGaError(err: unknown): AnalyticsFetchError {
+  const message = err instanceof Error ? err.message : String(err)
+  const code =
+    typeof err === "object" && err && "code" in err
+      ? String((err as { code: unknown }).code)
+      : ""
+
+  if (
+    /DEADLINE_EXCEEDED|ETIMEDOUT|ECONNRESET|ENOTFOUND|EAI_AGAIN|network/i.test(
+      `${code} ${message}`
+    )
+  ) {
+    return new AnalyticsFetchError(
+      "timeout",
+      "Cannot reach Google Analytics Data API (network timeout)"
+    )
+  }
+  if (
+    code === "7" ||
+    /PERMISSION_DENIED|does not have sufficient permissions|Caller does not have/i.test(
+      `${code} ${message}`
+    ) ||
+    (/\b403\b/.test(`${code} ${message}`) &&
+      /permission|denied|forbidden/i.test(message))
+  ) {
+    return new AnalyticsFetchError(
+      "permission",
+      "Service account lacks access to this GA4 property"
+    )
+  }
+  return new AnalyticsFetchError("unavailable", message.slice(0, 200))
+}
+
 /** Fetch GA4 report for a range (cached ~10 minutes). */
 export async function fetchAnalyticsReport(
   range: AnalyticsRange
@@ -76,42 +130,47 @@ export async function fetchAnalyticsReport(
   const dateRange = RANGES[range]
   const client = getClient()
 
-  const [batch] = await client.batchRunReports({
-    property,
-    requests: [
-      {
-        dateRanges: [dateRange],
-        metrics: [{ name: "activeUsers" }, { name: "screenPageViews" }],
-      },
-      {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "pagePath" }],
-        metrics: [{ name: "screenPageViews" }],
-        orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
-        limit: 10,
-      },
-      {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "sessionDefaultChannelGroup" }],
-        metrics: [{ name: "activeUsers" }],
-        orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
-        limit: 10,
-      },
-      {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "deviceCategory" }],
-        metrics: [{ name: "activeUsers" }],
-        orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
-      },
-      {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "country" }],
-        metrics: [{ name: "activeUsers" }],
-        orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
-        limit: 10,
-      },
-    ],
-  })
+  let batch: Awaited<ReturnType<typeof client.batchRunReports>>[0]
+  try {
+    ;[batch] = await client.batchRunReports({
+      property,
+      requests: [
+        {
+          dateRanges: [dateRange],
+          metrics: [{ name: "activeUsers" }, { name: "screenPageViews" }],
+        },
+        {
+          dateRanges: [dateRange],
+          dimensions: [{ name: "pagePath" }],
+          metrics: [{ name: "screenPageViews" }],
+          orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
+          limit: 10,
+        },
+        {
+          dateRanges: [dateRange],
+          dimensions: [{ name: "sessionDefaultChannelGroup" }],
+          metrics: [{ name: "activeUsers" }],
+          orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+          limit: 10,
+        },
+        {
+          dateRanges: [dateRange],
+          dimensions: [{ name: "deviceCategory" }],
+          metrics: [{ name: "activeUsers" }],
+          orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+        },
+        {
+          dateRanges: [dateRange],
+          dimensions: [{ name: "country" }],
+          metrics: [{ name: "activeUsers" }],
+          orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+          limit: 10,
+        },
+      ],
+    })
+  } catch (err) {
+    throw classifyGaError(err)
+  }
 
   const reports = batch.reports ?? []
   const totalsRow = reports[0]?.rows?.[0]

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { MessageSquare, Reply, FileText, Mail, Trash2, Check } from "lucide-react"
+import { Reply, FileText, Mail, Trash2, Check } from "lucide-react"
 import { apiFetch } from "@/lib/api-client"
 import { useCommentUnread } from "@/components/admin/comment-unread"
 import { useT } from "@/components/layout/trans"
@@ -15,7 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { CommentInboxCardSkeleton } from "@/components/ui/loading"
-import { EmptyState } from "@/components/ui/empty-state"
+import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { PaginationBar } from "@/components/admin/pagination-bar"
 import { HeaderActions } from "@/components/admin/header-actions"
 import { CommentAvatar } from "@/components/blog/comment-avatar"
@@ -165,12 +165,8 @@ export default function AdminCommentsPage() {
           </div>
         </div>
       ) : comments.length === 0 ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center">
-          <EmptyState
-            icon={<MessageSquare size={32} className="text-muted-foreground" />}
-            title={t("admin.commentsEmpty")}
-            className="py-0"
-          />
+        <div className="flex min-h-0 flex-1 items-center justify-center rounded-xl bg-card ring-1 ring-foreground/10">
+          <AdminBlockEmpty className="min-h-64" />
         </div>
       ) : (
         <>
