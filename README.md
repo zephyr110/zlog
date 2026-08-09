@@ -26,6 +26,8 @@ Static mirror (GitHub Pages): [zephyr110.github.io](https://zephyr110.github.io)
 - **Custom logo & favicon** — upload your own logo in Site Settings; the favicon follows it automatically
 - **Bilingual & themable** — zh/en switching, light/dark/system themes
 - **Self-hosted comments** — guest comments with no login required; Cloudflare Turnstile + rate limits + content filters against spam; unread-badge inbox in the admin panel
+- **Traffic analytics** — optional GA4 site tag (`NEXT_PUBLIC_GA_MEASUREMENT_ID`) plus admin dashboard reports via the GA4 Data API (Vercel / local `pnpm dev`)
+- **Pre-commit checks** — Husky runs `pnpm check` (ESLint + `tsc --noEmit`) before each commit
 
 ## Architecture
 
@@ -52,7 +54,7 @@ Full Next.js server deployment. Blog pages and `/api/*` run as Server Components
 | Data | Request-time from Turso |
 | Content updates | Publish in `/admin` → live within ~60s; **no redeploy** for posts |
 | Code updates | Push `main` → Vercel rebuilds the app |
-| Secrets | Vercel Environment Variables (`TURSO_*`, `SESSION_SECRET`, …) |
+| Secrets | Vercel Environment Variables (`TURSO_*`, `SESSION_SECRET`, optional `GA_*`, …) |
 
 Setup: import the repo → Root Directory `apps/web` → Build Command `pnpm build` → set env vars. Do **not** use `pnpm export` on Vercel (that drops SSR and admin).
 
@@ -76,17 +78,19 @@ See the [deployment guide](https://zephyr110.vercel.app/posts/zlog-deployment-gu
 
 ### Prerequisites
 
-Node.js 20+ · pnpm 9+
+Node.js 20+ · pnpm 11+ (see root `packageManager`)
 
 ### Install & run
 
 ```bash
-pnpm install
+pnpm install      # also installs Husky git hooks via prepare
 cd apps/web && cp .env.local.example .env.local   # fill in the values
 pnpm dev          # blog at :3000, admin at /admin/login
 ```
 
 Key env vars: `TURSO_DATABASE_URL` (use `file:./zlog.db` for local dev), `TURSO_AUTH_TOKEN`, `SESSION_SECRET`, `ADMIN_USERNAME` / `ADMIN_PASSWORD_HASH` (seed the admin user on first login), `NEXT_PUBLIC_SITE_URL`, and for guest comments `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` (free Cloudflare Turnstile widget — see `apps/web/.env.local.example` for the local-dev test keys).
+
+Optional GA4: `NEXT_PUBLIC_GA_MEASUREMENT_ID` (public gtag), plus server-only `GA_PROPERTY_ID` / `GA_CLIENT_EMAIL` / `GA_PRIVATE_KEY` for admin Traffic reports. Enable the **Google Analytics Data API** on the GCP project and add the service account as **Viewer** on the GA4 property. Details: `apps/web/.env.local.example` and the [deployment guide](https://zephyr110.vercel.app/posts/zlog-deployment-guide).
 
 Create or reset the admin user without env vars:
 
@@ -94,12 +98,15 @@ Create or reset the admin user without env vars:
 pnpm create-admin --username admin --password "your-password"
 ```
 
-### Build commands
+### Build & quality checks
 
 ```bash
 pnpm build       # Vercel / Node — SSR + admin
 pnpm export      # static export to apps/web/out (GitHub Pages)
+pnpm check       # lint + typecheck (also run by Husky on commit)
 ```
+
+Skip hooks when needed: `HUSKY=0 git commit …`.
 
 ## License
 

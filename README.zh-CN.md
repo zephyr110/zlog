@@ -26,6 +26,8 @@
 - **自定义 Logo 与 Favicon** — 在站点设置中上传自己的 Logo，Favicon 自动跟随
 - **双语与主题** — 中/英切换，浅色/深色/跟随系统
 - **自建评论** — 游客免登录评论；Cloudflare Turnstile + 限流 + 内容过滤防垃圾；admin 后台含未读徽标收件箱
+- **流量分析** — 可选 GA4 站点埋点（`NEXT_PUBLIC_GA_MEASUREMENT_ID`），后台仪表盘通过 GA4 Data API 展示报表（Vercel / 本地 `pnpm dev`）
+- **提交前检查** — Husky 在 commit 前执行 `pnpm check`（ESLint + `tsc --noEmit`）
 
 ## 核心架构
 
@@ -52,7 +54,7 @@ pnpm monorepo：
 | 数据 | 请求时从 Turso 读取 |
 | 内容更新 | `/admin` 发布后约 60 秒内可见，**不必为发文 Redeploy** |
 | 代码更新 | push `main` → Vercel 重建应用 |
-| 凭据 | Vercel Environment Variables（`TURSO_*`、`SESSION_SECRET` 等） |
+| 凭据 | Vercel Environment Variables（`TURSO_*`、`SESSION_SECRET`、可选 `GA_*` 等） |
 
 配置：导入仓库 → Root Directory 设为 `apps/web` → Build Command 用 `pnpm build` → 填写环境变量。**不要**在 Vercel 上跑 `pnpm export`（会丢掉 SSR 与后台）。
 
@@ -76,17 +78,19 @@ CI 执行 `pnpm export`（`NEXT_EXPORT=true`），在**构建时**查询 Turso�
 
 ### 环境要求
 
-Node.js 20+ · pnpm 9+
+Node.js 20+ · pnpm 11+（见根目录 `packageManager`）
 
 ### 安装与运行
 
 ```bash
-pnpm install
+pnpm install      # prepare 会安装 Husky git hooks
 cd apps/web && cp .env.local.example .env.local   # 填写配置
 pnpm dev          # 博客 :3000，后台 /admin/login
 ```
 
 关键环境变量：`TURSO_DATABASE_URL`（本地开发用 `file:./zlog.db`）、`TURSO_AUTH_TOKEN`、`SESSION_SECRET`、`ADMIN_USERNAME` / `ADMIN_PASSWORD_HASH`（首次登录时播种管理员账号）、`NEXT_PUBLIC_SITE_URL`，以及评论功能所需的 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`（免费 Cloudflare Turnstile widget，本地开发测试 key 见 `apps/web/.env.local.example`）。
+
+可选 GA4：`NEXT_PUBLIC_GA_MEASUREMENT_ID`（前台 gtag），以及服务端 `GA_PROPERTY_ID` / `GA_CLIENT_EMAIL` / `GA_PRIVATE_KEY`（后台 Traffic 报表）。需在 GCP 项目启用 **Google Analytics Data API**，并把服务账号加为 GA4 媒体资源的 **查看者**。详见 `apps/web/.env.local.example` 与[部署指南](https://zephyr110.vercel.app/posts/zlog-deployment-guide)。
 
 不依赖环境变量创建/重置管理员：
 
@@ -94,12 +98,15 @@ pnpm dev          # 博客 :3000，后台 /admin/login
 pnpm create-admin --username admin --password "your-password"
 ```
 
-### 构建命令
+### 构建与质量检查
 
 ```bash
 pnpm build       # Vercel / Node — SSR + 后台
 pnpm export      # 静态导出到 apps/web/out（GitHub Pages）
+pnpm check       # lint + typecheck（Husky 提交前也会跑）
 ```
+
+需要跳过 hooks 时：`HUSKY=0 git commit …`。
 
 ## License
 
