@@ -136,7 +136,8 @@ analyticsLoadFailedDesc: "请稍后重试，或检查服务账号是否已加入
 analyticsTimeout: "无法连接 Google Analytics",
 analyticsTimeoutDesc: "本机访问 Google API 超时（常见于需代理的网络）。可开代理后重试，或部署到 Vercel 后再看后台报表。",
 analyticsPermission: "服务账号没有权限",
-analyticsPermissionDesc: "请把服务账号邮箱加到该 GA4 媒体资源，角色选「查看者」。",
+analyticsPermissionDesc:
+  "请在 GCP 项目中启用 Google Analytics Data API，并把服务账号邮箱加到该 GA4 媒体资源（角色选「查看者」）。",
 insights: "数据洞察",
 postsCalendar: "发布日历",
 calendarRecent: "最近一年",
@@ -407,7 +408,8 @@ analyticsLoadFailedDesc: "Try again later, or check that the service account is 
 analyticsTimeout: "Can’t reach Google Analytics",
 analyticsTimeoutDesc: "Timed out calling Google’s API (common on networks that need a proxy). Retry with a proxy, or check the dashboard after deploying to Vercel.",
 analyticsPermission: "Service account lacks access",
-analyticsPermissionDesc: "Add the service account email to this GA4 property with the Viewer role.",
+analyticsPermissionDesc:
+  "Enable the Google Analytics Data API on the GCP project, and add the service account email to this GA4 property with the Viewer role.",
 insights: "Insights",
 postsCalendar: "Post Calendar",
 calendarRecent: "Past year",

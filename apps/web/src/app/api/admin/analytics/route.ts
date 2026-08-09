@@ -32,13 +32,11 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     const kind =
       err instanceof AnalyticsFetchError ? err.kind : "unavailable"
-    console.error(
-      "[analytics]",
-      kind,
-      err instanceof Error ? err.message : err
-    )
+    const message =
+      err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300)
+    console.error("[analytics]", kind, message)
     return NextResponse.json(
-      { configured: true, error: kind },
+      { configured: true, error: kind, message },
       { status: 502 }
     )
   }

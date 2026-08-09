@@ -94,10 +94,15 @@ function classifyGaError(err: unknown): AnalyticsFetchError {
     typeof err === "object" && err && "code" in err
       ? String((err as { code: unknown }).code)
       : ""
+  const status =
+    typeof err === "object" && err && "status" in err
+      ? String((err as { status: unknown }).status)
+      : ""
+  const blob = `${code} ${status} ${message}`
 
   if (
     /DEADLINE_EXCEEDED|ETIMEDOUT|ECONNRESET|ENOTFOUND|EAI_AGAIN|network/i.test(
-      `${code} ${message}`
+      blob
     )
   ) {
     return new AnalyticsFetchError(
@@ -105,17 +110,21 @@ function classifyGaError(err: unknown): AnalyticsFetchError {
       "Cannot reach Google Analytics Data API (network timeout)"
     )
   }
+  // Includes SERVICE_DISABLED (“API has not been used in project…”) and
+  // missing GA property Viewer — both surface as PERMISSION_DENIED / 403.
   if (
     code === "7" ||
-    /PERMISSION_DENIED|does not have sufficient permissions|Caller does not have/i.test(
-      `${code} ${message}`
+    status === "PERMISSION_DENIED" ||
+    /PERMISSION_DENIED|SERVICE_DISABLED|has not been used in project|does not have sufficient permissions|Caller does not have/i.test(
+      blob
     ) ||
-    (/\b403\b/.test(`${code} ${message}`) &&
-      /permission|denied|forbidden/i.test(message))
+    (/\b403\b/.test(blob) && /permission|denied|forbidden|disabled/i.test(blob))
   ) {
     return new AnalyticsFetchError(
       "permission",
-      "Service account lacks access to this GA4 property"
+      /SERVICE_DISABLED|has not been used in project/i.test(blob)
+        ? "Enable Google Analytics Data API on the GCP project, then retry"
+        : "Service account lacks access to this GA4 property"
     )
   }
   return new AnalyticsFetchError("unavailable", message.slice(0, 200))
