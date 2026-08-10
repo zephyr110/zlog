@@ -104,7 +104,6 @@ export function MediaLightbox({
       <p
         className="absolute top-4 left-4 z-10 max-w-[min(70vw,28rem)] truncate text-sm font-medium text-white/90"
         onClick={(e) => e.stopPropagation()}
-        title={file.name}
       >
         {file.name}
       </p>

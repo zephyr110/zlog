@@ -64,22 +64,28 @@ function RankList({
   }
   const max = Math.max(...rows.map((r) => r.value), 1)
   return (
-    <ul className="flex flex-col gap-2.5">
+    <ul className="flex flex-col gap-1">
       {rows.map((row, i) => (
-        <li key={`${row.label}-${i}`} className="flex flex-col gap-1">
-          <div className="flex items-baseline justify-between gap-3 text-sm">
-            <span className="min-w-0 truncate font-medium" title={row.label}>
+        <li
+          key={`${row.label}-${i}`}
+          className="relative overflow-hidden rounded-md transition-colors hover:bg-muted/50"
+        >
+          {/* Background data-bar (Plausible/GA style): magnitude reads from
+              the wash, so each row stays a single compact line. */}
+          <div
+            className="absolute inset-y-0 left-0 rounded-md bg-chart-2/15"
+            style={{ width: `${Math.max(3, (row.value / max) * 100)}%` }}
+            aria-hidden="true"
+          />
+          <div className="relative flex items-baseline justify-between gap-3 px-2 py-1.5 text-sm">
+            {/* Paths clip on the left ("…/my-slug") — the tail carries the
+                identity when several rows share a /posts/ prefix. */}
+            <span className="min-w-0 truncate font-medium [direction:rtl] [text-align:left] [unicode-bidi:plaintext]">
               {row.label}
             </span>
             <span className="shrink-0 tabular-nums text-muted-foreground">
               {row.value.toLocaleString()}
             </span>
-          </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary/70"
-              style={{ width: `${Math.max(4, (row.value / max) * 100)}%` }}
-            />
           </div>
         </li>
       ))}
@@ -105,7 +111,9 @@ function CompositionDonut({
 
   return (
     <div className="flex flex-1 flex-col justify-center gap-3">
-      <div className="flex flex-col items-center gap-4 sm:flex-row">
+      {/* Row mode centers the ring+legend as one compact group — a flex-1
+          legend would stretch across the card and leave a void in the middle. */}
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
         <ChartContainer
           config={config}
           className="aspect-square h-[150px] shrink-0"
@@ -157,16 +165,14 @@ function CompositionDonut({
           </PieChart>
         </ChartContainer>
 
-        <ul className="flex w-full min-w-0 flex-1 flex-col justify-center gap-1.5">
+        <ul className="flex w-full min-w-0 flex-col justify-center gap-1.5 sm:w-44 sm:flex-none">
           {data.map((d) => (
             <li key={d.key} className="flex items-center gap-2 text-xs">
               <span
                 className="size-2 shrink-0 rounded-full"
                 style={{ backgroundColor: d.color }}
               />
-              <span className="min-w-0 truncate font-medium" title={d.label}>
-                {d.label}
-              </span>
+              <span className="min-w-0 truncate font-medium">{d.label}</span>
               <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
                 {d.users.toLocaleString()}
               </span>
@@ -485,9 +491,9 @@ function PanelChrome({
  *  matching the real 64/44 radii → 20px stroke. */
 function DonutSkeleton() {
   return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row">
+    <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
       <div className="size-[150px] shrink-0 animate-pulse rounded-full border-[20px] border-muted" />
-      <div className="flex w-full min-w-0 flex-1 flex-col gap-2.5">
+      <div className="flex w-full min-w-0 flex-col gap-2.5 sm:w-44 sm:flex-none">
         {[0, 1, 2].map((j) => (
           <Skeleton key={j} className="h-4 w-full" />
         ))}
@@ -520,22 +526,24 @@ export function TrafficSkeleton() {
         ))}
       </div>
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
-        {/* Top pages — ranked list */}
+        {/* Top pages — single-line data-bar rows */}
         <PanelChrome titleWidth="w-28">
-          {Array.from({ length: 4 }).map((_, j) => (
-            <Skeleton key={j} className="h-6 w-full" />
-          ))}
+          <div className="flex flex-col gap-1">
+            {Array.from({ length: 6 }).map((_, j) => (
+              <Skeleton key={j} className="h-8 w-full rounded-md" />
+            ))}
+          </div>
         </PanelChrome>
         {/* Devices — donut */}
         <PanelChrome titleWidth="w-20">
           <DonutSkeleton />
         </PanelChrome>
-        {/* Countries — dotted map (95:48 viewBox) + 2-col legend */}
+        {/* Countries — dotted map (95:48 viewBox) + chip row */}
         <PanelChrome titleWidth="w-24">
           <Skeleton className="aspect-[95/48] w-full rounded-md" />
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {Array.from({ length: 6 }).map((_, j) => (
-              <Skeleton key={j} className="h-4 w-full" />
+              <Skeleton key={j} className="h-6 w-20 rounded-full" />
             ))}
           </div>
         </PanelChrome>

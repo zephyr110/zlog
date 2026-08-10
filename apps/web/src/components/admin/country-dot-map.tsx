@@ -89,7 +89,7 @@ export function CountryDotMap({
               fill="currentColor"
             />
           ))}
-          {pins.map((pin) => (
+          {pins.map((pin, i) => (
             <g
               key={`${pin.name}-${pin.x}-${pin.y}`}
               className="cursor-pointer"
@@ -102,16 +102,19 @@ export function CountryDotMap({
               }
               onMouseLeave={() => showTooltip(null)}
             >
+              {/* Halo breathes (pin-breathe, globals.css); delay staggers
+                  pins so the map shimmers instead of pulsing in unison.
+                  chart-2: single-hue family shared with area/calendar. */}
               <circle
                 cx={pin.x}
                 cy={pin.y}
                 r={pin.radius + 0.7}
-                fill="var(--color-primary)"
+                fill="var(--color-chart-2)"
                 opacity={0.15}
+                className="map-pin-halo"
+                style={{ animationDelay: `${(i * 0.45) % 2.6}s` }}
               />
-              <circle cx={pin.x} cy={pin.y} r={pin.radius} fill="var(--color-primary)">
-                <title>{`${pin.name}: ${pin.users.toLocaleString()} ${usersLabel}`}</title>
-              </circle>
+              <circle cx={pin.x} cy={pin.y} r={pin.radius} fill="var(--color-chart-2)" />
             </g>
           ))}
         </svg>
@@ -121,7 +124,7 @@ export function CountryDotMap({
             overflow-hidden would otherwise clip it. */}
         {tooltip && (
           <div
-            className="pointer-events-none absolute z-10 whitespace-nowrap rounded-md border bg-popover px-2.5 py-1.5 text-xs shadow-lg"
+            className="pointer-events-none absolute z-10 flex flex-col gap-0.5 whitespace-nowrap rounded-md border bg-popover px-2.5 py-1.5 text-xs shadow-lg"
             style={{
               left: `${tooltip.xPct}%`,
               top: `${tooltip.yPct}%`,
@@ -138,32 +141,31 @@ export function CountryDotMap({
               }`,
             }}
           >
-            <span className="font-medium">{tooltip.name}</span>{" "}
+            <span className="font-medium">{tooltip.name}</span>
             <span className="tabular-nums text-muted-foreground">
-              {tooltip.users.toLocaleString()} {usersLabel}
+              {usersLabel}: {tooltip.users.toLocaleString()}
             </span>
           </div>
         )}
       </div>
 
-      {/* Country legend — every row stays listed (the map can't carry exact
-          values); GA caps the report at 10 rows, so no slice here. */}
-      <ol className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+      {/* Country chips — every row stays listed (the map can't carry exact
+          values and touch devices have no hover); GA caps the report at 10
+          rows, so wrapping chips stay compact. */}
+      <ul className="flex flex-wrap gap-1.5">
         {countries.map((c, i) => (
           <li
             key={`${c.code}-${i}`}
-            className="flex items-center gap-2 text-xs"
+            className="flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-xs"
           >
-            <span className="size-1.5 shrink-0 rounded-full bg-primary" />
-            <span className="min-w-0 truncate font-medium" title={c.name}>
-              {c.name}
-            </span>
-            <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
+            <span className="size-1.5 shrink-0 rounded-full bg-chart-2" />
+            <span className="font-medium">{c.name}</span>
+            <span className="tabular-nums text-muted-foreground">
               {c.users.toLocaleString()}
             </span>
           </li>
         ))}
-      </ol>
+      </ul>
     </div>
   )
 }

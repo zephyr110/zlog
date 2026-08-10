@@ -124,10 +124,7 @@ export function MediaGrid({
               <TooltipContent>{file.name}</TooltipContent>
             </Tooltip>
             <div className="flex items-center gap-1">
-              <p
-                className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground"
-                title={file.createdAt}
-              >
+              <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
                 {file.createdAt ? formatUtcDateTime(file.createdAt) : " "}
               </p>
               <MediaRowActions

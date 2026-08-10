@@ -88,10 +88,7 @@ export function MediaList({
           >
             {file.name}
           </button>
-          <span
-            className="hidden sm:block w-24 shrink-0 text-xs text-muted-foreground text-right"
-            title={file.createdAt}
-          >
+          <span className="hidden sm:block w-24 shrink-0 text-xs text-muted-foreground text-right">
             {file.createdAt ? formatUtcDateTime(file.createdAt) : ""}
           </span>
           <MediaRowActions

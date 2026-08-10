@@ -379,7 +379,6 @@ function AdminPostsContent() {
                           href={`/admin/posts/edit?slug=${encodeURIComponent(
                             post.slug
                           )}`}
-                          title={post.title}
                           className="block truncate text-sm font-medium text-foreground transition-colors hover:text-primary"
                         >
                           {post.title}
@@ -401,10 +400,7 @@ function AdminPostsContent() {
                       </TableCell>
                       <TableCell className="text-center">
                         {post.pinnedAt ? (
-                          <span
-                            title={t("admin.pinned")}
-                            className="inline-flex text-foreground"
-                          >
+                          <span className="inline-flex text-foreground">
                             <Pin
                               className="size-3.5"
                               strokeWidth={2}
@@ -413,7 +409,6 @@ function AdminPostsContent() {
                           </span>
                         ) : (
                           <span
-                            title={t("admin.notPinned")}
                             className="inline-flex text-sm text-muted-foreground"
                             aria-label={t("admin.notPinned")}
                           >
