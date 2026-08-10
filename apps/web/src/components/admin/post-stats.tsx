@@ -251,9 +251,6 @@ export function PostStats({ posts }: PostStatsProps) {
                   cursor={{ stroke: "var(--border)" }}
                   content={<ChartTooltipContent indicator="line" />}
                 />
-                {/* isAnimationActive=false on all admin charts: full-page
-                    screenshot tools resize the viewport mid-capture, which
-                    replays enter animations and catches an empty frame. */}
                 <Area
                   type="monotone"
                   dataKey="count"
@@ -261,7 +258,6 @@ export function PostStats({ posts }: PostStatsProps) {
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#colorCount)"
-                  isAnimationActive={false}
                 />
               </AreaChart>
             </ChartContainer>
@@ -316,12 +312,7 @@ export function PostStats({ posts }: PostStatsProps) {
                 />
                 {/* Per-row `fill` on topicData drives both the bar and the
                     tooltip indicator (shadcn chart-data fill pattern). */}
-                <Bar
-                  dataKey="count"
-                  radius={[0, 4, 4, 0]}
-                  maxBarSize={20}
-                  isAnimationActive={false}
-                />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={20} />
               </BarChart>
             </ChartContainer>
           )}
