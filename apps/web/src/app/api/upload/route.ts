@@ -105,14 +105,15 @@ export async function GET(request: NextRequest) {
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
     })
   } catch (error) {
+    // A 200-with-empty-array here would make the client's `!res.ok`
+    // apiError check unreachable — a DB outage would render as a silent
+    // empty library. Surface the failure so the admin sees the error
+    // state instead of a dead-feeling empty grid.
     console.error("List media error:", error)
-    return NextResponse.json({
-      images: [],
-      total: 0,
-      page,
-      pageSize,
-      totalPages: 1,
-    })
+    return NextResponse.json(
+      { images: [], total: 0, page, pageSize, totalPages: 1 },
+      { status: 500 }
+    )
   }
 }
 

@@ -123,7 +123,15 @@ export function MediaGrid({
             </TruncateTooltip>
             <div className="flex items-center gap-1">
               <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                {file.createdAt ? formatUtcDateTime(file.createdAt) : " "}
+                {file.createdAt ? (
+                  // Hover shows the exact stored UTC timestamp (with
+                  // seconds) — the truncated local date alone can't.
+                  <span title={file.createdAt}>
+                    {formatUtcDateTime(file.createdAt)}
+                  </span>
+                ) : (
+                  " "
+                )}
               </p>
               <MediaRowActions
                 file={file}

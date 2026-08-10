@@ -1,5 +1,9 @@
 import { apiFetch } from "@/lib/api-client"
-import { MAX_UPLOAD_BYTES, UPLOAD_TIMEOUT_MS } from "@/lib/upload-constants"
+import {
+  MAX_UPLOAD_BYTES,
+  UPLOAD_ACCEPT,
+  UPLOAD_TIMEOUT_MS,
+} from "@/lib/upload-constants"
 
 export {
   MAX_UPLOAD_BYTES,
@@ -31,7 +35,8 @@ export async function uploadImageFile(file: File): Promise<UploadResult> {
     })
     const data = (await res.json().catch(() => ({}))) as {
       url?: string
-      name?: string
+      /** The route returns the stored media filename, not "name". */
+      filename?: string
       error?: string
     }
     if (!res.ok) {
@@ -45,15 +50,18 @@ export async function uploadImageFile(file: File): Promise<UploadResult> {
     if (!data.url) {
       return { ok: false, reason: "failed", status: res.status }
     }
-    return { ok: true, url: data.url, name: data.name }
+    return { ok: true, url: data.url, name: data.filename }
   } catch {
     return { ok: false, reason: "network" }
   }
 }
 
-/** Pre-flight check used by batch upload UIs before hitting the network. */
+/** Pre-flight check used by batch upload UIs before hitting the network.
+ *  Mirrors the server's ALLOWED_TYPES exactly — a startsWith("image/")
+ *  check would let AVIF/BMP/TIFF through preflight only to get a raw
+ *  English 400 from the server instead of the localized toast. */
 export function validateImageFile(file: File): "ok" | "type" | "size" {
-  if (!file.type.startsWith("image/")) return "type"
+  if (!UPLOAD_ACCEPT.split(",").includes(file.type)) return "type"
   if (file.size > MAX_UPLOAD_BYTES) return "size"
   return "ok"
 }

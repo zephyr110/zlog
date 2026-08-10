@@ -19,9 +19,8 @@ import { Spinner } from "@/components/ui/spinner"
 import { apiFetch } from "@/lib/api-client"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
-import { Upload } from "lucide-react"
+import { ImageIcon, Upload } from "lucide-react"
 import type { MediaFile } from "@/components/admin/media-lightbox"
-import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import {
   UPLOAD_ACCEPT,
   uploadImageFile,
@@ -285,7 +284,23 @@ export function MediaPickerDialog({
         ) : loading ? (
           <Spinner size="md" fill className="min-h-64" />
         ) : files.length === 0 ? (
-          <AdminBlockEmpty className="min-h-64" />
+          <div className="flex min-h-64 flex-col items-center justify-center gap-3 px-6 text-center">
+            <ImageIcon size={32} className="text-muted-foreground" />
+            <p className="text-sm font-medium">{t("admin.noImages")}</p>
+            <p className="max-w-sm text-xs text-muted-foreground">
+              {t("admin.noImagesDesc")}
+            </p>
+            {/* Hard navigation on purpose: leaving the editor mid-edit
+                fires its beforeunload unsaved-changes guard, which a
+                client-side router.push would bypass. */}
+            <a
+              href="/admin/media"
+              onClick={() => onOpenChange(false)}
+              className="mt-1 inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              {t("admin.goToMedia")}
+            </a>
+          </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {files.map((file) => (

@@ -96,7 +96,10 @@ export function MediaList({
               {file.name}
             </TruncateTooltip>
           </button>
-          <span className="hidden sm:block w-24 shrink-0 text-xs text-muted-foreground text-right">
+          <span
+            className="hidden sm:block w-24 shrink-0 text-xs text-muted-foreground text-right"
+            title={file.createdAt}
+          >
             {file.createdAt ? formatUtcDateTime(file.createdAt) : ""}
           </span>
           <MediaRowActions
