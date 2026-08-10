@@ -11,10 +11,11 @@ import { MediaList, MediaListSkeleton } from "@/components/admin/media-list"
 import { Input } from "@/components/ui/input"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
-import { Upload, LayoutGrid, List, X, Search, TriangleAlert } from "lucide-react"
+import { Upload, LayoutGrid, List, X, Search, TriangleAlert, SlidersHorizontal } from "lucide-react"
 import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { useLocale } from "@/components/layout/i18n-provider"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { IconButton } from "@/components/ui/icon-button"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
@@ -284,76 +285,176 @@ export default function AdminMediaPage() {
           className="hidden"
           id="media-file-input"
         />
-        {/* Filename search — debounced, resets to page 1 on query */}
-        <div className="relative">
-          <Search
-            size={14}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-          />
-          <Input
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder={t("admin.searchMedia")}
-            className="h-8 w-44 pl-8 text-xs"
-          />
-        </div>
-        {/* Date range filter — one trigger opens a two-month range
-            calendar; local dates, converted to exact UTC timestamps on
-            the wire */}
-        <div className="flex items-center gap-1.5">
-          <DateRangePicker
-            from={dateFrom}
-            to={dateTo}
-            onChange={updateDateRange}
-            ariaLabel={t("admin.dateRange")}
-            placeholder={t("admin.dateRange")}
-            locale={locale === "zh" ? "zh" : "en"}
-          />
-          {(dateFrom || dateTo) && (
+
+        {/* Desktop toolbar (md+) — every control inline in the header. */}
+        <div className="hidden items-center gap-2 md:flex">
+          {/* Filename search — debounced, resets to page 1 on query */}
+          <div className="relative">
+            <Search
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder={t("admin.searchMedia")}
+              className="h-8 w-44 pl-8 text-xs"
+            />
+          </div>
+          {/* Date range filter — one trigger opens a two-month range
+              calendar; local dates, converted to exact UTC timestamps on
+              the wire */}
+          <div className="flex items-center gap-1.5">
+            <DateRangePicker
+              from={dateFrom}
+              to={dateTo}
+              onChange={updateDateRange}
+              ariaLabel={t("admin.dateRange")}
+              placeholder={t("admin.dateRange")}
+              locale={locale === "zh" ? "zh" : "en"}
+            />
+            {(dateFrom || dateTo) && (
+              <IconButton
+                size="sm"
+                aria-label={t("admin.clearFilter")}
+                onClick={clearDateFilter}
+              >
+                <X size={14} />
+              </IconButton>
+            )}
+          </div>
+          {/* Segmented view toggle — fixed h-8 to match the date picker and
+              upload button; inner buttons fill the container's inner height
+              (32px − border − p-0.5 ≈ 26px). */}
+          <div
+            role="group"
+            aria-label={t("admin.viewMode")}
+            className="flex h-8 items-center rounded-lg border border-border bg-background p-0.5"
+          >
             <IconButton
               size="sm"
-              aria-label={t("admin.clearFilter")}
-              onClick={clearDateFilter}
+              aria-label={t("admin.gridView")}
+              aria-pressed={viewMode === "grid"}
+              className={cn("h-full w-7", viewMode === "grid" && "bg-muted text-foreground")}
+              onClick={() => switchView("grid")}
             >
-              <X size={14} />
+              <LayoutGrid size={14} />
             </IconButton>
-          )}
+            <IconButton
+              size="sm"
+              aria-label={t("admin.listView")}
+              aria-pressed={viewMode === "list"}
+              className={cn("h-full w-7", viewMode === "list" && "bg-muted text-foreground")}
+              onClick={() => switchView("list")}
+            >
+              <List size={14} />
+            </IconButton>
+          </div>
+          <Button
+            disabled={isUploading}
+            onClick={openFileInput}
+          >
+            {isUploading && uploadStats
+              ? t("admin.uploadProgress")(uploadStats.done, uploadStats.total)
+              : (t("admin.uploadImage"))}
+          </Button>
         </div>
-        {/* Segmented view toggle — fixed h-8 to match the date picker and
-            upload button; inner buttons fill the container's inner height
-            (32px − border − p-0.5 ≈ 26px). */}
-        <div
-          role="group"
-          aria-label={t("admin.viewMode")}
-          className="flex h-8 items-center rounded-lg border border-border bg-background p-0.5"
-        >
+
+        {/* Mobile toolbar (<md) — search + date range collapse into a filter
+            popover so the header fits the viewport; the view toggle and an
+            icon-only upload stay one tap away. A popover (not a dropdown
+            menu) because it hosts form controls, which roving-tabindex
+            menus fight against. */}
+        <div className="flex items-center gap-2 md:hidden">
+          <div
+            role="group"
+            aria-label={t("admin.viewMode")}
+            className="flex h-8 items-center rounded-lg border border-border bg-background p-0.5"
+          >
+            <IconButton
+              size="sm"
+              aria-label={t("admin.gridView")}
+              aria-pressed={viewMode === "grid"}
+              className={cn("h-full w-7", viewMode === "grid" && "bg-muted text-foreground")}
+              onClick={() => switchView("grid")}
+            >
+              <LayoutGrid size={14} />
+            </IconButton>
+            <IconButton
+              size="sm"
+              aria-label={t("admin.listView")}
+              aria-pressed={viewMode === "list"}
+              className={cn("h-full w-7", viewMode === "list" && "bg-muted text-foreground")}
+              onClick={() => switchView("list")}
+            >
+              <List size={14} />
+            </IconButton>
+          </div>
+          {/* All mobile header controls share h-8 / size-sm so the
+              segmented toggle, upload CTA, and filter trigger align. */}
           <IconButton
             size="sm"
-            aria-label={t("admin.gridView")}
-            aria-pressed={viewMode === "grid"}
-            className={cn("h-full w-7", viewMode === "grid" && "bg-muted text-foreground")}
-            onClick={() => switchView("grid")}
+            aria-label={t("admin.uploadImage")}
+            disabled={isUploading}
+            onClick={openFileInput}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            <LayoutGrid size={14} />
+            {isUploading ? <Spinner className="size-3.5" /> : <Upload size={14} />}
           </IconButton>
-          <IconButton
-            size="sm"
-            aria-label={t("admin.listView")}
-            aria-pressed={viewMode === "list"}
-            className={cn("h-full w-7", viewMode === "list" && "bg-muted text-foreground")}
-            onClick={() => switchView("list")}
-          >
-            <List size={14} />
-          </IconButton>
+          <Popover>
+            <PopoverTrigger
+              render={
+                <IconButton
+                  size="sm"
+                  aria-label={t("admin.filters")}
+                  className="relative bg-muted transition-colors duration-200 hover:bg-muted/80 data-popup-open:bg-accent data-popup-open:text-accent-foreground [&_svg]:transition-transform [&_svg]:duration-200 data-popup-open:[&_svg]:rotate-90"
+                >
+                  <SlidersHorizontal size={14} />
+                  {/* Active-filter dot — the controls live behind this
+                      popover, so the trigger must advertise engagement. */}
+                  {(searchQuery || dateFrom || dateTo) && (
+                    <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-primary ring-2 ring-background" />
+                  )}
+                </IconButton>
+              }
+            />
+            <PopoverContent align="end" sideOffset={6} className="w-72 p-3">
+              <div className="flex flex-col gap-3">
+                <div className="relative">
+                  <Search
+                    size={14}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                  />
+                  <Input
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder={t("admin.searchMedia")}
+                    className="h-8 w-full pl-8 text-xs"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <DateRangePicker
+                    from={dateFrom}
+                    to={dateTo}
+                    onChange={updateDateRange}
+                    ariaLabel={t("admin.dateRange")}
+                    placeholder={t("admin.dateRange")}
+                    locale={locale === "zh" ? "zh" : "en"}
+                  />
+                  {(dateFrom || dateTo) && (
+                    <IconButton
+                      size="sm"
+                      aria-label={t("admin.clearFilter")}
+                      onClick={clearDateFilter}
+                    >
+                      <X size={14} />
+                    </IconButton>
+                  )}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
-        <Button
-          disabled={isUploading}
-          onClick={openFileInput}
-        >
-          {isUploading && uploadStats
-            ? t("admin.uploadProgress")(uploadStats.done, uploadStats.total)
-            : (t("admin.uploadImage"))}
-        </Button>
       </HeaderActions>
 
       {/* API failure banner — a failed list fetch used to be swallowed

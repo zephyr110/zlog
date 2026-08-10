@@ -1,7 +1,8 @@
 // post — zh/en translation dictionary (split by domain)
 
-export const post = {
-  zh: {
+import type { LocaleMessages } from "./locale-messages"
+
+const zh = {
 
 minRead: (n: number) => `${n} 分钟`,
 comments: "评论",
@@ -50,8 +51,9 @@ shortDate: (d: Date) =>
     timeZone: "UTC",
   }),
     
-  },
-  en: {
+} as const
+
+const en = {
 
 minRead: (n: number) => `${n} min`,
 comments: "Comments",
@@ -100,5 +102,6 @@ shortDate: (d: Date) =>
     timeZone: "UTC",
   }),
 
-  },
-} as const
+} as const satisfies LocaleMessages<typeof zh>
+
+export const post = { zh, en }

@@ -80,33 +80,49 @@ export function PaginationBar({
   // the table/grid flex-1 so free space fills the list — not a void
   // between list and bar. Negative margins bleed edge-to-edge within
   // the admin content column (p-4 md:p-8).
+  //
+  // Mobile must stay a single row — never wrap. The shared Pagination
+  // primitive ships `w-full`, which used to stretch the nav and shove
+  // the page-size select onto a second line; override with w-auto.
   return (
     <div className="sticky bottom-0 z-10 shrink-0 !mt-auto -mx-4 -mb-4 md:-mx-8 md:-mb-8 bg-background/85 backdrop-blur px-4 md:px-8 py-2.5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <p className="text-sm text-muted-foreground">
-          {total} {itemLabel} · {t("admin.page")} {page}/{pageCount}
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-sm text-muted-foreground">
+          <span className="sm:hidden">
+            {total} · {page}/{pageCount}
+          </span>
+          <span className="hidden sm:inline">
+            {total} {itemLabel} · {t("admin.page")} {page}/{pageCount}
+          </span>
         </p>
-        <div className="flex items-center gap-3">
-          <Pagination>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <Pagination className="mx-0 w-auto">
             <PaginationContent>
               <PaginationItem>
                 <PaginationLink
                   onClick={() => onPageChange(page - 1)}
                   disabled={page <= 1}
-                  size="default"
-                  className="gap-1 pl-2.5"
+                  size="icon"
+                  aria-label={t("admin.prev")}
+                  className="sm:w-auto sm:gap-1 sm:px-2.5 sm:pl-2.5"
                 >
                   <ChevronLeft className="size-4" />
-                  <span>{t("admin.prev")}</span>
+                  {/* Icon-only below sm — the summary text already carries
+                      "Page x/y", and 7 chips + labeled buttons can't fit a
+                      phone viewport. */}
+                  <span className="hidden sm:inline">{t("admin.prev")}</span>
                 </PaginationLink>
               </PaginationItem>
               {paginationItems.map((item, index) =>
                 item === "ellipsis" ? (
-                  <PaginationItem key={`ellipsis-${index}`}>
+                  <PaginationItem
+                    key={`ellipsis-${index}`}
+                    className="hidden sm:list-item"
+                  >
                     <PaginationEllipsis />
                   </PaginationItem>
                 ) : (
-                  <PaginationItem key={item}>
+                  <PaginationItem key={item} className="hidden sm:list-item">
                     <PaginationLink
                       isActive={page === item}
                       onClick={() => onPageChange(item)}
@@ -120,10 +136,11 @@ export function PaginationBar({
                 <PaginationLink
                   onClick={() => onPageChange(page + 1)}
                   disabled={page >= pageCount}
-                  size="default"
-                  className="gap-1 pr-2.5"
+                  size="icon"
+                  aria-label={t("admin.next")}
+                  className="sm:w-auto sm:gap-1 sm:px-2.5 sm:pr-2.5"
                 >
-                  <span>{t("admin.next")}</span>
+                  <span className="hidden sm:inline">{t("admin.next")}</span>
                   <ChevronRight className="size-4" />
                 </PaginationLink>
               </PaginationItem>
@@ -137,7 +154,7 @@ export function PaginationBar({
               <SelectTrigger
                 size="sm"
                 aria-label={t("admin.pageSize")}
-                className="h-7 px-2 text-xs"
+                className="h-7 w-auto gap-1 px-2 text-xs tabular-nums"
               >
                 <SelectValue />
               </SelectTrigger>

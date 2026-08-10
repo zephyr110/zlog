@@ -1,6 +1,7 @@
 "use client"
 
 import { Skeleton } from "@/components/ui/skeleton"
+import { TruncateTooltip } from "@/components/ui/truncate-tooltip"
 import { MediaRowActions } from "@/components/admin/media-row-actions"
 import type { MediaFile } from "@/components/admin/media-lightbox"
 import { useT } from "@/components/layout/trans"
@@ -9,16 +10,21 @@ import { formatUtcDateTime } from "@/lib/date"
 
 export function MediaListSkeleton() {
   return (
-    <div className="space-y-1.5">
+    <div className="flex flex-col gap-1.5">
       {Array.from({ length: 8 }).map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2"
+          className="flex h-14 items-center gap-3 rounded-lg border bg-card px-3"
         >
           <Skeleton className="size-10 shrink-0 rounded-md" />
-          <Skeleton className="h-4 flex-1" />
-          <Skeleton className="hidden sm:block h-3.5 w-24" />
-          <Skeleton className="h-7 w-20" />
+          <Skeleton className="h-4 min-w-0 flex-1" />
+          <Skeleton className="hidden h-3.5 w-24 sm:block" />
+          {/* Three size-sm icon buttons — mirrors MediaRowActions */}
+          <div className="flex shrink-0 items-center gap-0.5">
+            <Skeleton className="size-8 rounded-md" />
+            <Skeleton className="size-8 rounded-md" />
+            <Skeleton className="size-8 rounded-md" />
+          </div>
         </div>
       ))}
     </div>
@@ -84,9 +90,11 @@ export function MediaList({
           <button
             type="button"
             onClick={() => onPreview(file)}
-            className="min-w-0 flex-1 truncate text-left text-sm font-medium cursor-pointer hover:underline"
+            className="min-w-0 flex-1 cursor-pointer text-left text-sm hover:underline"
           >
-            {file.name}
+            <TruncateTooltip nativeTitle className="block font-medium">
+              {file.name}
+            </TruncateTooltip>
           </button>
           <span className="hidden sm:block w-24 shrink-0 text-xs text-muted-foreground text-right">
             {file.createdAt ? formatUtcDateTime(file.createdAt) : ""}

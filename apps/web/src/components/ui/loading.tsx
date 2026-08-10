@@ -107,9 +107,10 @@ export function TableSkeleton({ rows = 5 }: { rows?: number }) {
   )
 }
 
-/** Admin comment inbox card — mirrors CardHeader / CardContent /
- *  CardFooter: avatar + name/time, optional thread line, body +
- *  source meta, then the footer action row. */
+/** Admin comment inbox card — mirrors CardHeader / CardContent:
+ *  avatar + name/time with corner actions, optional thread line, body
+ *  + source meta. Actions are icon-only below sm (two size-8 chips)
+ *  and labeled buttons from sm up. */
 export function CommentInboxCardSkeleton({
   withThread = false,
 }: {
@@ -122,12 +123,15 @@ export function CommentInboxCardSkeleton({
         <Skeleton className="size-8 shrink-0 rounded-full" />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex items-center gap-2">
-            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-32 max-w-[40%]" />
             <Skeleton className="size-1.5 shrink-0 rounded-full" />
           </div>
-          <Skeleton className="h-3 w-40" />
+          <Skeleton className="h-3 w-40 max-w-[55%]" />
         </div>
-        <Skeleton className="ml-auto h-8 w-24 rounded-md" />
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <Skeleton className="size-8 rounded-md sm:h-8 sm:w-24" />
+          <Skeleton className="size-8 rounded-md sm:h-8 sm:w-16" />
+        </div>
       </div>
 
       {/* Body — thread, content, source */}
@@ -146,8 +150,44 @@ export function CommentInboxCardSkeleton({
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border/50 pt-2.5">
           <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-3 w-36" />
+          <Skeleton className="h-3 w-36 max-sm:hidden" />
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** Admin posts list — mobile card stack below md, table from md up.
+ *  Shared by the page's loading state and the Suspense fallback. */
+export function PostsListSkeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-6">
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
+        <Skeleton className="h-9 w-44 rounded-lg" />
+        <Skeleton className="h-9 w-44 rounded-lg" />
+        <Skeleton className="h-9 min-w-40 max-w-sm flex-1 rounded-lg" />
+      </div>
+      <div className="flex flex-col gap-3 md:hidden">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="rounded-xl border bg-card p-4">
+            <div className="flex items-start justify-between gap-2">
+              <Skeleton className="mt-1 h-4 w-3/4 rounded-md" />
+              <Skeleton className="-mr-2 -mt-1 size-8 shrink-0 rounded-lg" />
+            </div>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-3.5 w-20 rounded-md" />
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-1">
+              <Skeleton className="h-5 w-14 rounded-md" />
+              <Skeleton className="h-5 w-12 rounded-md" />
+              <Skeleton className="h-5 w-10 rounded-md" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden md:block">
+        <TableSkeleton rows={rows} />
       </div>
     </div>
   )

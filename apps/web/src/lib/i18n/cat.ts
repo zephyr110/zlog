@@ -1,7 +1,8 @@
 // cat — zh/en translation dictionary (split by domain)
 
-export const cat = {
-  zh: {
+import type { LocaleMessages } from "./locale-messages"
+
+const zh = {
 
 frontend: "前端",
 backend: "后端",
@@ -11,8 +12,9 @@ gear: "工具",
 miniprogram: "小程序",
 summary: "总结",
     
-  },
-  en: {
+} as const
+
+const en = {
 
 frontend: "Frontend",
 backend: "Backend",
@@ -22,5 +24,6 @@ gear: "Tools",
 miniprogram: "Mini Program",
 summary: "Summary",
     
-  },
-} as const
+} as const satisfies LocaleMessages<typeof zh>
+
+export const cat = { zh, en }

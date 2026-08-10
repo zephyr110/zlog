@@ -6,6 +6,7 @@ import { Label, Pie, PieChart } from "recharts"
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/ui/empty-state"
+import { TruncateTooltip } from "@/components/ui/truncate-tooltip"
 import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { CountryDotMap } from "@/components/admin/country-dot-map"
 import {
@@ -49,7 +50,11 @@ function PanelCard({
       <CardHeader className="px-4">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
       </CardHeader>
-      <div className="flex min-h-40 flex-1 flex-col px-4 pb-4">{children}</div>
+      {/* min-h only from md — on phones a forced 160px floor leaves empty
+          gutters under short Devices/Sources content. */}
+      <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 md:min-h-40">
+        {children}
+      </div>
     </Card>
   )
 }
@@ -79,10 +84,11 @@ function RankList({
           />
           <div className="relative flex items-baseline justify-between gap-3 px-2 py-1.5 text-sm">
             {/* Paths clip on the left ("…/my-slug") — the tail carries the
-                identity when several rows share a /posts/ prefix. */}
-            <span className="min-w-0 truncate font-medium [direction:rtl] [text-align:left] [unicode-bidi:plaintext]">
+                identity when several rows share a /posts/ prefix. Full path
+                stays available via TruncateTooltip when overflowed. */}
+            <TruncateTooltip className="font-medium [direction:rtl] [text-align:left] [unicode-bidi:plaintext]">
               {row.label}
-            </span>
+            </TruncateTooltip>
             <span className="shrink-0 tabular-nums text-muted-foreground">
               {row.value.toLocaleString()}
             </span>
@@ -175,7 +181,7 @@ function CompositionDonut({
                 className="size-2 shrink-0 rounded-full"
                 style={{ backgroundColor: d.color }}
               />
-              <span className="min-w-0 truncate font-medium">{d.label}</span>
+              <TruncateTooltip className="font-medium">{d.label}</TruncateTooltip>
               <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
                 {d.users.toLocaleString()}
               </span>
@@ -263,7 +269,7 @@ function DevicesStackedBar({
               className="size-2 shrink-0 rounded-full"
               style={{ backgroundColor: d.color }}
             />
-            <span className="min-w-0 truncate font-medium">{d.label}</span>
+            <TruncateTooltip className="font-medium">{d.label}</TruncateTooltip>
             <span className="ml-auto shrink-0 tabular-nums">
               {d.users.toLocaleString()}
             </span>
@@ -287,6 +293,30 @@ const CHANNEL_COLORS = [
   "var(--color-chart-5)",
 ] as const
 
+/** GA4 sessionDefaultChannelGroup → admin i18n key. Unknown channels
+ *  fall through to the raw GA string. */
+const CHANNEL_I18N_KEYS = {
+  Direct: "admin.channelDirect",
+  "Organic Search": "admin.channelOrganicSearch",
+  "Paid Search": "admin.channelPaidSearch",
+  "Organic Social": "admin.channelOrganicSocial",
+  "Paid Social": "admin.channelPaidSocial",
+  "Organic Shopping": "admin.channelOrganicShopping",
+  "Paid Shopping": "admin.channelPaidShopping",
+  "Organic Video": "admin.channelOrganicVideo",
+  "Paid Video": "admin.channelPaidVideo",
+  Display: "admin.channelDisplay",
+  "Paid Other": "admin.channelPaidOther",
+  Referral: "admin.channelReferral",
+  Email: "admin.channelEmail",
+  Affiliates: "admin.channelAffiliates",
+  Audio: "admin.channelAudio",
+  SMS: "admin.channelSms",
+  "Mobile Push Notifications": "admin.channelMobilePush",
+  "Cross-network": "admin.channelCrossNetwork",
+  Unassigned: "admin.channelUnassigned",
+} as const satisfies Record<string, `admin.channel${string}`>
+
 function SourcesDonut({
   sources,
 }: {
@@ -308,9 +338,12 @@ function SourcesDonut({
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "") || "unknown"
+    const i18nKey =
+      CHANNEL_I18N_KEYS[s.source as keyof typeof CHANNEL_I18N_KEYS]
+    const label = i18nKey ? (t(i18nKey) as string) : s.source
     const entry = byKey.get(key)
     if (entry) entry.users += s.users
-    else byKey.set(key, { key, label: s.source, users: s.users })
+    else byKey.set(key, { key, label, users: s.users })
   }
   const data = [...byKey.values()].map((d, i) => ({
     ...d,
@@ -428,7 +461,7 @@ export function TrafficAnalytics() {
         />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5">
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -441,7 +474,7 @@ export function TrafficAnalytics() {
                 </CardAction>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                <p className="text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">
                   {state.data.totals.activeUsers.toLocaleString()}
                 </p>
               </CardContent>
@@ -458,17 +491,17 @@ export function TrafficAnalytics() {
                 </CardAction>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                <p className="text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">
                   {state.data.totals.screenPageViews.toLocaleString()}
                 </p>
               </CardContent>
             </Card>
           </div>
 
-          <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
-            {/* Row pairing is by height: compact donuts share row 1, the
-                list/map panels (~300px) share row 2 — equal-height grid
-                rows leave no dead space at the bottom of a shorter card. */}
+          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+            {/* Row pairing by height from sm up: compact Devices/Sources,
+                then list/map panels. Mobile still stacks but KPIs above
+                already share a row. */}
             <PanelCard title={t("admin.analyticsDevices")}>
               <DevicesStackedBar devices={state.data.devices} />
             </PanelCard>
@@ -512,13 +545,15 @@ function PanelChrome({
   children: React.ReactNode
 }) {
   // Mirrors PanelCard chrome: Card's 16px --card-spacing gap/padding and the
-  // min-h-40 flex-1 content column, so loading and loaded layouts align.
+  // content column (min-h only from md, matching PanelCard).
   return (
     <div className="flex flex-col gap-4 rounded-xl bg-card py-4 ring-1 ring-foreground/10">
       <div className="px-4">
         <Skeleton className={cn("h-4", titleWidth)} />
       </div>
-      <div className="flex min-h-40 flex-1 flex-col gap-3 px-4 pb-4">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4 md:min-h-40">
+        {children}
+      </div>
     </div>
   )
 }
@@ -554,12 +589,11 @@ function DonutSkeleton() {
 
 /** Totals + 4-panel placeholder. Exported so the dashboard page-level
  *  loading state mirrors the same shapes (header is rendered there).
- *  Panel order mirrors the real grid: pages list, devices donut,
- *  countries map, sources donut. */
+ *  Panel order mirrors the real grid: devices, sources, pages, countries. */
 export function TrafficSkeleton() {
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-5">
         {[0, 1].map((i) => (
           <div
             key={i}
@@ -570,13 +604,12 @@ export function TrafficSkeleton() {
               <Skeleton className="size-8 rounded-lg" />
             </div>
             <div className="px-4">
-              <Skeleton className="h-9 w-16" />
+              <Skeleton className="h-8 w-16 sm:h-9" />
             </div>
           </div>
         ))}
       </div>
-      <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
-        {/* Row pairing mirrors the real grid: donuts, then pages list + map. */}
+      <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
         {/* Devices — stacked bar */}
         <PanelChrome titleWidth="w-20">
           <StackedBarSkeleton />

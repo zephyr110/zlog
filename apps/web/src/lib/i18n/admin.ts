@@ -1,7 +1,8 @@
 // admin — zh/en translation dictionary (split by domain)
 
-export const admin = {
-  zh: {
+import type { LocaleMessages } from "./locale-messages"
+
+const zh = {
 
 adminPanel: "管理后台",
 loginTitle: "登录",
@@ -132,6 +133,26 @@ deviceDesktop: "桌面端",
 deviceMobile: "移动端",
 deviceTablet: "平板",
 deviceOther: "其他",
+channelDirect: "直接访问",
+channelOrganicSearch: "自然搜索",
+channelPaidSearch: "付费搜索",
+channelOrganicSocial: "自然社交",
+channelPaidSocial: "付费社交",
+channelOrganicShopping: "自然购物",
+channelPaidShopping: "付费购物",
+channelOrganicVideo: "自然视频",
+channelPaidVideo: "付费视频",
+channelDisplay: "展示广告",
+channelPaidOther: "其他付费",
+channelReferral: "引荐",
+channelEmail: "电子邮件",
+channelAffiliates: "联盟",
+channelAudio: "音频",
+channelSms: "短信",
+channelMobilePush: "移动推送",
+channelCrossNetwork: "跨网络",
+channelUnassigned: "未分配",
+countryNotSet: "未设置",
 analyticsCountries: "国家/地区",
 analyticsNotConfigured: "尚未配置 Google Analytics",
 analyticsNotConfiguredDesc: "在环境变量中设置 GA_PROPERTY_ID、GA_CLIENT_EMAIL、GA_PRIVATE_KEY 后即可在此查看报表。",
@@ -227,6 +248,7 @@ uploadLocal: "本地上传",
 uploadHint: "图片将自动压缩并同步到 CDN，上传完成后自动插入",
 dateRange: "日期范围",
 clearFilter: "清除日期筛选",
+filters: "筛选",
 searchMedia: "搜索文件名…",
 pageSize: "每页数量",
 download: "下载",
@@ -272,8 +294,9 @@ github: "GitHub",
 twitter: "Twitter / X",
 url: "URL",
     
-  },
-  en: {
+} as const
+
+const en = {
 
 adminPanel: "Admin",
 loginTitle: "Sign in",
@@ -408,6 +431,26 @@ deviceDesktop: "Desktop",
 deviceMobile: "Mobile",
 deviceTablet: "Tablet",
 deviceOther: "Other",
+channelDirect: "Direct",
+channelOrganicSearch: "Organic Search",
+channelPaidSearch: "Paid Search",
+channelOrganicSocial: "Organic Social",
+channelPaidSocial: "Paid Social",
+channelOrganicShopping: "Organic Shopping",
+channelPaidShopping: "Paid Shopping",
+channelOrganicVideo: "Organic Video",
+channelPaidVideo: "Paid Video",
+channelDisplay: "Display",
+channelPaidOther: "Paid Other",
+channelReferral: "Referral",
+channelEmail: "Email",
+channelAffiliates: "Affiliates",
+channelAudio: "Audio",
+channelSms: "SMS",
+channelMobilePush: "Mobile Push Notifications",
+channelCrossNetwork: "Cross-network",
+channelUnassigned: "Unassigned",
+countryNotSet: "(not set)",
 analyticsCountries: "Countries",
 analyticsNotConfigured: "Google Analytics isn’t configured",
 analyticsNotConfiguredDesc: "Set GA_PROPERTY_ID, GA_CLIENT_EMAIL, and GA_PRIVATE_KEY in the environment to load reports here.",
@@ -505,6 +548,7 @@ uploadHint:
   "Images are compressed and synced to CDN automatically, then inserted on completion",
 dateRange: "Date range",
 clearFilter: "Clear date filter",
+filters: "Filters",
 searchMedia: "Search by filename…",
 pageSize: "Items per page",
 download: "Download",
@@ -551,5 +595,6 @@ github: "GitHub",
 twitter: "Twitter / X",
 url: "URL",
     
-  },
-} as const
+} as const satisfies LocaleMessages<typeof zh>
+
+export const admin = { zh, en }

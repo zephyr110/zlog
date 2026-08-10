@@ -4,8 +4,7 @@ import { useEffect, useState, useMemo, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Ellipsis, Search, SquarePen, Eye, Globe, FilePen, Trash2, Pin } from "lucide-react"
-import { TableSkeleton } from "@/components/ui/loading"
-import { Skeleton } from "@/components/ui/skeleton"
+import { PostsListSkeleton } from "@/components/ui/loading"
 import { HeaderActions } from "@/components/admin/header-actions"
 import { PaginationBar } from "@/components/admin/pagination-bar"
 import { ConfirmDeleteDialog } from "@/components/admin/confirm-delete-dialog"
@@ -219,19 +218,64 @@ function AdminPostsContent() {
     }
   }
 
-  if (loading) {
-    // Mirrors the loaded layout: filter row + table columns
-    // (title / status / pin / date / tags / actions).
+  // Row actions menu shared by the desktop table cell and the mobile card.
+  function renderPostActions(post: PostSummary) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-6">
-        <div className="flex shrink-0 flex-wrap items-center gap-3">
-          <Skeleton className="h-9 w-44 rounded-lg" />
-          <Skeleton className="h-9 w-44 rounded-lg" />
-          <Skeleton className="h-9 max-w-sm flex-1 rounded-lg" />
-        </div>
-        <TableSkeleton rows={5} />
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={t("admin.actions")}
+          className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Ellipsis size={16} />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-36 whitespace-nowrap">
+          <DropdownMenuItem
+            onClick={() =>
+              router.push(
+                `/admin/posts/edit?slug=${encodeURIComponent(post.slug)}`
+              )
+            }
+          >
+            <SquarePen />
+            {t("admin.edit")}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => handleToggleDraft(post.slug, post.draft)}
+          >
+            {post.draft ? <Globe /> : <FilePen />}
+            {post.draft ? (t("admin.publish")) : (t("admin.unpublish"))}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => handleTogglePin(post.slug, post.pinnedAt)}
+          >
+            <Pin />
+            {post.pinnedAt ? t("admin.unpin") : t("admin.pin")}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() =>
+              router.push(`/posts/${encodeURIComponent(post.slug)}`)
+            }
+          >
+            <Eye />
+            {t("admin.view")}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setDeleteTarget(post)}
+          >
+            <Trash2 />
+            {t("admin.delete")}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     )
+  }
+
+  if (loading) {
+    // Mirrors the loaded layout on both breakpoints: filter row, then
+    // table columns on md+ and stacked cards below md.
+    return <PostsListSkeleton rows={5} />
   }
 
   return (
@@ -311,7 +355,7 @@ function AdminPostsContent() {
               </SelectContent>
             </Select>
 
-            <div className="relative flex-1 max-w-sm">
+            <div className="relative min-w-40 flex-1 max-w-sm">
               <Search
                 size={16}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
@@ -330,15 +374,96 @@ function AdminPostsContent() {
             )}
           </div>
 
+          {/* Mobile cards — below md the 6-column table can't fit, so each
+              post becomes a stacked card: title + actions, a meta row
+              (status / pin / date), then tags. */}
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto md:hidden">
+            {paginatedPosts.length === 0 ? (
+              <div className="flex min-h-0 flex-1 rounded-xl border bg-card">
+                <AdminBlockEmpty className="min-h-0 flex-1" />
+              </div>
+            ) : (
+              paginatedPosts.map((post) => (
+                <article
+                  key={post.slug}
+                  className="rounded-xl border bg-card p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <Link
+                      href={`/admin/posts/edit?slug=${encodeURIComponent(
+                        post.slug
+                      )}`}
+                      className="min-w-0 flex-1 line-clamp-2 text-sm font-medium leading-snug text-foreground transition-colors hover:text-primary"
+                    >
+                      {post.title}
+                    </Link>
+                    {/* Negative offsets optically align the icon button with
+                        the title's cap height and the card's right edge. */}
+                    <div className="-mr-2 -mt-1 shrink-0">
+                      {renderPostActions(post)}
+                    </div>
+                  </div>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                    <Badge
+                      variant={post.draft ? "secondary" : "default"}
+                      className={
+                        post.draft
+                          ? "bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+                          : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400"
+                      }
+                    >
+                      {post.draft
+                        ? (t("admin.draft"))
+                        : (t("admin.publishedStatus"))}
+                    </Badge>
+                    {post.pinnedAt ? (
+                      <Pin
+                        className="size-3.5 text-foreground"
+                        strokeWidth={2}
+                        aria-label={t("admin.pinned")}
+                      />
+                    ) : null}
+                    {/* UTC dates — same as the table, every admin sees the
+                        authored date. */}
+                    <span className="text-xs tabular-nums text-muted-foreground">
+                      {new Date(post.date).toLocaleDateString(undefined, {
+                        timeZone: "UTC",
+                      })}
+                    </span>
+                  </div>
+                  {post.tags.length > 0 ? (
+                    <div className="mt-2.5 flex flex-wrap items-center gap-1">
+                      {post.tags.slice(0, 3).map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant="outline"
+                          className="max-w-full truncate font-normal text-foreground"
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                      {post.tags.length > 3 && (
+                        <span className="text-xs text-muted-foreground">
+                          +{post.tags.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  ) : null}
+                </article>
+              ))
+            )}
+          </div>
+
           {/* Outer flex-1 fills space above the pinned PaginationBar.
               Empty: flex column so the no-data block fills below thead
               and centers. With rows: inner table container scrolls and
-              sticky thead pins against that scrollport. */}
+              sticky thead pins against that scrollport. Desktop only —
+              mobile renders the card list above. */}
           <div
             className={
               paginatedPosts.length === 0
-                ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card"
-                : "min-h-0 flex-1 overflow-y-auto rounded-xl border bg-card"
+                ? "hidden min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card md:flex"
+                : "hidden min-h-0 flex-1 overflow-y-auto rounded-xl border bg-card md:block"
             }
           >
             <Table
@@ -442,67 +567,7 @@ function AdminPostsContent() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            aria-label={t("admin.actions")}
-                            className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          >
-                            <Ellipsis size={16} />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            className="min-w-36 whitespace-nowrap"
-                          >
-                            <DropdownMenuItem
-                              onClick={() =>
-                                router.push(
-                                  `/admin/posts/edit?slug=${encodeURIComponent(
-                                    post.slug
-                                  )}`
-                                )
-                              }
-                            >
-                              <SquarePen />
-                              {t("admin.edit")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleToggleDraft(post.slug, post.draft)
-                              }
-                            >
-                              {post.draft ? <Globe /> : <FilePen />}
-                              {post.draft ? (t("admin.publish")) : (t("admin.unpublish"))}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleTogglePin(post.slug, post.pinnedAt)
-                              }
-                            >
-                              <Pin />
-                              {post.pinnedAt
-                                ? t("admin.unpin")
-                                : t("admin.pin")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                router.push(
-                                  `/posts/${encodeURIComponent(post.slug)}`
-                                )
-                              }
-                            >
-                              <Eye />
-                              {t("admin.view")}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onClick={() => setDeleteTarget(post)}
-                            >
-                              <Trash2 />
-                              {t("admin.delete")}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {renderPostActions(post)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -546,18 +611,7 @@ function AdminPostsContent() {
 
 export default function AdminPostsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-0 flex-1 flex-col gap-6">
-          <div className="flex shrink-0 flex-wrap items-center gap-3">
-            <Skeleton className="h-9 w-44 rounded-lg" />
-            <Skeleton className="h-9 w-44 rounded-lg" />
-            <Skeleton className="h-9 max-w-sm flex-1 rounded-lg" />
-          </div>
-          <TableSkeleton rows={5} />
-        </div>
-      }
-    >
+    <Suspense fallback={<PostsListSkeleton rows={5} />}>
       <AdminPostsContent />
     </Suspense>
   )

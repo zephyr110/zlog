@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
@@ -64,9 +64,11 @@ interface AdminSidebarProps {
   collapsed: boolean
   onToggle: () => void
   user: AuthUser
+  mobileOpen: boolean
+  onMobileClose: () => void
 }
 
-export function AdminSidebar({ collapsed, onToggle, user }: AdminSidebarProps) {
+export function AdminSidebar({ collapsed, onToggle, user, mobileOpen, onMobileClose }: AdminSidebarProps) {
   const { t } = useT()
   const site = useSiteConfig()
   const pathname = usePathname()
@@ -76,8 +78,23 @@ export function AdminSidebar({ collapsed, onToggle, user }: AdminSidebarProps) {
 
   const currentTheme = (theme as ThemeMode) || "system"
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false)
+  const asideRef = useRef<HTMLElement>(null)
   const logoSrc = siteLogoSrc(site)
   const { unread: unreadComments } = useCommentUnread()
+
+  // The avatar menu flies out to the right of the rail on desktop, but the
+  // mobile drawer is too narrow for a side flyout — open above the trigger.
+  const subscribeMobile = useCallback((onChange: () => void) => {
+    const mq = window.matchMedia("(max-width: 767px)")
+    mq.addEventListener("change", onChange)
+    return () => mq.removeEventListener("change", onChange)
+  }, [])
+  const isMobile = useSyncExternalStore(
+    subscribeMobile,
+    () => window.matchMedia("(max-width: 767px)").matches,
+    () => false // SSR/first paint: desktop placement; menu isn't open yet
+  )
 
   function handleLogout() {
     clearToken()
@@ -96,11 +113,54 @@ export function AdminSidebar({ collapsed, onToggle, user }: AdminSidebarProps) {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [onToggle])
 
+  // Mobile drawer: move focus in on open, restore to the header trigger on
+  // close. Desktop rail is not a dialog — skip.
+  useEffect(() => {
+    if (!mobileOpen) return
+    const trigger = document.querySelector<HTMLElement>(
+      "[data-admin-sidebar-trigger]"
+    )
+    const root = asideRef.current
+    const toFocus =
+      root?.querySelector<HTMLElement>("a[href], button:not([disabled])") ??
+      root
+    toFocus?.focus()
+    return () => {
+      trigger?.focus()
+    }
+  }, [mobileOpen])
+
   return (
-    <aside
+    <>
+    {/* Mobile drawer backdrop — sits above the sticky header (z-30), below
+        the aside (z-50). Always mounted so the fade animates both ways.
+        While the avatar menu is open it stays visible but inert, so a tap
+        on the dimmed area dismisses only the menu, not the drawer too. */}
+    <div
+      aria-hidden="true"
+      onClick={onMobileClose}
       className={cn(
-        "fixed top-0 left-0 z-40 flex h-full flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-300",
-        collapsed ? "w-[4.5rem]" : "w-64"
+        "fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 md:hidden",
+        mobileOpen
+          ? cn("opacity-100", avatarMenuOpen && "pointer-events-none")
+          : "pointer-events-none opacity-0"
+      )}
+    />
+    <aside
+      ref={asideRef}
+      role={mobileOpen ? "dialog" : undefined}
+      aria-modal={mobileOpen ? true : undefined}
+      aria-label={mobileOpen ? (t("admin.menu") as string) : undefined}
+      className={cn(
+        // Below md: off-canvas overlay drawer (always full width, the layout
+        // passes collapsed=false while open). md+: fixed rail that collapses.
+        // invisible when closed keeps the off-canvas drawer out of the a11y
+        // tree and hit-testing; transition-all flips it at transition end.
+        "fixed top-0 left-0 z-50 flex h-full w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-300",
+        collapsed ? "md:w-[4.5rem]" : "md:w-64",
+        mobileOpen
+          ? "max-md:visible max-md:translate-x-0"
+          : "max-md:invisible max-md:-translate-x-full"
       )}
     >
       {/* Logo — matches admin header height (h-14) */}
@@ -110,7 +170,11 @@ export function AdminSidebar({ collapsed, onToggle, user }: AdminSidebarProps) {
           collapsed ? "justify-center px-2" : "px-3"
         )}
       >
-        <Link href="/admin/dashboard" className="flex min-w-0 items-center gap-2">
+        <Link
+          href="/admin/dashboard"
+          onClick={onMobileClose}
+          className="flex min-w-0 items-center gap-2"
+        >
           <SiteLogo
             src={logoSrc}
             invertInDark={site.logoInvertInDark ?? true}
@@ -142,6 +206,7 @@ export function AdminSidebar({ collapsed, onToggle, user }: AdminSidebarProps) {
                 render={
                   <Link
                     href="/admin/posts/new"
+                    onClick={onMobileClose}
                     aria-label={t("admin.newPost")}
                     className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                   >
@@ -159,6 +224,7 @@ export function AdminSidebar({ collapsed, onToggle, user }: AdminSidebarProps) {
                   <Link
                     href="/"
                     target="_blank"
+                    onClick={onMobileClose}
                     aria-label={t("admin.viewBlog")}
                     className="flex size-9 items-center justify-center rounded-md text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   >
@@ -175,6 +241,7 @@ export function AdminSidebar({ collapsed, onToggle, user }: AdminSidebarProps) {
           <div className="flex items-center gap-2.5">
             <Link
               href="/admin/posts/new"
+              onClick={onMobileClose}
               className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <SquarePen size={16} />
@@ -186,6 +253,7 @@ export function AdminSidebar({ collapsed, onToggle, user }: AdminSidebarProps) {
                   <Link
                     href="/"
                     target="_blank"
+                    onClick={onMobileClose}
                     aria-label={t("admin.viewBlog")}
                     className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-sidebar-border text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   >
@@ -225,6 +293,7 @@ export function AdminSidebar({ collapsed, onToggle, user }: AdminSidebarProps) {
             <Link
               key={link.href}
               href={link.href}
+              onClick={onMobileClose}
               aria-current={isActive ? "page" : undefined}
               aria-label={collapsed ? (t(link.i18nKey) as string) : undefined}
               className={cn(
@@ -279,7 +348,7 @@ export function AdminSidebar({ collapsed, onToggle, user }: AdminSidebarProps) {
 
       {/* Footer — user menu trigger */}
       <div className={cn("shrink-0", collapsed ? "p-2" : "p-3 pt-2")}>
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={setAvatarMenuOpen}>
           <DropdownMenuTrigger
             className={cn(
               "group flex w-full items-center gap-2.5 rounded-lg outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring",
@@ -307,8 +376,8 @@ export function AdminSidebar({ collapsed, onToggle, user }: AdminSidebarProps) {
           </DropdownMenuTrigger>
 
           <DropdownMenuContent
-            align="start"
-            side="right"
+            align={isMobile ? "center" : "start"}
+            side={isMobile ? "top" : "right"}
             sideOffset={8}
             className="w-64 p-2"
           >
@@ -418,6 +487,7 @@ export function AdminSidebar({ collapsed, onToggle, user }: AdminSidebarProps) {
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </aside>
+    </>
   )
 }
 
@@ -451,16 +521,28 @@ export function AdminSidebarTrigger({
           <IconButton
             size="sm"
             onClick={onToggle}
-            aria-label={label}
+            data-admin-sidebar-trigger
             // Always-on muted background; deepens on hover.
             className="bg-muted hover:bg-muted/80"
           >
             <PanelLeft size={16} />
+            {/* Accessible name is breakpoint-aware: below md the button opens
+                the drawer, on desktop it collapses the rail. aria-label can't
+                switch per breakpoint, so visually hidden spans do — display:none
+                content is excluded from the computed name. */}
+            <span className="sr-only max-md:hidden">
+              {label} · {shortcut}
+            </span>
+            <span className="sr-only md:hidden">{t("admin.menu")}</span>
           </IconButton>
         }
       />
       <TooltipContent side="bottom" sideOffset={6}>
-        {label} · {shortcut}
+        {/* Match the breakpoint-aware accessible name on the trigger. */}
+        <span className="max-md:hidden">
+          {label} · {shortcut}
+        </span>
+        <span className="md:hidden">{t("admin.menu")}</span>
       </TooltipContent>
     </Tooltip>
   )

@@ -8,6 +8,8 @@ import { archive } from "./i18n/archive"
 import { category } from "./i18n/category"
 import { admin } from "./i18n/admin"
 
+export type { LocaleMessages } from "./i18n/locale-messages"
+
 export type Locale = "zh" | "en"
 
 export const locales: Locale[] = ["zh", "en"]

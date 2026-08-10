@@ -104,16 +104,30 @@ export default function AdminDashboardPage() {
             ))}
           </div>
 
-          {/* Contribution calendar card */}
+          {/* Contribution calendar card — title + year filter share one
+              header row; heatmap below with a mobile left-fade hint. */}
           <div className="flex flex-col gap-4 rounded-xl bg-card py-4 ring-1 ring-foreground/10">
-            <div className="px-4">
+            <div className="flex items-center justify-between gap-3 px-4">
               <Skeleton className="h-5 w-28" />
+              <Skeleton className="h-8 w-36 shrink-0 rounded-md" />
             </div>
             <div className="flex flex-col gap-3 px-4">
-              <div className="flex justify-end">
-                <Skeleton className="h-8 w-36 rounded-md" />
+              <div className="relative overflow-hidden">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-card to-transparent md:hidden"
+                />
+                <div className="mb-1.5 flex gap-[3px]">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <Skeleton key={i} className="h-3.5 flex-1 rounded-sm" />
+                  ))}
+                </div>
+                <div className="grid h-[90px] auto-cols-[minmax(0,1fr)] grid-flow-col grid-rows-7 gap-[3px]">
+                  {Array.from({ length: 7 * 24 }).map((_, i) => (
+                    <Skeleton key={i} className="rounded-[3px]" />
+                  ))}
+                </div>
               </div>
-              <Skeleton className="h-[118px] w-full" />
               <div className="flex items-center justify-end gap-1.5">
                 <Skeleton className="h-2.5 w-8" />
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -236,17 +250,9 @@ export default function AdminDashboardPage() {
           })}
         </div>
 
-        {/* Contribution calendar — full width */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              {t("admin.postsCalendar")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <ContributionCalendar posts={posts} />
-          </CardContent>
-        </Card>
+        {/* Contribution calendar — owns its Card so the year filter
+            sits in CardAction beside the title (same row on mobile). */}
+        <ContributionCalendar posts={posts} />
       </section>
 
       {/* Charts */}

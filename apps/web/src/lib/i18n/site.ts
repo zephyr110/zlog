@@ -1,7 +1,8 @@
 // site — zh/en translation dictionary (split by domain)
 
-export const site = {
-  zh: {
+import type { LocaleMessages } from "./locale-messages"
+
+const zh = {
 
 heroTitleLine1: "思考、想法",
 heroTitleLine2: "和故事。",
@@ -41,8 +42,9 @@ noTopics: "暂无分类",
 yearExpandAll: "展开全部",
 yearCollapseAll: "折叠全部",
     
-  },
-  en: {
+} as const
+
+const en = {
 
 
 heroTitleLine1: "Thoughts, ideas",
@@ -84,5 +86,6 @@ noTopics: "No topics",
     
 yearExpandAll: "Expand all",
 yearCollapseAll: "Collapse all",
-  },
-} as const
+} as const satisfies LocaleMessages<typeof zh>
+
+export const site = { zh, en }

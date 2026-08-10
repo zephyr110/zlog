@@ -1,7 +1,8 @@
 // about — zh/en translation dictionary (split by domain)
 
-export const about = {
-  zh: {
+import type { LocaleMessages } from "./locale-messages"
+
+const zh = {
 
 title: "关于",
 description: "关于这个博客及其作者的故事。",
@@ -25,8 +26,9 @@ database: "边缘分布式 SQLite 数据库",
 hosting: "全球边缘网络部署",
 cicd: "Git 推送自动构建部署",
     
-  },
-  en: {
+} as const
+
+const en = {
 
 title: "About",
 description:
@@ -52,5 +54,6 @@ database: "Edge-distributed SQLite database",
 hosting: "Global edge network deployment",
 cicd: "Automated build and deploy on push",
     
-  },
-} as const
+} as const satisfies LocaleMessages<typeof zh>
+
+export const about = { zh, en }

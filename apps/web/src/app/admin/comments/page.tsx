@@ -180,7 +180,7 @@ export default function AdminCommentsPage() {
                   !comment.isRead && "bg-primary/[0.03] ring-primary/30"
                 )}
               >
-                <CardHeader className="flex flex-row flex-wrap items-center gap-3">
+                <CardHeader className="flex flex-row items-center gap-3">
                   <CommentAvatar
                     commentId={comment.id}
                     name={comment.authorName || "Anonymous"}
@@ -221,9 +221,10 @@ export default function AdminCommentsPage() {
                   </div>
                   {/* Status / delete live in the header corner so the
                       body reads author → comment → context without a
-                      full-width action band. On narrow panes the
-                      actions wrap to their own row (basis-full). */}
-                  <div className="ml-auto flex shrink-0 items-center gap-1 max-sm:basis-full max-sm:justify-end">
+                      full-width action band. Icon-only below sm — text
+                      labels made the buttons wrap into a ragged second
+                      row on phones. */}
+                  <div className="ml-auto flex shrink-0 items-center gap-1">
                     {comment.isRead ? (
                       <span className="inline-flex items-center gap-1 px-1 text-xs text-muted-foreground/70">
                         <Check size={13} />
@@ -233,22 +234,29 @@ export default function AdminCommentsPage() {
                       <Button
                         size="sm"
                         variant="outline"
+                        aria-label={t("admin.markRead")}
+                        className="max-sm:size-8 max-sm:px-0"
                         onClick={() => void markRead(comment.id)}
                         disabled={busyId === comment.id}
                       >
-                        <Check size={14} className="mr-1.5" />
-                        {t("admin.markRead")}
+                        <Check size={14} className="sm:mr-1.5" />
+                        <span className="hidden sm:inline">
+                          {t("admin.markRead")}
+                        </span>
                       </Button>
                     )}
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      aria-label={t("admin.delete")}
+                      className="max-sm:size-8 max-sm:px-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
                       onClick={() => void remove(comment.id)}
                       disabled={busyId === comment.id}
                     >
-                      <Trash2 size={14} className="mr-1.5" />
-                      {t("admin.delete")}
+                      <Trash2 size={14} className="sm:mr-1.5" />
+                      <span className="hidden sm:inline">
+                        {t("admin.delete")}
+                      </span>
                     </Button>
                   </div>
                 </CardHeader>

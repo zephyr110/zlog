@@ -4,27 +4,28 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { MediaRowActions } from "@/components/admin/media-row-actions"
 import type { MediaFile } from "@/components/admin/media-lightbox"
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip"
+import { TruncateTooltip } from "@/components/ui/truncate-tooltip"
 import { useT } from "@/components/layout/trans"
 import { Upload, Trash2 } from "lucide-react"
 import { formatUtcDateTime } from "@/lib/date"
 
 export function MediaGridSkeleton() {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-x-4 gap-y-5">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-4 gap-y-5 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]">
       {Array.from({ length: 8 }).map((_, i) => (
         <div
           key={i}
           className="flex aspect-[4/3] flex-col overflow-hidden rounded-xl border bg-card"
         >
           <Skeleton className="min-h-0 flex-1 rounded-none" />
-          <div className="shrink-0 space-y-1 border-t p-2">
+          <div className="flex shrink-0 flex-col gap-1 border-t p-2">
             <Skeleton className="h-3.5 w-3/4" />
-            <Skeleton className="h-3 w-1/3" />
+            <div className="flex items-center gap-1">
+              <Skeleton className="h-3 w-1/3 flex-1" />
+              <Skeleton className="size-8 shrink-0 rounded-md" />
+              <Skeleton className="size-8 shrink-0 rounded-md" />
+              <Skeleton className="size-8 shrink-0 rounded-md" />
+            </div>
           </div>
         </div>
       ))}
@@ -54,7 +55,7 @@ export function MediaGrid({
   // Whole tile is 4:3 (flat) — image + meta share the box so upload
   // and media cards stay the same size. auto-fill ~200px min.
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-x-4 gap-y-5">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-4 gap-y-5 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]">
       {/* Upload tile — same 4:3 footprint as media cards */}
       <button
         type="button"
@@ -117,12 +118,9 @@ export function MediaGrid({
             </button>
           </div>
           <CardContent className="shrink-0 space-y-1 border-t p-2">
-            <Tooltip>
-              <TooltipTrigger
-                render={<p className="truncate text-xs font-medium">{file.name}</p>}
-              />
-              <TooltipContent>{file.name}</TooltipContent>
-            </Tooltip>
+            <TruncateTooltip className="block text-xs font-medium">
+              {file.name}
+            </TruncateTooltip>
             <div className="flex items-center gap-1">
               <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
                 {file.createdAt ? formatUtcDateTime(file.createdAt) : " "}
