@@ -45,9 +45,17 @@ function standaloneVideoFromChildren(children: ReactNode) {
   if (!isValidElement(only)) return null
   const href = (only.props as { href?: string }).href
   if (!href) return null
+  // A linked image ([![cover](img.png)](https://youtu.be/…)) must stay a
+  // link — converting it would silently drop the thumbnail. Only anchors
+  // whose content is plain text become embeds.
+  const anchorChildren = (only as ReactElement<{ children?: ReactNode }>).props
+    .children
+  if (Children.toArray(anchorChildren).some((c) => isValidElement(c))) {
+    return null
+  }
   const parsed = parseVideoEmbed(href)
   if (!parsed) return null
-  const title = childText((only as ReactElement<{ children?: ReactNode }>).props.children)
+  const title = childText(anchorChildren)
   return { ...parsed, title: title || undefined }
 }
 

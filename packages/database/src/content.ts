@@ -252,28 +252,56 @@ export async function setPostPinned(
   const existing = await getPostBySlug(clean, true)
   if (!existing) return null
 
-  await db.execute({
-    sql: `UPDATE posts SET pinned_at = ?, updated_at = datetime('now') WHERE slug = ?`,
-    args: [pinned ? new Date().toISOString() : null, clean],
+  // Idempotent: re-pinning an already-pinned post keeps its original
+  // pinned_at — rewriting the timestamp would silently reorder the
+  // homepage pins (ORDER BY pinned_at DESC).
+  if (pinned === Boolean(existing.pinnedAt)) return existing
+
+  // Same "YYYY-MM-DD HH:MM:SS" format as created_at/updated_at
+  // (datetime('now')) — an ISO string would mix formats in one table.
+  const pinnedAt = pinned
+    ? new Date().toISOString().slice(0, 19).replace("T", " ")
+    : null
+
+  const result = await db.execute({
+    sql: `UPDATE posts SET pinned_at = ?, updated_at = datetime('now') WHERE slug = ? RETURNING *`,
+    args: [pinnedAt, clean],
   })
-  return getPostBySlug(clean, true)
+  const row = result.rows[0]
+  return row ? rowToPost(row) : null
 }
 
+/** Homepage "Latest" grid: pinned posts first, then the newest unpinned
+ *  posts fill the remaining slots. Pinned is capped at limit − 1 — at
+ *  least one slot is always reserved for fresh unpinned content, so
+ *  pinning many posts can't push every recent article off the homepage. */
 export async function getHomepageLatestPosts(
-  excludeSlug: string,
   limit: number
 ): Promise<PostSummary[]> {
   const db = requireDb()
   await ensureTable(db)
-  const clean = safeSlug(excludeSlug)
-  const result = await db.execute({
-    sql: `SELECT * FROM posts
-          WHERE draft = 0 AND slug != ?
-          ORDER BY (pinned_at IS NULL) ASC, pinned_at DESC, date DESC
-          LIMIT ?`,
-    args: [clean, limit],
-  })
-  return result.rows.map((row) => toPostSummary(rowToPost(row)))
+  const pinnedLimit = Math.max(1, limit - 1)
+  const [pinned, unpinned] = await Promise.all([
+    db.execute({
+      sql: `SELECT * FROM posts
+            WHERE draft = 0 AND pinned_at IS NOT NULL
+            ORDER BY pinned_at DESC, date DESC
+            LIMIT ?`,
+      args: [pinnedLimit],
+    }),
+    db.execute({
+      sql: `SELECT * FROM posts
+            WHERE draft = 0 AND pinned_at IS NULL
+            ORDER BY date DESC
+            LIMIT ?`,
+      args: [limit],
+    }),
+  ])
+  const pinnedPosts = pinned.rows.map((row) => toPostSummary(rowToPost(row)))
+  const unpinnedPosts = unpinned.rows.map((row) =>
+    toPostSummary(rowToPost(row))
+  )
+  return [...pinnedPosts, ...unpinnedPosts].slice(0, limit)
 }
 
 export async function getAllTags(): Promise<string[]> {

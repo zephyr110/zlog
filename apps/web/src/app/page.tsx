@@ -15,16 +15,21 @@ import { EmptyState } from "@/components/ui/empty-state"
 const LATEST_GRID_COUNT = 6
 
 export default async function HomePage() {
-  // Featured stays newest-by-date; Latest is pin-aware and excludes Featured
-  // so a pinned spotlight post does not appear twice.
-  const [featuredList, postCount] = await Promise.all([
+  // Featured stays newest-by-date; Latest is pin-aware. Both queries run
+  // in parallel — the featured slug can't be known before getPublishedPosts
+  // resolves, so fetch one extra row and dedupe in JS instead of a second
+  // serialized round trip (the old code awaited a dependent query).
+  const [featuredList, postCount, latestAll] = await Promise.all([
     getPublishedPosts(1),
     getPublishedCount(),
+    getHomepageLatestPosts(LATEST_GRID_COUNT + 1),
   ])
   const featured = featuredList[0]
   const latest = featured
-    ? await getHomepageLatestPosts(featured.slug, LATEST_GRID_COUNT)
-    : []
+    ? latestAll
+        .filter((p) => p.slug !== featured.slug)
+        .slice(0, LATEST_GRID_COUNT)
+    : latestAll.slice(0, LATEST_GRID_COUNT)
 
   return (
     <div className="min-h-[calc(100vh-4rem)]">

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Calendar, Clock } from "lucide-react"
+import { ArrowRight, ArrowUpToLine, Calendar, Clock } from "lucide-react"
 import { TagBadge } from "@/components/blog/tag-badge"
 import { gradientPairs } from "@/components/blog/post-card"
 import { useT } from "@/components/layout/trans"
@@ -53,6 +53,23 @@ export function FeaturedPostCard({ post }: { post: PostSummary }) {
           <span className="absolute left-4 top-4 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
             {t("site.latest")}
           </span>
+
+          {/* Pin ribbon — mirrored to the right so it never collides with
+              the "Latest" badge; same fold as PostCard's showPinBadge. The
+              spotlight post is excluded from the Latest grid below, so
+              this is where a pinned newest post shows its pin. */}
+          {post.pinnedAt && (
+            <span
+              className="pointer-events-none absolute right-0 top-0 z-10 size-10 overflow-hidden rounded-tr-xl"
+              aria-hidden
+            >
+              <span className="absolute left-0 top-0 size-0 border-t-[40px] border-l-[40px] border-t-zinc-600 border-l-transparent dark:border-t-zinc-100" />
+              <ArrowUpToLine
+                className="absolute right-1 top-1 size-3.5 text-white dark:text-zinc-900"
+                strokeWidth={2.5}
+              />
+            </span>
+          )}
         </div>
 
         {/* Content */}

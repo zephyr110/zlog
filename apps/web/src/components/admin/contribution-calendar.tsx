@@ -6,11 +6,11 @@ import {
   useEffect,
   useRef,
   useCallback,
-  useSyncExternalStore,
   type CSSProperties,
 } from "react"
 import { useT } from "@/components/layout/trans"
 import { useLocale } from "@/components/layout/i18n-provider"
+import { useCanHover } from "@/hooks/use-media-query"
 import {
   Select,
   SelectContent,
@@ -54,16 +54,6 @@ function getLevel(count: number): number {
   return 4
 }
 
-function subscribeHover(onChange: () => void) {
-  const mq = window.matchMedia("(hover: hover) and (pointer: fine)")
-  mq.addEventListener("change", onChange)
-  return () => mq.removeEventListener("change", onChange)
-}
-
-function getHoverSnapshot() {
-  return window.matchMedia("(hover: hover) and (pointer: fine)").matches
-}
-
 interface TooltipState {
   date: string
   count: number
@@ -74,7 +64,14 @@ interface TooltipState {
   /** Horizontal alignment — flips near the edges so the card's
       overflow-hidden never clips the bubble. */
   align: "left" | "center" | "right"
+  /** Vertical side — top-row cells flip below so the scrollport
+      (overflow-x-auto ⇒ overflow-y: auto) can't clip the bubble. */
+  side: "top" | "bottom"
 }
+
+/** Bubble height + gap; cells in rows closer to the container top than
+ *  this flip the tooltip below the cell instead. */
+const TOOLTIP_FLIP_ABOVE_MIN = 72
 
 /** Calendar window: either the rolling past year or a specific year. */
 function buildWeeks(
@@ -83,20 +80,25 @@ function buildWeeks(
 ): { date: Date; key: string; count: number }[][] {
   let start: Date
   if (selectedYear) {
-    // Calendar year: Jan 1 … Dec 31
+    // Calendar year: Jan 1 … Dec 31. The Sunday-aligned window can start
+    // up to 6 days in the previous December and Math.ceil(totalDays / 7)
+    // columns would spill past Dec 31 into January — stop at the year
+    // boundary so the NEXT year's post counts never bleed into this
+    // year's heatmap (the last column simply holds fewer than 7 cells).
     start = new Date(selectedYear, 0, 1)
     start.setDate(start.getDate() - start.getDay()) // align to Sunday
     const end = new Date(selectedYear, 11, 31)
-    const totalDays = Math.ceil((end.getTime() - start.getTime()) / 86_400_000)
     const weeks: { date: Date; key: string; count: number }[][] = []
     const cursor = new Date(start)
-    for (let w = 0; w < Math.ceil(totalDays / 7); w++) {
+    for (let w = 0; w < 53; w++) {
       const column: { date: Date; key: string; count: number }[] = []
       for (let d = 0; d < 7; d++) {
+        if (cursor.getTime() > end.getTime()) break
         const key = formatLocalDate(cursor)
         column.push({ date: new Date(cursor), key, count: countsByDay.get(key) || 0 })
         cursor.setDate(cursor.getDate() + 1)
       }
+      if (column.length === 0) break
       weeks.push(column)
     }
     return weeks
@@ -134,11 +136,7 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Fine pointer + hover → desktop tooltips; touch devices use tap.
-  const canHover = useSyncExternalStore(
-    subscribeHover,
-    getHoverSnapshot,
-    () => true
-  )
+  const canHover = useCanHover()
 
   useEffect(() => {
     setMounted(true) // eslint-disable-line react-hooks/set-state-in-effect
@@ -269,12 +267,17 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
           : visibleX > width * 0.82
             ? "right"
             : "center"
+      // Top rows: the bubble (−translate-y-full above the cell) would sit
+      // above the scrollport's top edge and get clipped — flip below.
+      const cellTop = rect.top - originY
+      const flipBelow = cellTop < TOOLTIP_FLIP_ABOVE_MIN
       setTooltip({
         date,
         count,
         x,
-        y: rect.top - originY - 8,
+        y: flipBelow ? rect.bottom - originY + 8 : cellTop - 8,
         align,
+        side: flipBelow ? "bottom" : "top",
       })
     },
     []
@@ -505,7 +508,10 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
           {tooltip && (
             <div
               className={cn(
-                "pointer-events-none absolute z-20 -translate-y-full",
+                "pointer-events-none absolute z-20",
+                tooltip.side === "top"
+                  ? "-translate-y-full"
+                  : "translate-y-0",
                 tooltip.align === "center" && "-translate-x-1/2",
                 tooltip.align === "left" && "-translate-x-1",
                 tooltip.align === "right" && "translate-x-[calc(-100%+4px)]"

@@ -17,9 +17,14 @@ function hostname(url: URL): string {
 function bilibiliIdFromPath(pathname: string): string | null {
   // /video/BVxxx… or /video/BVxxx/...
   const m = pathname.match(/\/video\/(BV[a-zA-Z0-9]+)/i)
-  if (!m) return null
-  const id = m[1]
-  return BV_RE.test(id) ? id : null
+  if (m) {
+    const id = m[1]
+    return BV_RE.test(id) ? id : null
+  }
+  // b23.tv short links carry the BV id directly in the path
+  // (https://b23.tv/BV1xx…) with no /video/ segment.
+  const bare = pathname.match(/(BV[a-zA-Z0-9]+)/)
+  return bare && BV_RE.test(bare[1]) ? bare[1] : null
 }
 
 function youtubeIdFromUrl(url: URL): string | null {

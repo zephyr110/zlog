@@ -233,6 +233,16 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (pinned !== undefined) {
+    // A pin on a draft would sit invisible until publication, then
+    // silently jump the post to the top of the homepage — reject it.
+    // (draft:false + pinned:true together — publish-and-pin — is fine:
+    // the draft flip above already ran.)
+    if (pinned && updatedPost.draft) {
+      return NextResponse.json(
+        { error: "Publish the post before pinning it" },
+        { status: 400 }
+      )
+    }
     updatedPost = await setPostPinned(slug, pinned)
     if (!updatedPost) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 })

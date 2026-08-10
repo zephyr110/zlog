@@ -35,10 +35,51 @@ import {
 } from "@/components/ui/select"
 import { apiFetch } from "@/lib/api-client"
 import { fetchAdminPosts } from "@/lib/admin-posts"
+import { FormattedDate } from "@/components/blog/formatted-date"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
 import { categoryKeys, getCategoryLabel, resolveCategory } from "@/lib/categories"
 import { type PostSummary } from "@zlog/database"
+
+/** Draft/published badge — shared by the mobile card and desktop table so
+ *  the status palette can't drift between the two variants. */
+function StatusBadge({ draft }: { draft: boolean }) {
+  const { t } = useT()
+  return (
+    <Badge
+      variant={draft ? "secondary" : "default"}
+      className={
+        draft
+          ? "bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+          : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400"
+      }
+    >
+      {draft ? (t("admin.draft")) : (t("admin.publishedStatus"))}
+    </Badge>
+  )
+}
+
+/** First 3 tags + "+N" overflow — shared by the mobile card and table. */
+function TagChips({ tags }: { tags: string[] }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {tags.slice(0, 3).map((tag) => (
+        <Badge
+          key={tag}
+          variant="outline"
+          className="max-w-full truncate font-normal text-foreground"
+        >
+          {tag}
+        </Badge>
+      ))}
+      {tags.length > 3 && (
+        <span className="text-xs text-muted-foreground">
+          +{tags.length - 3}
+        </span>
+      )}
+    </div>
+  )
+}
 
 function AdminPostsContent() {
   const { t } = useT()
@@ -139,7 +180,10 @@ function AdminPostsContent() {
         }
       )
       if (res.ok) {
-        setPosts(posts.filter((p) => p.slug !== target.slug))
+        // Functional update — the render-time `posts` closure may predate
+        // pin/draft toggles that landed while the DELETE was in flight;
+        // filtering a stale array would wipe them from the UI.
+        setPosts((prev) => prev.filter((p) => p.slug !== target.slug))
         toast.success(t("admin.deleteSuccess"))
       } else {
         toast.error(t("admin.deleteFailed"))
@@ -200,9 +244,14 @@ function AdminPostsContent() {
             p.slug === slug
               ? {
                   ...p,
+                  // Mirror the server's SQLite "YYYY-MM-DD HH:MM:SS"
+                  // format so the optimistic value matches what the DB
+                  // stores (setPostPinned writes it, not ISO-8601).
                   pinnedAt:
                     data.post?.pinnedAt ??
-                    (nextPinned ? new Date().toISOString() : null),
+                    (nextPinned
+                      ? new Date().toISOString().slice(0, 19).replace("T", " ")
+                      : null),
                 }
               : p
           )
@@ -245,12 +294,17 @@ function AdminPostsContent() {
             {post.draft ? <Globe /> : <FilePen />}
             {post.draft ? (t("admin.publish")) : (t("admin.unpublish"))}
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => handleTogglePin(post.slug, post.pinnedAt)}
-          >
-            <Pin />
-            {post.pinnedAt ? t("admin.unpin") : t("admin.pin")}
-          </DropdownMenuItem>
+          {/* Pinning is published-only — a pin on a draft would sit
+              invisible until publication, then silently jump the post to
+              the top of the homepage. */}
+          {!post.draft && (
+            <DropdownMenuItem
+              onClick={() => handleTogglePin(post.slug, post.pinnedAt)}
+            >
+              <Pin />
+              {post.pinnedAt ? t("admin.unpin") : t("admin.pin")}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             onClick={() =>
               router.push(`/posts/${encodeURIComponent(post.slug)}`)
@@ -404,18 +458,7 @@ function AdminPostsContent() {
                     </div>
                   </div>
                   <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                    <Badge
-                      variant={post.draft ? "secondary" : "default"}
-                      className={
-                        post.draft
-                          ? "bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
-                          : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400"
-                      }
-                    >
-                      {post.draft
-                        ? (t("admin.draft"))
-                        : (t("admin.publishedStatus"))}
-                    </Badge>
+                    <StatusBadge draft={post.draft} />
                     {post.pinnedAt ? (
                       <Pin
                         className="size-3.5 text-foreground"
@@ -425,28 +468,15 @@ function AdminPostsContent() {
                     ) : null}
                     {/* UTC dates — same as the table, every admin sees the
                         authored date. */}
-                    <span className="text-xs tabular-nums text-muted-foreground">
-                      {new Date(post.date).toLocaleDateString(undefined, {
-                        timeZone: "UTC",
-                      })}
-                    </span>
+                    <FormattedDate
+                      date={post.date}
+                      month="short"
+                      className="text-xs tabular-nums text-muted-foreground"
+                    />
                   </div>
                   {post.tags.length > 0 ? (
-                    <div className="mt-2.5 flex flex-wrap items-center gap-1">
-                      {post.tags.slice(0, 3).map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="outline"
-                          className="max-w-full truncate font-normal text-foreground"
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                      {post.tags.length > 3 && (
-                        <span className="text-xs text-muted-foreground">
-                          +{post.tags.length - 3}
-                        </span>
-                      )}
+                    <div className="mt-2.5">
+                      <TagChips tags={post.tags} />
                     </div>
                   ) : null}
                 </article>
@@ -510,18 +540,7 @@ function AdminPostsContent() {
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={post.draft ? "secondary" : "default"}
-                          className={
-                            post.draft
-                              ? "bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
-                              : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400"
-                          }
-                        >
-                          {post.draft
-                            ? (t("admin.draft"))
-                            : (t("admin.publishedStatus"))}
-                        </Badge>
+                        <StatusBadge draft={post.draft} />
                       </TableCell>
                       <TableCell className="text-center">
                         {post.pinnedAt ? (
@@ -544,27 +563,10 @@ function AdminPostsContent() {
                       <TableCell className="whitespace-nowrap text-sm tabular-nums text-foreground">
                         {/* UTC dates — format in UTC so every admin sees
                             the authored date, not the previous day. */}
-                        {new Date(post.date).toLocaleDateString(undefined, {
-                          timeZone: "UTC",
-                        })}
+                        <FormattedDate date={post.date} month="short" />
                       </TableCell>
                       <TableCell className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-1">
-                          {post.tags.slice(0, 3).map((tag) => (
-                            <Badge
-                              key={tag}
-                              variant="outline"
-                              className="max-w-full truncate font-normal text-foreground"
-                            >
-                              {tag}
-                            </Badge>
-                          ))}
-                          {post.tags.length > 3 && (
-                            <span className="text-xs text-muted-foreground">
-                              +{post.tags.length - 3}
-                            </span>
-                          )}
-                        </div>
+                        <TagChips tags={post.tags} />
                       </TableCell>
                       <TableCell className="text-right">
                         {renderPostActions(post)}
