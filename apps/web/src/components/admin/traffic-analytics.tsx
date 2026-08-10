@@ -134,7 +134,6 @@ function CompositionDonut({
               outerRadius="85%"
               stroke="var(--color-card)"
               strokeWidth={4}
-              isAnimationActive={false}
             >
               <Label
                 content={({ viewBox }) => {
