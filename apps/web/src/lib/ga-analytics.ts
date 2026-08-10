@@ -9,7 +9,7 @@ export type AnalyticsReport = {
   topPages: { path: string; views: number }[]
   sources: { source: string; users: number }[]
   devices: { device: string; users: number }[]
-  countries: { country: string; users: number }[]
+  countries: { country: string; countryId: string; users: number }[]
 }
 
 export type AnalyticsFetchErrorKind = "timeout" | "permission" | "unavailable"
@@ -222,7 +222,7 @@ export async function fetchAnalyticsReport(
       },
       {
         dateRanges: [dateRange],
-        dimensions: [{ name: "country" }],
+        dimensions: [{ name: "country" }, { name: "countryId" }],
         metrics: [{ name: "activeUsers" }],
         orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
         limit: "10",
@@ -255,6 +255,7 @@ export async function fetchAnalyticsReport(
     })),
     countries: (reports[4]?.rows ?? []).map((row) => ({
       country: dimValue(row, 0),
+      countryId: dimValue(row, 1),
       users: metricValue(row, 0),
     })),
   }

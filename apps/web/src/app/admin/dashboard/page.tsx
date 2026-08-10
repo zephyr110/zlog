@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Card, CardAction, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { PostStats } from "@/components/admin/post-stats"
-import { TrafficAnalytics } from "@/components/admin/traffic-analytics"
+import { TrafficAnalytics, TrafficSkeleton } from "@/components/admin/traffic-analytics"
 import { ContributionCalendar } from "@/components/admin/contribution-calendar"
 import { FormattedDate } from "@/components/blog/formatted-date"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -147,45 +147,13 @@ export default function AdminDashboardPage() {
           </div>
         </section>
 
-        {/* Traffic — mirrors TrafficAnalytics chrome (header + 2 totals + 4 panels) */}
+        {/* Traffic — section chrome + shared panel skeletons */}
         <section className="flex flex-col gap-5 md:gap-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Skeleton className="h-7 w-24" />
             <Skeleton className="h-8 w-44 rounded-lg" />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
-            {[0, 1].map((i) => (
-              <div
-                key={i}
-                className="flex flex-col gap-4 rounded-xl bg-card py-4 ring-1 ring-foreground/10"
-              >
-                <div className="flex items-start justify-between px-4">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="size-8 rounded-lg" />
-                </div>
-                <div className="px-4">
-                  <Skeleton className="h-9 w-16" />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
-            {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="flex flex-col gap-3 rounded-xl bg-card py-4 ring-1 ring-foreground/10"
-              >
-                <div className="px-4">
-                  <Skeleton className="h-4 w-28" />
-                </div>
-                <div className="flex flex-col gap-3 px-4 pb-2">
-                  {Array.from({ length: 4 }).map((_, j) => (
-                    <Skeleton key={j} className="h-6 w-full" />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          <TrafficSkeleton />
         </section>
 
         {/* Recent posts — section header + list */}
