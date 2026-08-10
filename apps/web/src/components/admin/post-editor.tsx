@@ -14,9 +14,13 @@ import { computeReadingStats, type Post } from "@zlog/core"
 import { MediaPickerDialog } from "@/components/admin/media-picker-dialog"
 import {
   HeaderActions,
-  HeaderTitleExtra,
 } from "@/components/admin/header-actions"
 import { ExternalLink } from "lucide-react"
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import {
   EditorToolbar,
@@ -323,31 +327,43 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
 
   return (
     <div className="space-y-6">
-      {/* Title lives in admin layout pageMeta; adornment + actions portal in. */}
-      {!isNew && !draft && (
-        <HeaderTitleExtra>
-          <a
-            href={`/posts/${encodeURIComponent(slug)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-          >
-            <ExternalLink size={12} />
-            {t("admin.viewOnline")}
-          </a>
-        </HeaderTitleExtra>
-      )}
+      {/* Title lives in admin layout pageMeta; actions portal in. */}
       <HeaderActions>
+        {!isNew && !draft && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <a
+                  href={`/posts/${encodeURIComponent(slug)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t("admin.viewOnline")}
+                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-primary transition-colors hover:bg-primary/10 hover:text-primary"
+                >
+                  <ExternalLink size={14} />
+                </a>
+              }
+            />
+            <TooltipContent>{t("admin.viewOnline")}</TooltipContent>
+          </Tooltip>
+        )}
         <Button
           variant="outline"
           size="sm"
           onClick={() => savePost(false)}
           disabled={saving}
         >
-          {saving ? (t("admin.saving")) : (t("admin.saveDraft"))}
+          {saving ? (
+            t("admin.saving")
+          ) : (
+            <>
+              <span className="sm:hidden">{t("admin.saveDraftShort")}</span>
+              <span className="hidden sm:inline">{t("admin.saveDraft")}</span>
+            </>
+          )}
         </Button>
         <Button size="sm" onClick={() => savePost(true)} disabled={saving}>
-          {saving ? (t("admin.publishing")) : (t("admin.publish"))}
+          {saving ? t("admin.publishing") : t("admin.publish")}
         </Button>
       </HeaderActions>
 

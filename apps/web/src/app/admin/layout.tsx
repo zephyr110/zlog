@@ -174,7 +174,7 @@ export default function AdminLayout({
             onToggle={handleSidebarTrigger}
           />
           {meta && (
-            <div className="flex min-w-0 items-center gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 <h1 className="truncate text-lg font-semibold tracking-tight md:text-xl">
                   {/* titleKey/descKey are TranslationPath (union of all
@@ -182,10 +182,12 @@ export default function AdminLayout({
                       pageMeta only stores string keys — narrow for JSX. */}
                   {t(meta.titleKey) as string}
                 </h1>
-                {/* Optional adornment beside the title (e.g. view-live link) */}
+                {/* Optional adornment beside the title (e.g. view-live link).
+                    Hidden on narrow screens when empty; pages that still
+                    portal here keep desktop-only extras next to the title. */}
                 <div
                   id="admin-header-title-extra"
-                  className="min-w-0 shrink-0 empty:hidden"
+                  className="hidden min-w-0 shrink-0 empty:hidden sm:block"
                 />
               </div>
               {meta.descKey && (
@@ -202,7 +204,10 @@ export default function AdminLayout({
             </div>
           )}
           {/* Page primary actions portaled in via <HeaderActions /> */}
-          <div id="admin-header-actions" className="ml-auto flex items-center gap-2" />
+          <div
+            id="admin-header-actions"
+            className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2"
+          />
         </header>
         {/* Content column fills the viewport under the header. List pages
             grow their table/grid (flex-1) and pin PaginationBar to the
