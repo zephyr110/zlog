@@ -114,9 +114,12 @@ function CompositionDonut({
       {/* Row mode centers the ring+legend as one compact group — a flex-1
           legend would stretch across the card and leave a void in the middle. */}
       <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+        {/* Fluid ring: ~45% of the card width, capped — Pie radii are
+            percentages below so the donut actually scales on wide screens
+            instead of staying a fixed 150px island. */}
         <ChartContainer
           config={config}
-          className="aspect-square h-[150px] shrink-0"
+          className="aspect-square h-auto w-full max-w-[190px] shrink-0 sm:w-[45%] sm:max-w-[220px]"
         >
           <PieChart>
             <ChartTooltip
@@ -127,8 +130,8 @@ function CompositionDonut({
               data={data}
               dataKey="users"
               nameKey="label"
-              innerRadius={44}
-              outerRadius={64}
+              innerRadius="59%"
+              outerRadius="85%"
               stroke="var(--color-card)"
               strokeWidth={4}
             >
@@ -165,7 +168,7 @@ function CompositionDonut({
           </PieChart>
         </ChartContainer>
 
-        <ul className="flex w-full min-w-0 flex-col justify-center gap-1.5 sm:w-44 sm:flex-none">
+        <ul className="flex w-full min-w-0 flex-col justify-center gap-1.5 sm:w-44 sm:flex-none xl:w-56">
           {data.map((d) => (
             <li key={d.key} className="flex items-center gap-2 text-xs">
               <span
@@ -487,13 +490,13 @@ function PanelChrome({
   )
 }
 
-/** Donut ring + legend rows. The border trick draws a hollow ring,
- *  matching the real 64/44 radii → 20px stroke. */
+/** Donut ring + legend rows. The border trick draws a hollow ring; the size
+ *  mirrors the real fluid ring (45% of card width, 220px cap, ~59/85% radii). */
 function DonutSkeleton() {
   return (
     <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-      <div className="size-[150px] shrink-0 animate-pulse rounded-full border-[20px] border-muted" />
-      <div className="flex w-full min-w-0 flex-col gap-2.5 sm:w-44 sm:flex-none">
+      <div className="aspect-square h-auto w-full max-w-[190px] shrink-0 animate-pulse rounded-full border-[24px] border-muted sm:w-[45%] sm:max-w-[220px]" />
+      <div className="flex w-full min-w-0 flex-col gap-2.5 sm:w-44 sm:flex-none xl:w-56">
         {[0, 1, 2].map((j) => (
           <Skeleton key={j} className="h-4 w-full" />
         ))}
