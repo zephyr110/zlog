@@ -99,6 +99,28 @@ function RankList({
   )
 }
 
+/**
+ * Sources donut row — stacked by default; side-by-side only when the
+ * card container is wide enough (@container), so a half-width panel at
+ * ~1024px viewport doesn’t pin the ring to the left with a void on the right.
+ */
+const DONUT_ROW_CLASS = cn(
+  "mx-auto flex w-full flex-col items-center gap-5",
+  "@[24rem]:flex-row @[24rem]:justify-center @[24rem]:gap-8 @[24rem]:px-2",
+  "@[32rem]:gap-12"
+)
+
+const DONUT_RING_CLASS = cn(
+  "aspect-square h-auto w-[min(100%,11.25rem)] shrink-0",
+  "@[24rem]:w-[min(42%,13.75rem)]"
+)
+
+const DONUT_LEGEND_CLASS = cn(
+  "flex w-full max-w-[15rem] min-w-0 flex-col justify-center gap-1.5",
+  "@[24rem]:w-44 @[24rem]:max-w-none @[24rem]:flex-none",
+  "@[36rem]:w-56"
+)
+
 /** Horizontal donut (ring + centered total + side legend) for the Sources
  *  panel — channels are a closed taxonomy, so the full-composition story
  *  is real. (Devices deliberately uses a stacked bar for form variety.) */
@@ -116,17 +138,9 @@ function CompositionDonut({
   const total = data.reduce((sum, d) => sum + d.users, 0)
 
   return (
-    <div className="flex flex-1 flex-col justify-center gap-3">
-      {/* Row mode centers the ring+legend as one compact group — a flex-1
-          legend would stretch across the card and leave a void in the middle. */}
-      <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-        {/* Fluid ring: ~45% of the card width, capped — Pie radii are
-            percentages below so the donut actually scales on wide screens
-            instead of staying a fixed 150px island. */}
-        <ChartContainer
-          config={config}
-          className="aspect-square h-auto w-full max-w-[190px] shrink-0 sm:w-[45%] sm:max-w-[220px]"
-        >
+    <div className="@container flex flex-1 flex-col justify-center">
+      <div className={DONUT_ROW_CLASS}>
+        <ChartContainer config={config} className={DONUT_RING_CLASS}>
           <PieChart>
             <ChartTooltip
               cursor={false}
@@ -174,7 +188,7 @@ function CompositionDonut({
           </PieChart>
         </ChartContainer>
 
-        <ul className="flex w-full min-w-0 flex-col justify-center gap-1.5 sm:w-44 sm:flex-none xl:w-56">
+        <ul className={DONUT_LEGEND_CLASS}>
           {data.map((d) => (
             <li key={d.key} className="flex items-center gap-2 text-xs">
               <span
@@ -498,10 +512,10 @@ export function TrafficAnalytics() {
             </Card>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
-            {/* Row pairing by height from sm up: compact Devices/Sources,
-                then list/map panels. Mobile still stacks but KPIs above
-                already share a row. */}
+          <div className="grid gap-4 xl:grid-cols-2 xl:gap-5">
+            {/* Two columns only from xl — below that, full-width cards so
+                Sources’ donut+legend can breathe (half-width ~1024px was
+                pinning the ring left with empty space on the right). */}
             <PanelCard title={t("admin.analyticsDevices")}>
               <DevicesStackedBar devices={state.data.devices} />
             </PanelCard>
@@ -551,7 +565,7 @@ function PanelChrome({
       <div className="px-4">
         <Skeleton className={cn("h-4", titleWidth)} />
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4 md:min-h-40">
+      <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 md:min-h-40">
         {children}
       </div>
     </div>
@@ -562,26 +576,46 @@ function PanelChrome({
 function StackedBarSkeleton() {
   return (
     <div className="flex flex-1 flex-col justify-center gap-4">
-      <Skeleton className="h-9 w-full rounded-md" />
-      <div className="flex flex-col gap-2">
+      <Skeleton className="h-9 w-full rounded-sm" />
+      <ul className="flex flex-col gap-2">
         {[0, 1, 2].map((j) => (
-          <Skeleton key={j} className="h-5 w-full" />
+          <li key={j} className="flex items-center gap-2">
+            <Skeleton className="size-2 shrink-0 rounded-full" />
+            <Skeleton className="h-4 flex-1" />
+            <Skeleton className="h-4 w-8 shrink-0" />
+            <Skeleton className="h-4 w-10 shrink-0" />
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   )
 }
 
-/** Donut ring + legend rows. The border trick draws a hollow ring; the size
- *  mirrors the real fluid ring (45% of card width, 220px cap, ~59/85% radii). */
+/** Donut ring + legend — mirrors CompositionDonut breakpoints (@container). */
 function DonutSkeleton() {
   return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-      <div className="aspect-square h-auto w-full max-w-[190px] shrink-0 animate-pulse rounded-full border-[24px] border-muted sm:w-[45%] sm:max-w-[220px]" />
-      <div className="flex w-full min-w-0 flex-col gap-2.5 sm:w-44 sm:flex-none xl:w-56">
-        {[0, 1, 2].map((j) => (
-          <Skeleton key={j} className="h-4 w-full" />
-        ))}
+    <div className="@container flex flex-1 flex-col justify-center">
+      <div className={DONUT_ROW_CLASS}>
+        <div className={cn(DONUT_RING_CLASS, "relative")}>
+          {/* Hollow ring ≈ pie inner/outer radii; center mirrors total + label. */}
+          <div
+            aria-hidden
+            className="absolute inset-0 animate-pulse rounded-full border-[1.35rem] border-muted"
+          />
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
+            <Skeleton className="h-5 w-12" />
+            <Skeleton className="h-3 w-8" />
+          </div>
+        </div>
+        <ul className={DONUT_LEGEND_CLASS}>
+          {[0, 1, 2, 3].map((j) => (
+            <li key={j} className="flex items-center gap-2">
+              <Skeleton className="size-2 shrink-0 rounded-full" />
+              <Skeleton className="h-3 flex-1" />
+              <Skeleton className="h-3 w-5 shrink-0" />
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   )
@@ -609,7 +643,7 @@ export function TrafficSkeleton() {
           </div>
         ))}
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+      <div className="grid gap-4 xl:grid-cols-2 xl:gap-5">
         {/* Devices — stacked bar */}
         <PanelChrome titleWidth="w-20">
           <StackedBarSkeleton />
@@ -618,21 +652,31 @@ export function TrafficSkeleton() {
         <PanelChrome titleWidth="w-20">
           <DonutSkeleton />
         </PanelChrome>
-        {/* Top pages — single-line data-bar rows */}
+        {/* Top pages — single-line data-bar rows (RankList) */}
         <PanelChrome titleWidth="w-28">
-          <div className="flex flex-col gap-1">
+          <ul className="flex flex-col gap-1">
             {Array.from({ length: 6 }).map((_, j) => (
-              <Skeleton key={j} className="h-8 w-full rounded-md" />
+              <li
+                key={j}
+                className="flex items-baseline justify-between gap-3 rounded-md px-2 py-1.5"
+              >
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-8 shrink-0" />
+              </li>
             ))}
-          </div>
+          </ul>
         </PanelChrome>
         {/* Countries — dotted map (95:48 viewBox) + chip row */}
         <PanelChrome titleWidth="w-24">
-          <Skeleton className="aspect-[95/48] w-full rounded-md" />
-          <div className="flex flex-wrap gap-1.5">
-            {Array.from({ length: 6 }).map((_, j) => (
-              <Skeleton key={j} className="h-6 w-20 rounded-full" />
-            ))}
+          <div className="flex flex-col gap-3">
+            <Skeleton className="aspect-[95/48] w-full rounded-md" />
+            <ul className="flex flex-wrap gap-1.5">
+              {["w-20", "w-24", "w-16", "w-28", "w-14", "w-32"].map((w, j) => (
+                <li key={j}>
+                  <Skeleton className={cn("h-6 rounded-full", w)} />
+                </li>
+              ))}
+            </ul>
           </div>
         </PanelChrome>
       </div>
