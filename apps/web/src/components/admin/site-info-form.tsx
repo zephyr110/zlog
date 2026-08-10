@@ -12,13 +12,54 @@ import { useSiteConfig } from "@/components/layout/site-config-provider"
 import { siteLogoSrc } from "@/lib/site-config"
 import { SiteLogo } from "@/components/layout/site-logo"
 import { toast } from "sonner"
-import { ImageIcon, Upload, X } from "lucide-react"
+import { ExternalLink, ImageIcon, Upload, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   UPLOAD_ACCEPT,
   uploadImageFile,
   validateImageFile,
 } from "@/lib/upload"
+
+/** Only allow opening http(s) URLs typed in the form — empty/invalid stay inert. */
+function externalHref(raw: string): string | null {
+  const value = raw.trim()
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null
+    return url.href
+  } catch {
+    return null
+  }
+}
+
+function OpenUrlButton({ href, label }: { href: string | null; label: string }) {
+  // Match Input height (h-8) so the trailing action sits on the same row.
+  const className = cn(
+    "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    href ? "hover:bg-muted hover:text-foreground" : "opacity-50"
+  )
+
+  if (!href) {
+    return (
+      <span className={className} aria-hidden="true">
+        <ExternalLink size={14} />
+      </span>
+    )
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={label}
+      className={className}
+    >
+      <ExternalLink size={14} />
+    </a>
+  )
+}
 
 type FormState = {
   name: string
@@ -412,27 +453,41 @@ export function SiteInfoForm({
           <Label htmlFor={`${idPrefix}-github`}>
             {t("admin.github")}
           </Label>
-          <Input
-            id={`${idPrefix}-github`}
-            type="url"
-            value={form.githubUrl}
-            onChange={(e) => patch("githubUrl", e.target.value)}
-            maxLength={300}
-            placeholder="https://github.com/..."
-          />
+          <div className="flex items-center gap-1.5">
+            <Input
+              id={`${idPrefix}-github`}
+              type="url"
+              value={form.githubUrl}
+              onChange={(e) => patch("githubUrl", e.target.value)}
+              maxLength={300}
+              placeholder="https://github.com/..."
+              className="min-w-0 flex-1"
+            />
+            <OpenUrlButton
+              href={externalHref(form.githubUrl)}
+              label={`${t("admin.openUrl") as string} — ${t("admin.github") as string}`}
+            />
+          </div>
         </div>
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-twitter`}>
             {t("admin.twitter")}
           </Label>
-          <Input
-            id={`${idPrefix}-twitter`}
-            type="url"
-            value={form.twitterUrl}
-            onChange={(e) => patch("twitterUrl", e.target.value)}
-            maxLength={300}
-            placeholder="https://x.com/..."
-          />
+          <div className="flex items-center gap-1.5">
+            <Input
+              id={`${idPrefix}-twitter`}
+              type="url"
+              value={form.twitterUrl}
+              onChange={(e) => patch("twitterUrl", e.target.value)}
+              maxLength={300}
+              placeholder="https://x.com/..."
+              className="min-w-0 flex-1"
+            />
+            <OpenUrlButton
+              href={externalHref(form.twitterUrl)}
+              label={`${t("admin.openUrl") as string} — ${t("admin.twitter") as string}`}
+            />
+          </div>
         </div>
       </div>
 

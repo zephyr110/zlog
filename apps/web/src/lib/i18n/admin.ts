@@ -294,6 +294,7 @@ editor: "编辑器",
 github: "GitHub",
 twitter: "Twitter / X",
 url: "URL",
+openUrl: "打开链接",
     
 } as const
 
@@ -596,6 +597,7 @@ editor: "Editor",
 github: "GitHub",
 twitter: "Twitter / X",
 url: "URL",
+openUrl: "Open link",
     
 } as const satisfies LocaleMessages<typeof zh>
 
