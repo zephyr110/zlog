@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { useLocale } from "@/components/layout/i18n-provider"
 import {
   t as tLocale,
@@ -11,14 +12,22 @@ import {
 /**
  * Returns a translation function. Usage: const { t, locale } = useT()
  * `t("site.home")` is typed as string; `t("site.yearPosts")` as (n: number) => string.
+ *
+ * `t` is memoized on `locale` — its identity is stable across renders, so
+ * useMemo(..., [t]) in consumers actually caches (a fresh closure per
+ * render silently defeats every t-dependent memo, e.g. chart data and
+ * map projections rebuilt on every tooltip hover).
  */
 export function useT() {
   const { locale } = useLocale()
-  return {
-    locale,
-    t: <P extends TranslationPath>(path: P): TranslationValueAt<P> =>
-      tLocale(locale, path),
-  }
+  return useMemo(
+    () => ({
+      locale,
+      t: <P extends TranslationPath>(path: P): TranslationValueAt<P> =>
+        tLocale(locale, path),
+    }),
+    [locale]
+  )
 }
 
 type TransArgs<P extends TranslationPath> =

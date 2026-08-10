@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import { useSiteConfig } from "@/components/layout/site-config-provider"
 import { siteLogoSrc } from "@/lib/site-config"
 import { SiteLogo } from "@/components/layout/site-logo"
@@ -85,16 +86,8 @@ export function AdminSidebar({ collapsed, onToggle, user, mobileOpen, onMobileCl
 
   // The avatar menu flies out to the right of the rail on desktop, but the
   // mobile drawer is too narrow for a side flyout — open above the trigger.
-  const subscribeMobile = useCallback((onChange: () => void) => {
-    const mq = window.matchMedia("(max-width: 767px)")
-    mq.addEventListener("change", onChange)
-    return () => mq.removeEventListener("change", onChange)
-  }, [])
-  const isMobile = useSyncExternalStore(
-    subscribeMobile,
-    () => window.matchMedia("(max-width: 767px)").matches,
-    () => false // SSR/first paint: desktop placement; menu isn't open yet
-  )
+  // SSR/first paint defaults to desktop placement; the menu isn't open yet.
+  const isMobile = useMediaQuery("(max-width: 767px)")
 
   function handleLogout() {
     clearToken()

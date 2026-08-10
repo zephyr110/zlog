@@ -1,10 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import DottedMap, { type MapData } from "dotted-map/without-countries"
 import { WORLD_DOT_MAP_JSON } from "@/lib/world-dot-map"
 import { COUNTRY_CENTROIDS } from "@/lib/country-centroids"
 import { TruncateTooltip } from "@/components/ui/truncate-tooltip"
+import { useCanHover } from "@/hooks/use-media-query"
 import { useT } from "@/components/layout/trans"
 import { cn } from "@/lib/utils"
 import type { Locale } from "@/lib/i18n"
@@ -36,16 +37,12 @@ const DOT_RADIUS = 0.3
 /** Invisible hit target floor — map coords are tiny; without this, phone
  *  taps miss the pin core entirely. */
 const PIN_HIT_MIN = 2.2
-
-function subscribeHover(onChange: () => void) {
-  const mq = window.matchMedia("(hover: hover) and (pointer: fine)")
-  mq.addEventListener("change", onChange)
-  return () => mq.removeEventListener("change", onChange)
-}
-
-function getHoverSnapshot() {
-  return window.matchMedia("(hover: hover) and (pointer: fine)").matches
-}
+/**
+ * Pin-halo breathe duration (seconds) — MUST match the `pin-breathe`
+ * animation in globals.css. The stagger phases wrap on this value so the
+ * shimmer stays evenly distributed when the animation is re-tuned.
+ */
+const PIN_BREATHE_S = 2.6
 
 /** Localize a GA country via ISO code; fall back to the API string. */
 function localizedCountryName(
@@ -83,18 +80,26 @@ export function CountryDotMap({
 }) {
   const { t, locale } = useT()
   const [tooltip, setTooltip] = useState<PinTooltip | null>(null)
-  const canHover = useSyncExternalStore(
-    subscribeHover,
-    getHoverSnapshot,
-    () => true
-  )
+  const canHover = useCanHover()
 
+  // t is stable across renders (memoized on locale in useT), so memoizing
+  // on [countries, locale] is safe — a per-render t identity here used to
+  // re-run the whole {dots,pins} pipeline (new DottedMap + getPoints over
+  // the full dot grid) on every pin hover.
+  //
+  // Distinct GA rows can localize to the same name ("(not set)" classes,
+  // DisplayNames collisions) — dedupe by name and merge users so legend
+  // chips and map pins are 1:1 and chip taps always hit their own pin.
   const localizedCountries = useMemo(() => {
     const notSet = t("admin.countryNotSet") as string
-    return countries.map((c) => ({
-      ...c,
-      name: localizedCountryName(c.code, c.name, locale, notSet),
-    }))
+    const byName = new Map<string, CountryDatum & { name: string }>()
+    for (const c of countries) {
+      const name = localizedCountryName(c.code, c.name, locale, notSet)
+      const entry = byName.get(name)
+      if (entry) entry.users += c.users
+      else byName.set(name, { ...c, name })
+    }
+    return [...byName.values()]
   }, [countries, locale, t])
 
   // Drop an open tip when the locale flips so we don't keep an English
@@ -212,7 +217,9 @@ export function CountryDotMap({
                   fill="var(--color-chart-2)"
                   opacity={active ? 0.35 : 0.15}
                   className="map-pin-halo"
-                  style={{ animationDelay: `${(i * 0.45) % 2.6}s` }}
+                  style={{
+                    animationDelay: `${(i * 0.45) % PIN_BREATHE_S}s`,
+                  }}
                 />
                 <circle
                   cx={pin.x}

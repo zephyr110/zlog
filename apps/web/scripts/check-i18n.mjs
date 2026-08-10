@@ -20,17 +20,18 @@ for (const f of readdirSync(dir).filter((x) => x.endsWith(".ts"))) {
   const en = []
 
   for (const line of lines) {
-    // Dictionary blocks are exactly "  zh: {" / "  en: {" / "  },"
-    // (values' continuation lines use other indentation/colons).
-    if (line === "  zh: {") {
+    // Dictionary blocks: `const zh = {` … `} as const` and
+    // `const en = {` … `} as const satisfies LocaleMessages<typeof zh>`.
+    // (Values' continuation lines use other indentation/colons.)
+    if (line === "const zh = {") {
       block = "zh"
       continue
     }
-    if (line === "  en: {") {
+    if (line === "const en = {") {
       block = "en"
       continue
     }
-    if (line === "  },") {
+    if (line.startsWith("} as const")) {
       block = null
       continue
     }

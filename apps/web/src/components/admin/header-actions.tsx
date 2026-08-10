@@ -25,13 +25,3 @@ export function HeaderActions({ children }: { children: React.ReactNode }) {
   return createPortal(children, slot)
 }
 
-/**
- * Renders optional content beside the page title in the admin header
- * (#admin-header-title-extra) — e.g. a "View live post" link on the
- * editor. Renders nothing until mounted.
- */
-export function HeaderTitleExtra({ children }: { children: React.ReactNode }) {
-  const slot = useHeaderSlot("admin-header-title-extra")
-  if (!slot) return null
-  return createPortal(children, slot)
-}

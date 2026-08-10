@@ -33,8 +33,10 @@ type LoginMode = "login" | "reset"
  *  color-mix a touch of the OPPOSITE anchor: hover mixes the button a
  *  little toward white on light (lift) and toward black on dark
  *  (settle) — both read as a natural press feedback without clipping. */
+// Base colors come from Button's primary variant; only layout and the
+// color-mix press theming (which no variant provides) are re-specified.
 const LOGIN_SUBMIT_CLASSES =
-  "h-10 w-full bg-primary text-primary-foreground shadow-sm shadow-primary/25 transition-all duration-200 hover:shadow-md hover:shadow-primary/30 focus-visible:ring-primary/40 " +
+  "h-10 w-full shadow-sm shadow-primary/25 transition-all duration-200 hover:shadow-md hover:shadow-primary/30 focus-visible:ring-primary/40 " +
   "hover:bg-[color-mix(in_oklab,var(--primary),white_8%)] active:bg-[color-mix(in_oklab,var(--primary),black_6%)] " +
   "dark:hover:bg-[color-mix(in_oklab,var(--primary),black_10%)] dark:active:bg-[color-mix(in_oklab,var(--primary),black_18%)]"
 

@@ -182,13 +182,6 @@ export default function AdminLayout({
                       pageMeta only stores string keys — narrow for JSX. */}
                   {t(meta.titleKey) as string}
                 </h1>
-                {/* Optional adornment beside the title (e.g. view-live link).
-                    Hidden on narrow screens when empty; pages that still
-                    portal here keep desktop-only extras next to the title. */}
-                <div
-                  id="admin-header-title-extra"
-                  className="hidden min-w-0 shrink-0 empty:hidden sm:block"
-                />
               </div>
               {meta.descKey && (
                 <>

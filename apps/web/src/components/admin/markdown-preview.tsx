@@ -29,7 +29,11 @@ export function MarkdownPreview({ content }: MarkdownPreviewProps) {
   const deferredContent = useDeferredValue(content)
   const [source, setSource] = useState<PreviewSource | null>(null)
   const [compileError, setCompileError] = useState(false)
-  const [compiling, setCompiling] = useState(false)
+  // Fully derivable from the source/error state — the render chain shows
+  // "rendering" exactly when there is content but no compile yet. (On the
+  // first mount with content this shows the label where a manual flag
+  // could drift to null.)
+  const compiling = deferredContent.trim() !== "" && !source && !compileError
 
   useEffect(() => {
     const text = deferredContent.trim()
@@ -37,12 +41,10 @@ export function MarkdownPreview({ content }: MarkdownPreviewProps) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset compile state when the deferred buffer clears
       setSource(null)
       setCompileError(false)
-      setCompiling(false)
       return
     }
 
     let cancelled = false
-    setCompiling(true)
     setCompileError(false)
 
     serialize(text, {
@@ -56,7 +58,6 @@ export function MarkdownPreview({ content }: MarkdownPreviewProps) {
         if (cancelled) return
         setSource(result)
         setCompileError(false)
-        setCompiling(false)
       })
       .catch(() => {
         if (cancelled) return
@@ -64,7 +65,6 @@ export function MarkdownPreview({ content }: MarkdownPreviewProps) {
         // typing don't blank the preview; only surface an error if we have
         // nothing to show yet.
         setCompileError(true)
-        setCompiling(false)
       })
 
     return () => {
@@ -85,6 +85,11 @@ export function MarkdownPreview({ content }: MarkdownPreviewProps) {
         </p>
       ) : source ? (
         <PreviewErrorBoundary
+          // Reset only when a fresh compile lands (not per keystroke):
+          // remounting the whole MDX tree on every keystroke would churn
+          // mermaid/highlighting re-inits. A crash in a given compiled
+          // source re-crashes on reset anyway, so the fallback persists
+          // until the next successful compile either way.
           resetKey={source.compiledSource}
           fallback={
             <p className="text-muted-foreground italic">
