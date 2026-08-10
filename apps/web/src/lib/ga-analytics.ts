@@ -108,14 +108,24 @@ function classifyGaError(err: unknown): AnalyticsFetchError {
       : ""
   const blob = `${code} ${status} ${message} ${cause}`
 
-  if (
-    /DEADLINE_EXCEEDED|ETIMEDOUT|ECONNRESET|ENOTFOUND|EAI_AGAIN|network|fetch failed|ConnectTimeout|UND_ERR/i.test(
-      blob
-    )
-  ) {
+  // Shared with isNetworkFailure below — one matcher drives both the
+  // direct→proxy failover decision and the user-facing error kind.
+  if (NETWORK_ERROR_RE.test(blob)) {
     return new AnalyticsFetchError(
       "timeout",
       "Cannot reach Google Analytics Data API (network timeout)"
+    )
+  }
+  // OAuth token-exchange failures (rotated private key, wrong client
+  // email) surface as 400 invalid_grant / 401 — a credential problem, not
+  // a transient outage.
+  if (
+    (code === "400" || code === "401") &&
+    /invalid_grant|unauthorized_client|invalid_client/i.test(blob)
+  ) {
+    return new AnalyticsFetchError(
+      "permission",
+      "Google Analytics credentials are invalid — check GA_PRIVATE_KEY and GA_CLIENT_EMAIL"
     )
   }
   // Includes SERVICE_DISABLED (“API has not been used in project…”) and
@@ -153,6 +163,9 @@ function resolveProxyUrl(): string | undefined {
   return url || undefined
 }
 
+const NETWORK_ERROR_RE =
+  /DEADLINE_EXCEEDED|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|network|fetch failed|ConnectTimeout|UND_ERR/i
+
 function isNetworkFailure(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err)
   const code =
@@ -163,17 +176,16 @@ function isNetworkFailure(err: unknown): boolean {
     typeof err === "object" && err && "cause" in err
       ? String((err as { cause: unknown }).cause)
       : ""
-  return /DEADLINE_EXCEEDED|ETIMEDOUT|ECONNRESET|ENOTFOUND|EAI_AGAIN|network|fetch failed|ConnectTimeout|UND_ERR|ECONNREFUSED/i.test(
-    `${code} ${message} ${cause}`
-  )
+  return NETWORK_ERROR_RE.test(`${code} ${message} ${cause}`)
 }
 
 /** Short connect budget so a blocked direct path fails over to the proxy
- *  quickly instead of hanging the admin dashboard. */
+ *  quickly instead of hanging the admin dashboard. Body budget matches the
+ *  proxy agent — GA batch reports can legitimately take >20s on busy days. */
 const directAgent = new Agent({
   connectTimeout: 4_000,
-  headersTimeout: 12_000,
-  bodyTimeout: 20_000,
+  headersTimeout: 20_000,
+  bodyTimeout: 30_000,
 })
 
 let cachedProxyAgent: ProxyAgent | undefined
@@ -261,13 +273,21 @@ async function gaFetch(
     return await gaFetchOnce(input, init, directAgent)
   } catch (err) {
     if (!proxy || !isNetworkFailure(err)) throw err
-    preferProxyUntil = Date.now() + PREFER_PROXY_MS
     console.warn(
       "[analytics] direct Google request failed; retrying via HTTPS_PROXY"
     )
     try {
-      return await gaFetchOnce(input, init, proxy)
+      const res = await gaFetchOnce(input, init, proxy)
+      // Prefer the proxy briefly only after it PROVED reachable — arming
+      // before the attempt would make the next 60s go proxy-first through
+      // a dead proxy (8s burn) before falling back.
+      preferProxyUntil = Date.now() + PREFER_PROXY_MS
+      return res
     } catch {
+      // Drop the cached proxy agent so the next build re-tests a restarted
+      // proxy instead of reusing the dead one forever.
+      cachedProxyAgent = undefined
+      cachedProxyUrl = undefined
       // Surface the original direct failure (timeout) for admin copy.
       throw err
     }
@@ -296,7 +316,15 @@ function signServiceAccountAssertion(email: string, privateKey: string): string 
   return `${unsigned}.${signature}`
 }
 
+/** Access tokens are valid for 1h — reuse one until ~10 min before expiry
+ *  instead of re-signing the JWT and re-exchanging on every report fetch. */
+let cachedToken: { token: string; expiresAt: number } | null = null
+
 async function getAccessToken(): Promise<string> {
+  if (cachedToken && cachedToken.expiresAt > Date.now()) {
+    return cachedToken.token
+  }
+
   const email = process.env.GA_CLIENT_EMAIL!.trim()
   const privateKey = normalizePrivateKey(process.env.GA_PRIVATE_KEY!)
   const assertion = signServiceAccountAssertion(email, privateKey)
@@ -311,13 +339,19 @@ async function getAccessToken(): Promise<string> {
   })
   const text = await res.text()
   if (!res.ok) {
+    cachedToken = null
     throw Object.assign(new Error(text.slice(0, 500)), {
       code: String(res.status),
     })
   }
   const json = JSON.parse(text) as { access_token?: string }
   if (!json.access_token) {
+    cachedToken = null
     throw new AnalyticsFetchError("unavailable", "Failed to obtain Google access token")
+  }
+  cachedToken = {
+    token: json.access_token,
+    expiresAt: Date.now() + 50 * 60 * 1000, // 1h validity; refresh 10 min early
   }
   return json.access_token
 }

@@ -10,6 +10,7 @@ import { TruncateTooltip } from "@/components/ui/truncate-tooltip"
 import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { CountryDotMap } from "@/components/admin/country-dot-map"
 import {
+  CHART_COLORS,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -85,8 +86,11 @@ function RankList({
           <div className="relative flex items-baseline justify-between gap-3 px-2 py-1.5 text-sm">
             {/* Paths clip on the left ("…/my-slug") — the tail carries the
                 identity when several rows share a /posts/ prefix. Full path
-                stays available via TruncateTooltip when overflowed. */}
-            <TruncateTooltip className="font-medium [direction:rtl] [text-align:left] [unicode-bidi:plaintext]">
+                stays available via TruncateTooltip when overflowed.
+                direction:rtl puts the ellipsis at the left edge; do NOT add
+                unicode-bidi:plaintext here — it resolves Latin paths back
+                to LTR and the ellipsis ends up clipping the tail instead. */}
+            <TruncateTooltip className="font-medium [direction:rtl] [text-align:left]">
               {row.label}
             </TruncateTooltip>
             <span className="shrink-0 tabular-nums text-muted-foreground">
@@ -234,10 +238,10 @@ function DevicesStackedBar({
     other: t("admin.deviceOther"),
   }
   const colors: Record<DeviceKey, string> = {
-    desktop: "var(--color-chart-1)",
-    mobile: "var(--color-chart-2)",
-    tablet: "var(--color-chart-3)",
-    other: "var(--color-chart-4)",
+    desktop: CHART_COLORS[0],
+    mobile: CHART_COLORS[1],
+    tablet: CHART_COLORS[2],
+    other: CHART_COLORS[3],
   }
   // Aggregate by normalized key first — GA can return several categories
   // that all fold into "other" (e.g. "(not set)", "tv"), which would
@@ -299,13 +303,7 @@ function DevicesStackedBar({
 
 /** Channel colors rotate through the five chart tokens; with ≤5 active
  *  channels (the common case) every slice gets a distinct color. */
-const CHANNEL_COLORS = [
-  "var(--color-chart-1)",
-  "var(--color-chart-2)",
-  "var(--color-chart-3)",
-  "var(--color-chart-4)",
-  "var(--color-chart-5)",
-] as const
+const CHANNEL_COLORS = CHART_COLORS
 
 /** GA4 sessionDefaultChannelGroup → admin i18n key. Unknown channels
  *  fall through to the raw GA string. */
@@ -382,7 +380,13 @@ export function TrafficAnalytics() {
 
     async function load() {
       try {
-        const res = await apiFetch(`/api/admin/analytics?range=${range}`)
+        // The server-side GA chain (OAuth + batch, with direct→proxy
+        // failover) can legitimately take 15-40s — far beyond the default
+        // 15s apiFetch timeout, which would abort slow-but-successful
+        // reports and misreport them as a network timeout.
+        const res = await apiFetch(`/api/admin/analytics?range=${range}`, {
+          timeout: 60_000,
+        })
         if (cancelled) return
         if (res.status === 503) {
           setState({ status: "unconfigured" })
@@ -401,8 +405,13 @@ export function TrafficAnalytics() {
         }
         const data = (await res.json()) as AnalyticsReport
         if (!cancelled) setState({ status: "ok", data })
-      } catch {
-        if (!cancelled) setState({ status: "error", kind: "timeout" })
+      } catch (err) {
+        // Only genuine aborts are a timeout; a thrown parse/network error
+        // is a server or transport failure, not a timeout.
+        const name = err instanceof Error ? err.name : ""
+        const kind =
+          name === "TimeoutError" || name === "AbortError" ? "timeout" : "unavailable"
+        if (!cancelled) setState({ status: "error", kind })
       }
     }
 

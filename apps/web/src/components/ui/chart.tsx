@@ -376,6 +376,17 @@ function getPayloadConfigFromPayload(
   return configLabelKey in config ? config[configLabelKey] : config[key]
 }
 
+/** The shadcn chart palette — single source for every chart component
+ *  (post-stats, traffic-analytics), so theming changes in globals.css
+ *  don't require syncing multiple literal copies. */
+export const CHART_COLORS = [
+  "var(--color-chart-1)",
+  "var(--color-chart-2)",
+  "var(--color-chart-3)",
+  "var(--color-chart-4)",
+  "var(--color-chart-5)",
+] as const
+
 export {
   ChartContainer,
   ChartTooltip,

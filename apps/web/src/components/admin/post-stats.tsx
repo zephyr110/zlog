@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  CHART_COLORS,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -35,14 +36,8 @@ import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { resolveCategory, getCategoryLabel } from "@/lib/categories"
 import { type PostSummary } from "@zlog/database"
 
-/** shadcn chart palette — bars cycle chart-1…chart-5 (token → --color-*). */
-const BAR_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-]
+/** Bars cycle the shared chart palette (chart-1…chart-5). */
+const BAR_COLORS = CHART_COLORS
 
 type TimeRange = "7d" | "30d" | "90d" | "all"
 
