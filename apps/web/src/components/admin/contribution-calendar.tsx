@@ -338,7 +338,9 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
           <CardAction>{yearFilter}</CardAction>
         </CardHeader>
         <CardContent>
-          <div className="h-[118px] animate-pulse rounded-md bg-muted" />
+          {/* Match dashboard page skeleton: compact on phones, full-year
+              height on md+ so hydrate doesn't flash a wrong desktop shape. */}
+          <div className="h-[90px] animate-pulse rounded-md bg-muted md:h-[118px]" />
         </CardContent>
       </Card>
     )

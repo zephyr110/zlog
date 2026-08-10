@@ -105,17 +105,20 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Contribution calendar card — title + year filter share one
-              header row; heatmap below with a mobile left-fade hint. */}
+              header row (matches the loaded Card). Heatmap skeleton is
+              breakpoint-split: phones get a clipped multi-column hint;
+              md+ fills the card like the real flex year grid. */}
           <div className="flex flex-col gap-4 rounded-xl bg-card py-4 ring-1 ring-foreground/10">
             <div className="flex items-center justify-between gap-3 px-4">
               <Skeleton className="h-5 w-28" />
               <Skeleton className="h-8 w-36 shrink-0 rounded-md" />
             </div>
             <div className="flex flex-col gap-3 px-4">
-              <div className="relative overflow-hidden">
+              {/* Mobile — ~24 weeks visible + left fade (scroll affordance). */}
+              <div className="relative overflow-hidden md:hidden">
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-card to-transparent md:hidden"
+                  className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-card to-transparent"
                 />
                 <div className="mb-1.5 flex gap-[3px]">
                   {Array.from({ length: 8 }).map((_, i) => (
@@ -124,6 +127,19 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="grid h-[90px] auto-cols-[minmax(0,1fr)] grid-flow-col grid-rows-7 gap-[3px]">
                   {Array.from({ length: 7 * 24 }).map((_, i) => (
+                    <Skeleton key={i} className="rounded-[3px]" />
+                  ))}
+                </div>
+              </div>
+              {/* Desktop — full-width year block (≈53 weeks stretched). */}
+              <div className="hidden md:block">
+                <div className="mb-1.5 flex gap-[3px]">
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <Skeleton key={i} className="h-3.5 flex-1 rounded-sm" />
+                  ))}
+                </div>
+                <div className="grid h-[118px] auto-cols-[minmax(0,1fr)] grid-flow-col grid-rows-7 gap-[3px]">
+                  {Array.from({ length: 7 * 53 }).map((_, i) => (
                     <Skeleton key={i} className="rounded-[3px]" />
                   ))}
                 </div>
