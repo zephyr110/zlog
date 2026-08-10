@@ -338,9 +338,13 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
           <CardAction>{yearFilter}</CardAction>
         </CardHeader>
         <CardContent>
-          {/* Match dashboard page skeleton: compact on phones, full-year
-              height on md+ so hydrate doesn't flash a wrong desktop shape. */}
-          <div className="h-[90px] animate-pulse rounded-md bg-muted md:h-[118px]" />
+          {/* Match dashboard page skeleton totals (month-label row +
+              heatmap): phones ~90px grid, md+ ~118px, so hydrate doesn't
+              collapse under the page-level placeholder. */}
+          <div className="flex flex-col gap-1.5">
+            <div className="h-3.5 animate-pulse rounded-sm bg-muted/70" />
+            <div className="h-[90px] animate-pulse rounded-md bg-muted md:h-[118px]" />
+          </div>
         </CardContent>
       </Card>
     )
