@@ -10,11 +10,11 @@
 
 ![home_dark](https://cdn.jsdelivr.net/gh/zephyr110/blog-img/1786200886932-zephyr110.vercel.app___1_.png)
 
-![admin_dark](https://cdn.jsdelivr.net/gh/zephyr110/blog-img/1786200907995-zephyr110.vercel.app___4_.png)
+![alt text](https://cdn.jsdelivr.net/gh/zephyr110/blog-img/1786337581535-zephyr110.vercel.app_admin_dashboard_macbook_pro_1.png)
 
 ![home_light](https://cdn.jsdelivr.net/gh/zephyr110/blog-img/1786200944045-zephyr110.vercel.app___2_.png)
 
-![admin_light](https://cdn.jsdelivr.net/gh/zephyr110/blog-img/1786200967284-zephyr110.vercel.app___3_.png)
+![alt text](https://cdn.jsdelivr.net/gh/zephyr110/blog-img/1786337593021-zephyr110.vercel.app_admin_dashboard_macbook_pro_1.png)
 
 ## 功能模块
 
