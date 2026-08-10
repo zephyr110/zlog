@@ -93,9 +93,9 @@ function RankList({
   )
 }
 
-/** Horizontal donut (ring + centered total + side legend) shared by the
- *  closed-taxonomy panels — devices and traffic sources both tell a
- *  full-composition story. */
+/** Horizontal donut (ring + centered total + side legend) for the Sources
+ *  panel — channels are a closed taxonomy, so the full-composition story
+ *  is real. (Devices deliberately uses a stacked bar for form variety.) */
 function CompositionDonut({
   data,
   config,
@@ -196,7 +196,7 @@ function deviceKey(raw: string): DeviceKey {
   return "other"
 }
 
-function DevicesDonut({
+function DevicesStackedBar({
   devices,
 }: {
   devices: { device: string; users: number }[]
@@ -219,18 +219,9 @@ function DevicesDonut({
     tablet: "var(--color-chart-3)",
     other: "var(--color-chart-4)",
   }
-  const chartConfig: ChartConfig = {
-    users: { label: t("admin.analyticsUsers") },
-    ...Object.fromEntries(
-      (Object.keys(labels) as DeviceKey[]).map((key) => [
-        key,
-        { label: labels[key], color: colors[key] },
-      ])
-    ),
-  }
   // Aggregate by normalized key first — GA can return several categories
   // that all fold into "other" (e.g. "(not set)", "tv"), which would
-  // otherwise produce duplicate slices and duplicate React keys.
+  // otherwise produce duplicate segments and duplicate React keys.
   const byKey = new Map<DeviceKey, { key: DeviceKey; label: string; users: number }>()
   for (const d of devices) {
     const key = deviceKey(d.device)
@@ -238,13 +229,52 @@ function DevicesDonut({
     if (entry) entry.users += d.users
     else byKey.set(key, { key, label: labels[key], users: d.users })
   }
+  const total = [...byKey.values()].reduce((sum, d) => sum + d.users, 0) || 1
   const data = [...byKey.values()].map((d) => ({
     ...d,
-    fill: `var(--color-${d.key})`,
     color: colors[d.key],
+    pct: (d.users / total) * 100,
   }))
 
-  return <CompositionDonut data={data} config={chartConfig} />
+  return (
+    <div className="flex flex-1 flex-col justify-center gap-4">
+      {/* 100%-stacked bar; a segment shows its inline % only when wide
+          enough, narrow ones stay readable via the detail rows below. */}
+      <div className="flex h-9 w-full gap-[3px]" aria-hidden="true">
+        {data.map((d) => (
+          <div
+            key={d.key}
+            className="flex items-center justify-center rounded-sm transition-[width]"
+            style={{ width: `${d.pct}%`, backgroundColor: d.color }}
+          >
+            {d.pct >= 12 && (
+              <span className="text-[11px] font-semibold text-white [text-shadow:0_0_3px_rgba(0,0,0,0.4)]">
+                {d.pct.toFixed(0)}%
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <ul className="flex flex-col gap-2">
+        {data.map((d) => (
+          <li key={d.key} className="flex items-center gap-2 text-sm">
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: d.color }}
+            />
+            <span className="min-w-0 truncate font-medium">{d.label}</span>
+            <span className="ml-auto shrink-0 tabular-nums">
+              {d.users.toLocaleString()}
+            </span>
+            <span className="w-14 shrink-0 text-right tabular-nums text-muted-foreground">
+              {d.pct.toFixed(1)}%
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }
 
 /** Channel colors rotate through the five chart tokens; with ≤5 active
@@ -436,8 +466,15 @@ export function TrafficAnalytics() {
           </div>
 
           <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
-            {/* Order alternates composition (donuts) with distribution
-                (list/map) so the two donuts never sit side by side. */}
+            {/* Row pairing is by height: compact donuts share row 1, the
+                list/map panels (~300px) share row 2 — equal-height grid
+                rows leave no dead space at the bottom of a shorter card. */}
+            <PanelCard title={t("admin.analyticsDevices")}>
+              <DevicesStackedBar devices={state.data.devices} />
+            </PanelCard>
+            <PanelCard title={t("admin.analyticsSources")}>
+              <SourcesDonut sources={state.data.sources} />
+            </PanelCard>
             <PanelCard title={t("admin.analyticsTopPages")}>
               <RankList
                 rows={state.data.topPages.map((p) => ({
@@ -445,9 +482,6 @@ export function TrafficAnalytics() {
                   value: p.views,
                 }))}
               />
-            </PanelCard>
-            <PanelCard title={t("admin.analyticsDevices")}>
-              <DevicesDonut devices={state.data.devices} />
             </PanelCard>
             <PanelCard title={t("admin.analyticsCountries")}>
               {state.data.countries.length === 0 ? (
@@ -463,9 +497,6 @@ export function TrafficAnalytics() {
                 />
               )}
             </PanelCard>
-            <PanelCard title={t("admin.analyticsSources")}>
-              <SourcesDonut sources={state.data.sources} />
-            </PanelCard>
           </div>
         </>
       )}
@@ -480,12 +511,28 @@ function PanelChrome({
   titleWidth: string
   children: React.ReactNode
 }) {
+  // Mirrors PanelCard chrome: Card's 16px --card-spacing gap/padding and the
+  // min-h-40 flex-1 content column, so loading and loaded layouts align.
   return (
-    <div className="flex flex-col gap-3 rounded-xl bg-card py-4 ring-1 ring-foreground/10">
+    <div className="flex flex-col gap-4 rounded-xl bg-card py-4 ring-1 ring-foreground/10">
       <div className="px-4">
         <Skeleton className={cn("h-4", titleWidth)} />
       </div>
-      <div className="flex flex-col gap-3 px-4 pb-2">{children}</div>
+      <div className="flex min-h-40 flex-1 flex-col gap-3 px-4 pb-4">{children}</div>
+    </div>
+  )
+}
+
+/** Chunky stacked bar + detail rows; mirrors DevicesStackedBar. */
+function StackedBarSkeleton() {
+  return (
+    <div className="flex flex-1 flex-col justify-center gap-4">
+      <Skeleton className="h-9 w-full rounded-md" />
+      <div className="flex flex-col gap-2">
+        {[0, 1, 2].map((j) => (
+          <Skeleton key={j} className="h-5 w-full" />
+        ))}
+      </div>
     </div>
   )
 }
@@ -529,6 +576,15 @@ export function TrafficSkeleton() {
         ))}
       </div>
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
+        {/* Row pairing mirrors the real grid: donuts, then pages list + map. */}
+        {/* Devices — stacked bar */}
+        <PanelChrome titleWidth="w-20">
+          <StackedBarSkeleton />
+        </PanelChrome>
+        {/* Sources — donut */}
+        <PanelChrome titleWidth="w-20">
+          <DonutSkeleton />
+        </PanelChrome>
         {/* Top pages — single-line data-bar rows */}
         <PanelChrome titleWidth="w-28">
           <div className="flex flex-col gap-1">
@@ -536,10 +592,6 @@ export function TrafficSkeleton() {
               <Skeleton key={j} className="h-8 w-full rounded-md" />
             ))}
           </div>
-        </PanelChrome>
-        {/* Devices — donut */}
-        <PanelChrome titleWidth="w-20">
-          <DonutSkeleton />
         </PanelChrome>
         {/* Countries — dotted map (95:48 viewBox) + chip row */}
         <PanelChrome titleWidth="w-24">
@@ -549,10 +601,6 @@ export function TrafficSkeleton() {
               <Skeleton key={j} className="h-6 w-20 rounded-full" />
             ))}
           </div>
-        </PanelChrome>
-        {/* Sources — donut */}
-        <PanelChrome titleWidth="w-20">
-          <DonutSkeleton />
         </PanelChrome>
       </div>
     </>
