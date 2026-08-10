@@ -15,21 +15,18 @@ import { EmptyState } from "@/components/ui/empty-state"
 const LATEST_GRID_COUNT = 6
 
 export default async function HomePage() {
-  // Featured stays newest-by-date; Latest is pin-aware. Both queries run
-  // in parallel — the featured slug can't be known before getPublishedPosts
-  // resolves, so fetch one extra row and dedupe in JS instead of a second
-  // serialized round trip (the old code awaited a dependent query).
-  const [featuredList, postCount, latestAll] = await Promise.all([
+  // Featured stays newest-by-date; Latest is pin-aware and excludes Featured
+  // in SQL so the unpinned-slot reserve still fills after dedupe (a parallel
+  // over-fetch + JS filter could leave six pins and zero unpinned when the
+  // reserved slot was the featured post itself).
+  const [featuredList, postCount] = await Promise.all([
     getPublishedPosts(1),
     getPublishedCount(),
-    getHomepageLatestPosts(LATEST_GRID_COUNT + 1),
   ])
   const featured = featuredList[0]
   const latest = featured
-    ? latestAll
-        .filter((p) => p.slug !== featured.slug)
-        .slice(0, LATEST_GRID_COUNT)
-    : latestAll.slice(0, LATEST_GRID_COUNT)
+    ? await getHomepageLatestPosts(LATEST_GRID_COUNT, featured.slug)
+    : []
 
   return (
     <div className="min-h-[calc(100vh-4rem)]">

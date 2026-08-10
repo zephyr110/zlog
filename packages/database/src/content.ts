@@ -274,27 +274,32 @@ export async function setPostPinned(
 /** Homepage "Latest" grid: pinned posts first, then the newest unpinned
  *  posts fill the remaining slots. Pinned is capped at limit − 1 — at
  *  least one slot is always reserved for fresh unpinned content, so
- *  pinning many posts can't push every recent article off the homepage. */
+ *  pinning many posts can't push every recent article off the homepage.
+ *  `excludeSlug` drops the Featured spotlight so it isn't duplicated and
+ *  so the unpinned reserve still applies to posts that actually render. */
 export async function getHomepageLatestPosts(
-  limit: number
+  limit: number,
+  excludeSlug?: string
 ): Promise<PostSummary[]> {
   const db = requireDb()
   await ensureTable(db)
   const pinnedLimit = Math.max(1, limit - 1)
+  const exclude = excludeSlug ? safeSlug(excludeSlug) : null
+  const excludeSql = exclude ? "AND slug != ?" : ""
   const [pinned, unpinned] = await Promise.all([
     db.execute({
       sql: `SELECT * FROM posts
-            WHERE draft = 0 AND pinned_at IS NOT NULL
+            WHERE draft = 0 AND pinned_at IS NOT NULL ${excludeSql}
             ORDER BY pinned_at DESC, date DESC
             LIMIT ?`,
-      args: [pinnedLimit],
+      args: exclude ? [exclude, pinnedLimit] : [pinnedLimit],
     }),
     db.execute({
       sql: `SELECT * FROM posts
-            WHERE draft = 0 AND pinned_at IS NULL
+            WHERE draft = 0 AND pinned_at IS NULL ${excludeSql}
             ORDER BY date DESC
             LIMIT ?`,
-      args: [limit],
+      args: exclude ? [exclude, limit] : [limit],
     }),
   ])
   const pinnedPosts = pinned.rows.map((row) => toPostSummary(rowToPost(row)))
