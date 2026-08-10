@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, Fragment, type ReactNode } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
@@ -16,8 +16,9 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip"
 import { useSiteConfig } from "@/components/layout/site-config-provider"
-import { siteLogoSrc } from "@/lib/site-config"
+import { siteLogoSrc, defaultSiteConfig } from "@/lib/site-config"
 import { SiteLogo } from "@/components/layout/site-logo"
+import { GithubIcon, XIcon } from "@/components/ui/brand-icons"
 import { useLocale } from "@/components/layout/i18n-provider"
 import { useT } from "@/components/layout/trans"
 import { localeLabels, locales, type TranslationPath } from "@/lib/i18n"
@@ -59,6 +60,96 @@ const sidebarLinks: {
 ]
 
 type ThemeMode = "light" | "dark" | "system"
+
+/** GitHub / X shortcuts — stacked above the avatar. Quiet ghost rows so
+ *  the footer reads as one block with the user menu; labels match About. */
+function SidebarSocialLinks({ collapsed }: { collapsed: boolean }) {
+  const { t } = useT()
+  const site = useSiteConfig()
+  const githubUrl = (site.social.github || defaultSiteConfig.social.github).trim()
+  const twitterUrl = (site.social.twitter || "").trim()
+
+  const links = [
+    githubUrl
+      ? {
+          href: githubUrl,
+          label: t("about.github") as string,
+          icon: <GithubIcon size={16} />,
+        }
+      : null,
+    twitterUrl
+      ? {
+          href: twitterUrl,
+          label: t("about.twitter") as string,
+          icon: <XIcon size={16} />,
+        }
+      : null,
+  ].filter(Boolean) as {
+    href: string
+    label: string
+    icon: ReactNode
+  }[]
+
+  if (links.length === 0) return null
+
+  return (
+    <div
+      role="group"
+      aria-label={t("site.links") as string}
+      className={cn(
+        "flex flex-col",
+        collapsed ? "items-center gap-0.5" : "gap-0.5"
+      )}
+    >
+      {links.map((link) => {
+        const row = (
+          <a
+            href={link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={collapsed ? link.label : undefined}
+            className={cn(
+              // Match inactive nav / “view blog”: full sidebar-foreground,
+              // not the /55 used on the non-interactive “Menu” eyebrow.
+              "inline-flex items-center text-sm outline-none transition-colors",
+              "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+              collapsed
+                ? "size-9 justify-center rounded-lg"
+                : "h-9 w-full gap-2.5 rounded-lg px-2.5 font-medium"
+            )}
+          >
+            {collapsed ? (
+              link.icon
+            ) : (
+              <>
+                {/* size-8 leading column matches nav + avatar */}
+                <span className="inline-flex size-8 shrink-0 items-center justify-center">
+                  {link.icon}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-left">
+                  {link.label}
+                </span>
+              </>
+            )}
+          </a>
+        )
+
+        // Collapsed rail: label only in the tooltip (same as nav items).
+        return collapsed ? (
+          <Tooltip key={link.href}>
+            <TooltipTrigger render={row} />
+            <TooltipContent side="right" sideOffset={8}>
+              {link.label}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Fragment key={link.href}>{row}</Fragment>
+        )
+      })}
+    </div>
+  )
+}
 
 interface AdminSidebarProps {
   collapsed: boolean
@@ -306,7 +397,14 @@ export function AdminSidebar({ collapsed, onToggle, user, mobileOpen, onMobileCl
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
-              <span className={cn("relative", collapsed && "shrink-0")}>
+              {/* Expanded: size-8 leading column matches the avatar so icon
+                  glyphs and the user chip share one vertical axis. */}
+              <span
+                className={cn(
+                  "relative inline-flex shrink-0 items-center justify-center",
+                  collapsed ? undefined : "size-8"
+                )}
+              >
                 <Icon size={16} className="shrink-0" />
                 {/* Unread badge — collapsed mode shows a dot, expanded a
                     count pill, both only while there's something new. */}
@@ -346,13 +444,26 @@ export function AdminSidebar({ collapsed, onToggle, user, mobileOpen, onMobileCl
         </nav>
       </div>
 
-      {/* Footer — user menu trigger */}
-      <div className={cn("shrink-0", collapsed ? "p-2" : "p-3 pt-2")}>
-        <DropdownMenu onOpenChange={setAvatarMenuOpen}>
+      {/* Footer — social shortcuts above the user menu, pinned to the
+          bottom of the rail (not in the scrollable nav list). */}
+      <div
+        className={cn(
+          "shrink-0",
+          collapsed
+            ? "flex flex-col items-center gap-1 p-2"
+            : "flex flex-col gap-0.5 p-3 pt-2"
+        )}
+      >
+        <SidebarSocialLinks collapsed={collapsed} />
+        {/* modal=false: avoid document scroll-lock, which was shifting this
+            fixed footer up when the menu opened. */}
+        <DropdownMenu modal={false} onOpenChange={setAvatarMenuOpen}>
           <DropdownMenuTrigger
             className={cn(
-              "group flex w-full items-center gap-2.5 rounded-lg outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-              collapsed ? "justify-center p-1.5" : "px-2.5 py-2"
+              "group flex w-full items-center rounded-lg text-sm outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+              // Same h-9 / px-2.5 / gap-2.5 as nav + social rows so the
+              // avatar’s left edge shares the content column.
+              collapsed ? "size-9 justify-center p-0" : "h-9 gap-2.5 px-2.5"
             )}
           >
             <Avatar className="size-8 shrink-0">
@@ -365,12 +476,14 @@ export function AdminSidebar({ collapsed, onToggle, user, mobileOpen, onMobileCl
                 {/* Just the username — the author name and role badge live
                     in the menu, where there is room for them. */}
                 <div className="min-w-0 flex-1 text-left leading-tight">
-                  <p className="truncate text-sm font-medium">{user.username}</p>
+                  <p className="truncate font-medium">{user.username}</p>
                 </div>
-                <ChevronRight
-                  size={14}
-                  className="shrink-0 text-sidebar-foreground/70 transition-transform duration-200 group-data-[state=open]:rotate-90"
-                />
+                <span className="inline-flex size-3.5 shrink-0 items-center justify-center text-sidebar-foreground/70">
+                  <ChevronRight
+                    size={14}
+                    className="transition-transform duration-200 group-data-[state=open]:rotate-90"
+                  />
+                </span>
               </>
             )}
           </DropdownMenuTrigger>
