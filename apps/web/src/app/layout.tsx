@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { cookies } from "next/headers"
 import { Toaster } from "@/components/ui/sonner"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
@@ -6,17 +7,17 @@ import { ThemeProvider } from "@/components/layout/theme-provider"
 import { I18nProvider } from "@/components/layout/i18n-provider"
 import { SiteConfigProvider } from "@/components/layout/site-config-provider"
 import { DocumentTitle } from "@/components/layout/document-title"
+import { SiteAnalytics } from "@/components/layout/site-analytics"
 import { getSiteConfig } from "@/lib/get-site-config"
 import { DEFAULT_FAVICON } from "@/lib/site-config"
 import { defaultLocale } from "@/lib/i18n"
 import { getAllTags } from "@zlog/database"
 import { unstable_cache } from "next/cache"
-import { Analytics } from "@vercel/analytics/next"
-import { GoogleAnalytics } from "@next/third-parties/google"
+import { ADMIN_TOKEN_COOKIE } from "@/lib/api-client"
 import { categoryKeys } from "@/lib/categories"
 import "./globals.css"
 
-const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim()
+const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() || undefined
 
 export async function generateMetadata(): Promise<Metadata> {
   const site = await getSiteConfig()
@@ -83,7 +84,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const [tags, site] = await Promise.all([getNavTags(), getSiteConfig()])
+  const [tags, site, cookieStore] = await Promise.all([
+    getNavTags(),
+    getSiteConfig(),
+    cookies(),
+  ])
   // Only show categories that have matching tags, with post count
   const navCategories = categoryKeys
     .map((key) => ({
@@ -95,6 +100,10 @@ export default async function RootLayout({
   const displayCategories = navCategories.length > 0
     ? navCategories
     : categoryKeys.map((key) => ({ key, count: 0 }))
+
+  // Prefer cookie over a delayed client check so anonymous visitors still
+  // get GA in the first HTML; admin browsers skip it from the start.
+  const initialAllowGa = !cookieStore.get(ADMIN_TOKEN_COOKIE)?.value
 
   return (
     <html
@@ -126,10 +135,7 @@ export default async function RootLayout({
             </SiteConfigProvider>
           </I18nProvider>
         </ThemeProvider>
-        <Analytics />
-        {gaMeasurementId ? (
-          <GoogleAnalytics gaId={gaMeasurementId} />
-        ) : null}
+        <SiteAnalytics gaId={gaMeasurementId} initialAllowGa={initialAllowGa} />
       </body>
     </html>
   )

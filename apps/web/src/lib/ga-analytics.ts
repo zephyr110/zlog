@@ -377,8 +377,13 @@ async function getAccessToken(): Promise<string> {
  * Avoids `@google-analytics/data` REST fallback, which throws
  * `toProto3JSON: don't know how to convert value 10` for int64 `limit`
  * on Vercel’s Node runtime.
+ *
+ * Each batchRunReports HTTP call allows at most 5 requests — chunk when
+ * the dashboard asks for more panels (browsers / OS / …).
  */
-async function batchRunReports(
+const GA_BATCH_MAX = 5
+
+async function batchRunReportsOnce(
   property: string,
   requests: RunReportRequest[]
 ): Promise<BatchRunReportsResponse> {
@@ -408,6 +413,23 @@ async function batchRunReports(
     })
   }
   return JSON.parse(text) as BatchRunReportsResponse
+}
+
+async function batchRunReports(
+  property: string,
+  requests: RunReportRequest[]
+): Promise<BatchRunReportsResponse> {
+  if (requests.length <= GA_BATCH_MAX) {
+    return batchRunReportsOnce(property, requests)
+  }
+  const chunks: RunReportRequest[][] = []
+  for (let i = 0; i < requests.length; i += GA_BATCH_MAX) {
+    chunks.push(requests.slice(i, i + GA_BATCH_MAX))
+  }
+  const parts = await Promise.all(
+    chunks.map((chunk) => batchRunReportsOnce(property, chunk))
+  )
+  return { reports: parts.flatMap((p) => p.reports ?? []) }
 }
 
 /** Fetch GA4 report for a range (cached ~10 minutes). */

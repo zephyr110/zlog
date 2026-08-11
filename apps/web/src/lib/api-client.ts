@@ -1,5 +1,10 @@
 const TOKEN_KEY = "blog-admin-token"
-const COOKIE_NAME = "blog-admin-token"
+/** Cookie mirrored from localStorage so proxy can gate `/admin` routes. */
+export const ADMIN_TOKEN_COOKIE = "blog-admin-token"
+const COOKIE_NAME = ADMIN_TOKEN_COOKIE
+/** Same-tab signal for analytics (and other listeners) when login/logout
+ *  mutates localStorage — the browser `storage` event only fires cross-tab. */
+export const ADMIN_SESSION_EVENT = "zlog:admin-session"
 const REQUEST_TIMEOUT = 15_000
 
 // Routes whose 401 responses are business errors (wrong password),
@@ -10,9 +15,25 @@ const AUTH_EXEMPT_PATHS = [
   "/api/auth/reset", // wrong recovery key is a business error, not a dead session
 ]
 
+function notifyAdminSessionChange(): void {
+  if (typeof window === "undefined") return
+  window.dispatchEvent(new Event(ADMIN_SESSION_EVENT))
+}
+
 export function getToken(): string | null {
   if (typeof window === "undefined") return null
   return localStorage.getItem(TOKEN_KEY)
+}
+
+/** True when this browser holds an admin session (localStorage or cookie).
+ *  Used to suppress analytics collection for the owner’s own browsing. */
+export function hasAdminSession(): boolean {
+  if (typeof window === "undefined") return false
+  if (localStorage.getItem(TOKEN_KEY)) return true
+  return document.cookie.split(";").some((part) => {
+    const [name, ...rest] = part.trim().split("=")
+    return name === COOKIE_NAME && rest.join("=").length > 0
+  })
 }
 
 export function setToken(token: string): void {
@@ -21,6 +42,7 @@ export function setToken(token: string): void {
     // Keep a cookie in sync so proxy can validate admin routes.
     const maxAge = 60 * 60 * 24 * 7 // 7 days
     document.cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax`
+    notifyAdminSessionChange()
   }
 }
 
@@ -28,6 +50,7 @@ export function clearToken(): void {
   if (typeof window !== "undefined") {
     localStorage.removeItem(TOKEN_KEY)
     document.cookie = `${COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`
+    notifyAdminSessionChange()
   }
 }
 
