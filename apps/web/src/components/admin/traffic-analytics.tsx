@@ -896,24 +896,6 @@ function StackedBarSkeleton() {
   )
 }
 
-/** Horizontal share-bar placeholder for Browsers / OS tabs. */
-function ShareHBarSkeleton({ rows = 5 }: { rows?: number }) {
-  const widths = ["w-[88%]", "w-[62%]", "w-[48%]", "w-[28%]", "w-[16%]", "w-[10%]"]
-  return (
-    <div className="flex flex-1 flex-col justify-center gap-3 py-1">
-      {Array.from({ length: rows }).map((_, j) => (
-        <div key={j} className="flex items-center gap-2">
-          <Skeleton className="h-3 w-16 shrink-0 sm:w-20" />
-          <Skeleton
-            className={cn("h-4 flex-1 rounded-sm", widths[j] ?? "w-1/4")}
-          />
-          <Skeleton className="h-3 w-7 shrink-0" />
-        </div>
-      ))}
-    </div>
-  )
-}
-
 /** Rank list rows — top pages. */
 function RankListSkeleton({ rows = 6 }: { rows?: number }) {
   return (
