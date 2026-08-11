@@ -5,6 +5,7 @@ import { Analytics, type BeforeSendEvent } from "@vercel/analytics/next"
 import { GoogleAnalytics } from "@next/third-parties/google"
 import {
   ADMIN_SESSION_EVENT,
+  ADMIN_TOKEN_COOKIE,
   hasAdminSession,
 } from "@/lib/api-client"
 import { isPublicTrafficPath } from "@/lib/analytics-paths"
@@ -18,6 +19,13 @@ function subscribeAdminSession(onStoreChange: () => void) {
   }
 }
 
+/** Server snapshot must be static — root layout cannot call cookies() or
+ *  GitHub Pages `next export` fails on `/_not-found`. Admin detection is
+ *  client-only (+ the inline ga-disable bootstrap below). */
+function getServerAdminSnapshot() {
+  return false
+}
+
 /**
  * Site-wide pageview collectors. Drops owner noise at send time:
  * - admin session (token in localStorage / cookie) — covers public pages
@@ -26,21 +34,13 @@ function subscribeAdminSession(onStoreChange: () => void) {
  *
  * Historical aggregates cannot be scrubbed; this only affects new events.
  */
-export function SiteAnalytics({
-  gaId,
-  /** From the request cookie on the server so real visitors still get GA
-   *  in the initial HTML (no post-hydration delay). */
-  initialAllowGa = true,
-}: {
-  gaId?: string
-  initialAllowGa?: boolean
-}) {
+export function SiteAnalytics({ gaId }: { gaId?: string }) {
   // Same-tab login/logout: ADMIN_SESSION_EVENT from setToken/clearToken.
-  // Cross-tab: native `storage`. Server snapshot uses the cookie seed.
+  // Cross-tab: native `storage`.
   const isAdmin = useSyncExternalStore(
     subscribeAdminSession,
     hasAdminSession,
-    () => !initialAllowGa
+    getServerAdminSnapshot
   )
   const allowGa = !isAdmin
 
@@ -62,8 +62,17 @@ export function SiteAnalytics({
     return event
   }, [])
 
+  // Runs before GoogleAnalytics’s script: cookie-only check so an admin
+  // hard-refresh does not send a first hit while React hydrates.
+  const gaDisableBootstrap =
+    gaId &&
+    `(function(){try{if(/(?:^|;\\s*)${ADMIN_TOKEN_COOKIE}=/.test(document.cookie)){window[${JSON.stringify(`ga-disable-${gaId}`)}]=true}}catch(e){}})();`
+
   return (
     <>
+      {gaDisableBootstrap ? (
+        <script dangerouslySetInnerHTML={{ __html: gaDisableBootstrap }} />
+      ) : null}
       <Analytics beforeSend={beforeSend} />
       {gaId && allowGa ? <GoogleAnalytics gaId={gaId} /> : null}
     </>

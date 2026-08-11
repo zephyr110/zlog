@@ -1,5 +1,4 @@
 import type { Metadata } from "next"
-import { cookies } from "next/headers"
 import { Toaster } from "@/components/ui/sonner"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
@@ -13,7 +12,6 @@ import { DEFAULT_FAVICON } from "@/lib/site-config"
 import { defaultLocale } from "@/lib/i18n"
 import { getAllTags } from "@zlog/database"
 import { unstable_cache } from "next/cache"
-import { ADMIN_TOKEN_COOKIE } from "@/lib/api-client"
 import { categoryKeys } from "@/lib/categories"
 import "./globals.css"
 
@@ -84,11 +82,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const [tags, site, cookieStore] = await Promise.all([
-    getNavTags(),
-    getSiteConfig(),
-    cookies(),
-  ])
+  const [tags, site] = await Promise.all([getNavTags(), getSiteConfig()])
   // Only show categories that have matching tags, with post count
   const navCategories = categoryKeys
     .map((key) => ({
@@ -100,10 +94,6 @@ export default async function RootLayout({
   const displayCategories = navCategories.length > 0
     ? navCategories
     : categoryKeys.map((key) => ({ key, count: 0 }))
-
-  // Prefer cookie over a delayed client check so anonymous visitors still
-  // get GA in the first HTML; admin browsers skip it from the start.
-  const initialAllowGa = !cookieStore.get(ADMIN_TOKEN_COOKIE)?.value
 
   return (
     <html
@@ -135,7 +125,7 @@ export default async function RootLayout({
             </SiteConfigProvider>
           </I18nProvider>
         </ThemeProvider>
-        <SiteAnalytics gaId={gaMeasurementId} initialAllowGa={initialAllowGa} />
+        <SiteAnalytics gaId={gaMeasurementId} />
       </body>
     </html>
   )
