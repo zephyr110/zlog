@@ -1,10 +1,21 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { Maximize2 } from "lucide-react"
 import DottedMap, { type MapData } from "dotted-map/without-countries"
 import { WORLD_DOT_MAP_JSON } from "@/lib/world-dot-map"
 import { COUNTRY_CENTROIDS } from "@/lib/country-centroids"
 import { TruncateTooltip } from "@/components/ui/truncate-tooltip"
+import { Button } from "@/components/ui/button"
+import { Card, CardAction, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { useCanHover } from "@/hooks/use-media-query"
 import { useT } from "@/components/layout/trans"
 import { cn } from "@/lib/utils"
@@ -27,6 +38,8 @@ interface PinTooltip extends PinData {
   xPct: number
   yPct: number
 }
+
+type LegendMode = "scroll" | "grid"
 
 // Parsed once at module load — the 90KB JSON is a precomputed dot grid, so
 // no country polygons or projection math ship to the client bundle.
@@ -66,17 +79,27 @@ function localizedCountryName(
   }
 }
 
+/** ISO 3166-1 alpha-2 → regional-indicator flag emoji (🇺🇸 etc.). */
+function countryFlagEmoji(code: string): string | null {
+  if (!/^[A-Za-z]{2}$/.test(code)) return null
+  const cc = code.toUpperCase()
+  return String.fromCodePoint(
+    ...[...cc].map((c) => 0x1f1e6 - 65 + c.charCodeAt(0))
+  )
+}
+
 /**
- * Dotted world map (GitHub-contribution-style) with a pin per visitor
- * country. Exact numbers stay readable in the legend below — the map is
- * the at-a-glance geographic shape, not the precise source of truth.
+ * Dotted world map + country legend. `legend="scroll"` keeps the compact
+ * card row; `legend="grid"` wraps every country so expanded view shows all.
  */
-export function CountryDotMap({
+function CountryMapView({
   countries,
   usersLabel,
+  legend,
 }: {
   countries: CountryDatum[]
   usersLabel: string
+  legend: LegendMode
 }) {
   const { t, locale } = useT()
   const [tooltip, setTooltip] = useState<PinTooltip | null>(null)
@@ -99,8 +122,11 @@ export function CountryDotMap({
       if (entry) entry.users += c.users
       else byName.set(name, { ...c, name })
     }
-    return [...byName.values()]
+    return [...byName.values()].sort((a, b) => b.users - a.users)
   }, [countries, locale, t])
+
+  const totalUsers =
+    localizedCountries.reduce((sum, c) => sum + c.users, 0) || 1
 
   // Drop an open tip when the locale flips so we don't keep an English
   // (or Chinese) label after the chips have already relabeled.
@@ -145,6 +171,19 @@ export function CountryDotMap({
     [width, height]
   )
 
+  const selectCountry = useCallback(
+    (name: string) => {
+      const pin = pins.find((p) => p.name === name)
+      if (!pin) {
+        setTooltip(null)
+        return
+      }
+      const next = pinTooltip(pin)
+      setTooltip((cur) => (cur?.name === next.name ? null : next))
+    },
+    [pins, pinTooltip]
+  )
+
   // Tap-outside dismisses the mobile pin tooltip.
   useEffect(() => {
     if (!tooltip || canHover) return
@@ -158,8 +197,8 @@ export function CountryDotMap({
   }, [tooltip, canHover])
 
   return (
-    <div className="flex flex-col gap-3" data-country-map>
-      <div className="relative">
+    <div className="flex min-w-0 flex-col gap-3" data-country-map>
+      <div className="relative min-w-0">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="h-auto w-full text-muted-foreground/30"
@@ -262,49 +301,181 @@ export function CountryDotMap({
         )}
       </div>
 
-      {/* Country chips — every row stays listed (the map can't carry exact
-          values); GA caps the report at 10 rows, so wrapping chips stay
-          compact. On touch, tapping a chip also focuses the matching pin. */}
-      <ul className="flex flex-wrap gap-1.5">
-        {localizedCountries.map((c, i) => {
-          const pin = pins.find((p) => p.name === c.name)
-          const selected = tooltip?.name === c.name
-          return (
-            <li key={`${c.code}-${i}`}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!pin) {
-                    setTooltip(null)
-                    return
-                  }
-                  const next = pinTooltip(pin)
-                  setTooltip((cur) =>
-                    cur?.name === next.name ? null : next
-                  )
-                }}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors",
-                  selected
-                    ? "border-chart-2/50 bg-chart-2/15"
-                    : "border-border/60 bg-muted/40 hover:bg-muted"
-                )}
-              >
-                <span className="size-1.5 shrink-0 rounded-full bg-chart-2" />
-                <TruncateTooltip
-                  nativeTitle
-                  className="max-w-[9rem] font-medium"
+      {legend === "scroll" ? (
+        /* Compact card: one row with horizontal scroll when chips overflow. */
+        <ul className="flex min-w-0 touch-pan-x gap-1.5 overflow-x-auto overscroll-x-contain pb-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]">
+          {localizedCountries.map((c, i) => {
+            const selected = tooltip?.name === c.name
+            const flag = countryFlagEmoji(c.code)
+            return (
+              <li key={`${c.code}-${i}`} className="shrink-0">
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => selectCountry(c.name)}
+                  className={cn(
+                    "flex max-w-[min(100vw-3rem,18rem)] items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors",
+                    selected
+                      ? "border-chart-2/50 bg-chart-2/15"
+                      : "border-border/60 bg-muted/40 hover:bg-muted"
+                  )}
                 >
-                  {c.name}
-                </TruncateTooltip>
-                <span className="tabular-nums text-muted-foreground">
-                  {c.users.toLocaleString()}
-                </span>
-              </button>
-            </li>
-          )
-        })}
-      </ul>
+                  {flag ? (
+                    <span
+                      className="shrink-0 text-[13px] leading-none"
+                      aria-hidden
+                    >
+                      {flag}
+                    </span>
+                  ) : (
+                    <span className="size-1.5 shrink-0 rounded-full bg-chart-2" />
+                  )}
+                  <TruncateTooltip
+                    nativeTitle
+                    className="max-w-[7rem] font-medium sm:max-w-[9rem]"
+                  >
+                    {c.name}
+                  </TruncateTooltip>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">
+                    ({c.users.toLocaleString()})
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        /* Expanded dialog: wrap grid so every country is visible at once. */
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {localizedCountries.map((c, i) => {
+            const selected = tooltip?.name === c.name
+            const flag = countryFlagEmoji(c.code)
+            const pct = Math.round((c.users / totalUsers) * 1000) / 10
+            return (
+              <li key={`${c.code}-${i}`}>
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => selectCountry(c.name)}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-colors",
+                    selected
+                      ? "border-chart-2/50 bg-chart-2/15"
+                      : "border-border/60 bg-muted/30 hover:bg-muted/60"
+                  )}
+                >
+                  {flag ? (
+                    <span
+                      className="shrink-0 text-lg leading-none"
+                      aria-hidden
+                    >
+                      {flag}
+                    </span>
+                  ) : (
+                    <span className="flex size-7 shrink-0 items-center justify-center">
+                      <span className="size-2 rounded-full bg-chart-2" />
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">
+                      {c.name}
+                    </span>
+                    <span className="mt-0.5 flex items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
+                      <span>
+                        {usersLabel} {c.users.toLocaleString()}
+                      </span>
+                      <span aria-hidden>·</span>
+                      <span>{pct}%</span>
+                    </span>
+                    <span
+                      className="mt-1.5 block h-1 overflow-hidden rounded-full bg-muted"
+                      aria-hidden
+                    >
+                      <span
+                        className="block h-full rounded-full bg-chart-2"
+                        style={{ width: `${Math.min(100, pct)}%` }}
+                      />
+                    </span>
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }
+
+/**
+ * Countries breakdown card with optional fullscreen dialog — compact chips
+ * stay in the panel; expand shows the full wrap grid so nothing is hidden
+ * behind horizontal scroll.
+ */
+export function CountriesPanel({
+  title,
+  countries,
+  usersLabel,
+}: {
+  title: string
+  countries: CountryDatum[]
+  usersLabel: string
+}) {
+  const { t } = useT()
+  const [open, setOpen] = useState(false)
+  const empty = countries.length === 0
+
+  return (
+    <>
+      <Card className="flex min-w-0 flex-col py-4">
+        <CardHeader className="px-4">
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          {!empty && (
+            <CardAction>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label={t("admin.analyticsExpandCountries")}
+                onClick={() => setOpen(true)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <Maximize2 />
+              </Button>
+            </CardAction>
+          )}
+        </CardHeader>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 md:min-h-40">
+          {empty ? (
+            <AdminBlockEmpty className="min-h-0 flex-1" />
+          ) : (
+            <CountryMapView
+              countries={countries}
+              usersLabel={usersLabel}
+              legend="scroll"
+            />
+          )}
+        </div>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="flex max-h-[min(94vh,56rem)] w-full max-w-[min(56rem,calc(100%_-_1.5rem))] flex-col gap-0 overflow-hidden p-0 xl:max-h-[min(94vh,68rem)] xl:max-w-[min(72rem,calc(100%_-_3rem))] 2xl:max-w-[min(84rem,calc(100%_-_4rem))]">
+          <DialogHeader className="shrink-0 space-y-1 border-b px-4 py-3 pr-12 text-left">
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>
+              {t("admin.analyticsExpandCountriesDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
+            <CountryMapView
+              countries={countries}
+              usersLabel={usersLabel}
+              legend="grid"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+

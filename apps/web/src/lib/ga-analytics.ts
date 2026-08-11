@@ -5,16 +5,23 @@ import {
   fetch as undiciFetch,
   type Dispatcher,
 } from "undici"
+import { isPublicTrafficPath } from "@/lib/analytics-paths"
 
-export type AnalyticsRange = "today" | "7d" | "28d"
+export type AnalyticsRange = "today" | "7d" | "30d"
+
+/** Which backend powers the admin Traffic panels. */
+export type AnalyticsSource = "ga" | "vercel"
 
 export type AnalyticsReport = {
   configured: true
+  source: AnalyticsSource
   range: AnalyticsRange
   totals: { activeUsers: number; screenPageViews: number }
   topPages: { path: string; views: number }[]
   sources: { source: string; users: number }[]
   devices: { device: string; users: number }[]
+  browsers: { browser: string; users: number }[]
+  operatingSystems: { os: string; users: number }[]
   countries: { country: string; countryId: string; users: number }[]
 }
 
@@ -32,7 +39,7 @@ export class AnalyticsFetchError extends Error {
 const RANGES: Record<AnalyticsRange, { startDate: string; endDate: string }> = {
   today: { startDate: "today", endDate: "today" },
   "7d": { startDate: "7daysAgo", endDate: "today" },
-  "28d": { startDate: "28daysAgo", endDate: "today" },
+  "30d": { startDate: "30daysAgo", endDate: "today" },
 }
 
 const CACHE_TTL_MS = 10 * 60 * 1000
@@ -59,11 +66,19 @@ type RunReportRequest = {
   orderBys?: { metric: { metricName: string }; desc?: boolean }[]
   /** GA REST encodes int64 limit as a string. */
   limit?: string
+  dimensionFilter?: Record<string, unknown>
 }
 
 export function parseAnalyticsRange(raw: string | null): AnalyticsRange {
-  if (raw === "today" || raw === "7d" || raw === "28d") return raw
+  if (raw === "today" || raw === "7d" || raw === "30d") return raw
+  // Legacy Traffic URL/cache used 28d — treat as the month window.
+  if (raw === "28d") return "30d"
   return "7d"
+}
+
+export function parseAnalyticsSource(raw: string | null): AnalyticsSource {
+  if (raw === "vercel" || raw === "ga") return raw
+  return "vercel"
 }
 
 export function isGaConfigured(): boolean {
@@ -418,6 +433,36 @@ export async function fetchAnalyticsReport(
         dimensions: [{ name: "pagePath" }],
         metrics: [{ name: "screenPageViews" }],
         orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
+        // Owner-only /admin and /admin/* — exact + slash prefix so public
+        // paths like /administration are not dropped.
+        dimensionFilter: {
+          notExpression: {
+            orGroup: {
+              expressions: [
+                {
+                  filter: {
+                    fieldName: "pagePath",
+                    stringFilter: {
+                      matchType: "EXACT",
+                      value: "/admin",
+                      caseSensitive: false,
+                    },
+                  },
+                },
+                {
+                  filter: {
+                    fieldName: "pagePath",
+                    stringFilter: {
+                      matchType: "BEGINS_WITH",
+                      value: "/admin/",
+                      caseSensitive: false,
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
         limit: "10",
       },
       {
@@ -435,6 +480,20 @@ export async function fetchAnalyticsReport(
       },
       {
         dateRanges: [dateRange],
+        dimensions: [{ name: "browser" }],
+        metrics: [{ name: "activeUsers" }],
+        orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+        limit: "10",
+      },
+      {
+        dateRanges: [dateRange],
+        dimensions: [{ name: "operatingSystem" }],
+        metrics: [{ name: "activeUsers" }],
+        orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+        limit: "10",
+      },
+      {
+        dateRanges: [dateRange],
         dimensions: [{ name: "country" }, { name: "countryId" }],
         metrics: [{ name: "activeUsers" }],
         orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
@@ -449,15 +508,19 @@ export async function fetchAnalyticsReport(
   const totalsRow = reports[0]?.rows?.[0]
   const report: AnalyticsReport = {
     configured: true,
+    source: "ga",
     range,
     totals: {
       activeUsers: metricValue(totalsRow, 0),
       screenPageViews: metricValue(totalsRow, 1),
     },
-    topPages: (reports[1]?.rows ?? []).map((row) => ({
-      path: dimValue(row, 0),
-      views: metricValue(row, 0),
-    })),
+    topPages: (reports[1]?.rows ?? [])
+      .map((row) => ({
+        path: dimValue(row, 0),
+        views: metricValue(row, 0),
+      }))
+      .filter((row) => isPublicTrafficPath(row.path))
+      .slice(0, 10),
     sources: (reports[2]?.rows ?? []).map((row) => ({
       source: dimValue(row, 0),
       users: metricValue(row, 0),
@@ -466,7 +529,15 @@ export async function fetchAnalyticsReport(
       device: dimValue(row, 0),
       users: metricValue(row, 0),
     })),
-    countries: (reports[4]?.rows ?? []).map((row) => ({
+    browsers: (reports[4]?.rows ?? []).map((row) => ({
+      browser: dimValue(row, 0),
+      users: metricValue(row, 0),
+    })),
+    operatingSystems: (reports[5]?.rows ?? []).map((row) => ({
+      os: dimValue(row, 0),
+      users: metricValue(row, 0),
+    })),
+    countries: (reports[6]?.rows ?? []).map((row) => ({
       country: dimValue(row, 0),
       countryId: dimValue(row, 1),
       users: metricValue(row, 0),

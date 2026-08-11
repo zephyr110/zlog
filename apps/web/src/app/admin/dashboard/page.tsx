@@ -179,9 +179,12 @@ export default function AdminDashboardPage() {
 
         {/* Traffic — section chrome + shared panel skeletons */}
         <section className="flex flex-col gap-5 md:gap-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <Skeleton className="h-7 w-24" />
-            <Skeleton className="h-8 w-44 rounded-lg" />
+            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
+              <Skeleton className="h-8 w-28 rounded-lg" />
+              <Skeleton className="h-8 w-44 rounded-lg" />
+            </div>
           </div>
           <TrafficSkeleton />
         </section>
