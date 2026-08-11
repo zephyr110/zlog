@@ -9,7 +9,6 @@ import { useSiteConfig } from "@/components/layout/site-config-provider"
 import { siteLogoSrc, defaultSiteConfig } from "@/lib/site-config"
 import { SiteLogo } from "@/components/layout/site-logo"
 import { useT } from "@/components/layout/trans"
-import { Separator } from "@/components/ui/separator"
 import {
   Tooltip,
   TooltipContent,
@@ -21,10 +20,11 @@ const iconButtonClass =
   "inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
 
 /**
- * Site footer — brand block + quick nav + icon actions on top, a hairline
- * copyright row below. The admin entry is a quiet icon button (lock when
- * signed out, dashboard when signed in): invisible to readers, always
- * where the admin expects it.
+ * Site footer — brand block + quick nav + icon actions, sitting on a
+ * gradient that fades from the page background into the muted panel tone
+ * (no hairline: the tonal zone itself marks the boundary). The admin entry
+ * is a quiet icon button (lock when signed out, dashboard when signed in):
+ * invisible to readers, always where the admin expects it.
  */
 export function Footer() {
   const pathname = usePathname()
@@ -44,13 +44,8 @@ export function Footer() {
   if (pathname?.startsWith("/admin")) return null
 
   return (
-    <footer className="bg-gradient-to-b from-background via-muted/30 to-muted/50">
-      {/* Hairline at 90% viewport width — divides without touching the
-          viewport edges, softer than a full-bleed border. */}
-      <div className="mx-auto w-[90%]">
-        <Separator className="bg-border/60" />
-      </div>
-      <div className="container mx-auto max-w-5xl px-4 pb-8 pt-12 2xl:max-w-7xl">
+    <footer className="bg-gradient-to-b from-background via-muted/40 to-muted">
+      <div className="container mx-auto max-w-5xl px-4 pb-8 pt-16 2xl:max-w-7xl">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           {/* Brand */}
           <div className="flex max-w-xs flex-col gap-3">
