@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Maximize2 } from "lucide-react"
 import { hasFlag } from "country-flag-icons"
+import * as Flags from "country-flag-icons/react/3x2"
 import DottedMap, { type MapData } from "dotted-map/without-countries"
 import { WORLD_DOT_MAP_JSON } from "@/lib/world-dot-map"
 import { COUNTRY_CENTROIDS } from "@/lib/country-centroids"
@@ -90,33 +91,6 @@ const FLAG_SIZE_CLASS: Record<FlagSize, string> = {
   lg: "h-4 w-6",
 }
 
-/** Per-code SVG markup cache — avoids re-fetching when chips remount. */
-const flagSvgCache = new Map<string, string | null>()
-const flagSvgInflight = new Map<string, Promise<string | null>>()
-
-function loadFlagSvg(cc: string): Promise<string | null> {
-  if (flagSvgCache.has(cc)) return Promise.resolve(flagSvgCache.get(cc)!)
-  const pending = flagSvgInflight.get(cc)
-  if (pending) return pending
-
-  // Dynamic import so only codes present in the report become chunks —
-  // `import * as Flags` would ship the full ~330KB react/3x2 barrel.
-  const request = import(`country-flag-icons/string/3x2/${cc}.js`)
-    .then((mod) => {
-      const svg = typeof mod.default === "string" ? mod.default : null
-      flagSvgCache.set(cc, svg)
-      flagSvgInflight.delete(cc)
-      return svg
-    })
-    .catch(() => {
-      flagSvgCache.set(cc, null)
-      flagSvgInflight.delete(cc)
-      return null
-    })
-  flagSvgInflight.set(cc, request)
-  return request
-}
-
 function FlagFallback({
   size,
   className,
@@ -141,6 +115,10 @@ function FlagFallback({
 /**
  * Cross-platform SVG flag (country-flag-icons). System emoji flags are
  * unreliable on Windows — these render identically everywhere.
+ *
+ * Uses the static react/3x2 barrel (Turbopack cannot resolve dynamic
+ * `import(\`…/${cc}\`)` into that package). The module is admin-only via
+ * Traffic’s client boundary.
  */
 function CountryFlag({
   code,
@@ -152,36 +130,21 @@ function CountryFlag({
   className?: string
 }) {
   const cc = code.trim().toUpperCase()
-  const canLoad = /^[A-Z]{2}$/.test(cc) && hasFlag(cc)
-  const [loaded, setLoaded] = useState<{ cc: string; svg: string | null } | null>(
-    null
-  )
-
-  useEffect(() => {
-    if (!canLoad) return
-    let cancelled = false
-    void loadFlagSvg(cc).then((svg) => {
-      if (!cancelled) setLoaded({ cc, svg })
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [canLoad, cc])
-
-  const svg = loaded?.cc === cc ? loaded.svg : null
-  if (!canLoad || !svg) {
+  if (!/^[A-Z]{2}$/.test(cc) || !hasFlag(cc)) {
     return <FlagFallback size={size} className={className} />
   }
-
+  const Flag = Flags[cc as keyof typeof Flags]
+  if (!Flag) {
+    return <FlagFallback size={size} className={className} />
+  }
   return (
-    <span
+    <Flag
       className={cn(
-        "inline-flex shrink-0 overflow-hidden rounded-[2px] ring-1 ring-border/40 [&_svg]:block [&_svg]:h-full [&_svg]:w-full",
+        "shrink-0 rounded-[2px] ring-1 ring-border/40",
         FLAG_SIZE_CLASS[size],
         className
       )}
       aria-hidden
-      dangerouslySetInnerHTML={{ __html: svg }}
     />
   )
 }
