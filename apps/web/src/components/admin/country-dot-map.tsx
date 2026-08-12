@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Maximize2 } from "lucide-react"
+import { hasFlag } from "country-flag-icons"
 import DottedMap, { type MapData } from "dotted-map/without-countries"
 import { WORLD_DOT_MAP_JSON } from "@/lib/world-dot-map"
 import { COUNTRY_CENTROIDS } from "@/lib/country-centroids"
@@ -29,7 +30,7 @@ export interface CountryDatum {
 }
 
 interface PinData {
-  /** ISO 3166-1 alpha-2 — drives the tooltip flag emoji. */
+  /** ISO 3166-1 alpha-2 — drives the SVG flag in tooltips/chips. */
   code: string
   name: string
   users: number
@@ -81,12 +82,107 @@ function localizedCountryName(
   }
 }
 
-/** ISO 3166-1 alpha-2 → regional-indicator flag emoji (🇺🇸 etc.). */
-function countryFlagEmoji(code: string): string | null {
-  if (!/^[A-Za-z]{2}$/.test(code)) return null
-  const cc = code.toUpperCase()
-  return String.fromCodePoint(
-    ...[...cc].map((c) => 0x1f1e6 - 65 + c.charCodeAt(0))
+type FlagSize = "sm" | "md" | "lg"
+
+const FLAG_SIZE_CLASS: Record<FlagSize, string> = {
+  sm: "h-3 w-[1.125rem]",
+  md: "h-3.5 w-5",
+  lg: "h-4 w-6",
+}
+
+/** Per-code SVG markup cache — avoids re-fetching when chips remount. */
+const flagSvgCache = new Map<string, string | null>()
+const flagSvgInflight = new Map<string, Promise<string | null>>()
+
+function loadFlagSvg(cc: string): Promise<string | null> {
+  if (flagSvgCache.has(cc)) return Promise.resolve(flagSvgCache.get(cc)!)
+  const pending = flagSvgInflight.get(cc)
+  if (pending) return pending
+
+  // Dynamic import so only codes present in the report become chunks —
+  // `import * as Flags` would ship the full ~330KB react/3x2 barrel.
+  const request = import(`country-flag-icons/string/3x2/${cc}.js`)
+    .then((mod) => {
+      const svg = typeof mod.default === "string" ? mod.default : null
+      flagSvgCache.set(cc, svg)
+      flagSvgInflight.delete(cc)
+      return svg
+    })
+    .catch(() => {
+      flagSvgCache.set(cc, null)
+      flagSvgInflight.delete(cc)
+      return null
+    })
+  flagSvgInflight.set(cc, request)
+  return request
+}
+
+function FlagFallback({
+  size,
+  className,
+}: {
+  size: FlagSize
+  className?: string
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center",
+        FLAG_SIZE_CLASS[size],
+        className
+      )}
+      aria-hidden
+    >
+      <span className="size-1.5 rounded-full bg-chart-2" />
+    </span>
+  )
+}
+
+/**
+ * Cross-platform SVG flag (country-flag-icons). System emoji flags are
+ * unreliable on Windows — these render identically everywhere.
+ */
+function CountryFlag({
+  code,
+  size = "sm",
+  className,
+}: {
+  code: string
+  size?: FlagSize
+  className?: string
+}) {
+  const cc = code.trim().toUpperCase()
+  const canLoad = /^[A-Z]{2}$/.test(cc) && hasFlag(cc)
+  const [loaded, setLoaded] = useState<{ cc: string; svg: string | null } | null>(
+    null
+  )
+
+  useEffect(() => {
+    if (!canLoad) return
+    let cancelled = false
+    void loadFlagSvg(cc).then((svg) => {
+      if (!cancelled) setLoaded({ cc, svg })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [canLoad, cc])
+
+  const svg = loaded?.cc === cc ? loaded.svg : null
+  if (!canLoad || !svg) {
+    return <FlagFallback size={size} className={className} />
+  }
+
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 overflow-hidden rounded-[2px] ring-1 ring-border/40 [&_svg]:block [&_svg]:h-full [&_svg]:w-full",
+        FLAG_SIZE_CLASS[size],
+        className
+      )}
+      aria-hidden
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
   )
 }
 
@@ -199,11 +295,26 @@ function CountryMapView({
     return () => window.removeEventListener("pointerdown", onPointerDown)
   }, [tooltip, canHover])
 
-  const tooltipFlag = tooltip ? countryFlagEmoji(tooltip.code) : null
+  const tooltipFlag = tooltip ? (
+    <CountryFlag code={tooltip.code} size="md" className="mt-0.5" />
+  ) : null
 
   return (
-    <div className="flex min-w-0 flex-col gap-3" data-country-map>
-      <div className="relative min-w-0">
+    <div
+      className={cn(
+        "flex min-w-0 flex-col gap-3",
+        // Compact card: fill stretched xl row height so chips sit on the
+        // floor instead of floating above a void.
+        legend === "scroll" && "min-h-0 flex-1"
+      )}
+      data-country-map
+    >
+      <div
+        className={cn(
+          "relative min-w-0",
+          legend === "scroll" && "flex min-h-0 flex-1 items-center"
+        )}
+      >
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="h-auto w-full text-muted-foreground/30"
@@ -298,14 +409,7 @@ function CountryMapView({
               }`,
             }}
           >
-            {tooltipFlag ? (
-              <span
-                className="mt-0.5 shrink-0 text-base leading-none"
-                aria-hidden
-              >
-                {tooltipFlag}
-              </span>
-            ) : null}
+            {tooltipFlag}
             <div className="flex min-w-0 flex-col gap-0.5">
               <span className="font-medium">{tooltip.name}</span>
               <span className="tabular-nums text-muted-foreground">
@@ -318,10 +422,9 @@ function CountryMapView({
 
       {legend === "scroll" ? (
         /* Compact card: one row with horizontal scroll when chips overflow. */
-        <ul className="flex min-w-0 touch-pan-x gap-1.5 overflow-x-auto overscroll-x-contain pb-0.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]">
+        <ul className="flex min-w-0 shrink-0 touch-pan-x gap-1.5 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]">
           {localizedCountries.map((c, i) => {
             const selected = tooltip?.name === c.name
-            const flag = countryFlagEmoji(c.code)
             return (
               <li key={`${c.code}-${i}`} className="shrink-0">
                 <button
@@ -335,16 +438,7 @@ function CountryMapView({
                       : "border-border/60 bg-muted/40 hover:bg-muted"
                   )}
                 >
-                  {flag ? (
-                    <span
-                      className="shrink-0 text-[13px] leading-none"
-                      aria-hidden
-                    >
-                      {flag}
-                    </span>
-                  ) : (
-                    <span className="size-1.5 shrink-0 rounded-full bg-chart-2" />
-                  )}
+                  <CountryFlag code={c.code} size="sm" />
                   <TruncateTooltip
                     nativeTitle
                     className="max-w-[7rem] font-medium sm:max-w-[9rem]"
@@ -364,7 +458,6 @@ function CountryMapView({
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {localizedCountries.map((c, i) => {
             const selected = tooltip?.name === c.name
-            const flag = countryFlagEmoji(c.code)
             const pct = Math.round((c.users / totalUsers) * 1000) / 10
             return (
               <li key={`${c.code}-${i}`}>
@@ -379,18 +472,7 @@ function CountryMapView({
                       : "border-border/60 bg-muted/30 hover:bg-muted/60"
                   )}
                 >
-                  {flag ? (
-                    <span
-                      className="shrink-0 text-lg leading-none"
-                      aria-hidden
-                    >
-                      {flag}
-                    </span>
-                  ) : (
-                    <span className="flex size-7 shrink-0 items-center justify-center">
-                      <span className="size-2 rounded-full bg-chart-2" />
-                    </span>
-                  )}
+                  <CountryFlag code={c.code} size="lg" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">
                       {c.name}
@@ -460,7 +542,9 @@ export function CountriesPanel({
             </CardAction>
           )}
         </CardHeader>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 md:min-h-40">
+        {/* Card py-4 already provides the 16px floor — no extra pb-4, so
+            side/bottom insets stay equal (px-4). */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 md:min-h-40">
           {empty ? (
             <AdminBlockEmpty className="min-h-0 flex-1" />
           ) : (
