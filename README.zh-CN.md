@@ -26,7 +26,7 @@
 - **自定义 Logo 与 Favicon** — 在站点设置中上传自己的 Logo，Favicon 自动跟随
 - **双语与主题** — 中/英切换，浅色/深色/跟随系统
 - **自建评论** — 游客免登录评论；Cloudflare Turnstile + 限流 + 内容过滤防垃圾；admin 后台含未读徽标收件箱
-- **流量分析** — 可选 GA4 站点埋点（`NEXT_PUBLIC_GA_MEASUREMENT_ID`），后台仪表盘通过 GA4 Data API 展示报表（Vercel / 本地 `pnpm dev`）
+- **流量分析** — 后台仪表盘可选双数据源（Vercel / 本地 `pnpm dev`）：默认 **Vercel Analytics**，亦可切换 **GA4** Data API；配置 `NEXT_PUBLIC_GA_MEASUREMENT_ID` 时前台加载 GA4 gtag
 - **提交前检查** — Husky 在 commit 前执行 `pnpm check`（ESLint + `tsc --noEmit`）
 
 ## 核心架构
@@ -54,7 +54,7 @@ pnpm monorepo：
 | 数据 | 请求时从 Turso 读取 |
 | 内容更新 | `/admin` 发布后约 60 秒内可见，**不必为发文 Redeploy** |
 | 代码更新 | push `main` → Vercel 重建应用 |
-| 凭据 | Vercel Environment Variables（`TURSO_*`、`SESSION_SECRET`、可选 `GA_*` 等） |
+| 凭据 | Vercel Environment Variables（`TURSO_*`、`SESSION_SECRET`、可选 `GA_*` / `VERCEL_*` 流量分析等） |
 
 配置：导入仓库 → Root Directory 设为 `apps/web` → Build Command 用 `pnpm build` → 填写环境变量。**不要**在 Vercel 上跑 `pnpm export`（会丢掉 SSR 与后台）。
 
@@ -90,7 +90,12 @@ pnpm dev          # 博客 :3000，后台 /admin/login
 
 关键环境变量：`TURSO_DATABASE_URL`（本地开发用 `file:./zlog.db`）、`TURSO_AUTH_TOKEN`、`SESSION_SECRET`、`ADMIN_USERNAME` / `ADMIN_PASSWORD_HASH`（首次登录时播种管理员账号）、`NEXT_PUBLIC_SITE_URL`，以及评论功能所需的 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`（免费 Cloudflare Turnstile widget，本地开发测试 key 见 `apps/web/.env.local.example`）。
 
-可选 GA4：`NEXT_PUBLIC_GA_MEASUREMENT_ID`（前台 gtag），以及服务端 `GA_PROPERTY_ID` / `GA_CLIENT_EMAIL` / `GA_PRIVATE_KEY`（后台 Traffic 报表）。需在 GCP 项目启用 **Google Analytics Data API**，并把服务账号加为 GA4 媒体资源的 **查看者**。详见 `apps/web/.env.local.example` 与[部署指南](https://zephyr110.vercel.app/posts/zlog-deployment-guide)。
+可选流量分析（后台仪表盘，仅 Vercel / 本地）：
+
+- **Vercel Analytics**（UI 默认数据源）：`VERCEL_API_TOKEN`、`VERCEL_ANALYTICS_PROJECT_ID`，可选 `VERCEL_ANALYTICS_TEAM_ID`
+- **GA4**：`NEXT_PUBLIC_GA_MEASUREMENT_ID`（前台 gtag），以及服务端 `GA_PROPERTY_ID` / `GA_CLIENT_EMAIL` / `GA_PRIVATE_KEY`。需在 GCP 项目启用 **Google Analytics Data API**，并把服务账号加为 GA4 媒体资源的 **查看者**
+
+详见 `apps/web/.env.local.example` 与[部署指南](https://zephyr110.vercel.app/posts/zlog-deployment-guide)。
 
 不依赖环境变量创建/重置管理员：
 
