@@ -1,43 +1,42 @@
 // Regenerates the two static geo assets used by the admin Traffic panel:
-//   src/lib/world-dot-map.ts     — precomputed Natural Earth land dots + projection
+//   src/lib/world-dot-map.ts     — precomputed Robinson land dots + projection
 //   src/lib/country-centroids.ts — ISO 3166-1 alpha-2 → [lat, lng] centroids
 //
 // Run from apps/web:  pnpm generate:geo
 // Runtime cost: zero polygons — the client only ships the flat dot list and
-// reuses the same Natural Earth scale/translate (via d3-geo) for traffic pins.
+// reuses the same Robinson scale/translate (via d3-geo-projection) for pins.
 
 import { writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
-import { geoNaturalEarth1, geoContains } from "d3-geo"
+import { geoContains, geoCentroid, geoArea } from "d3-geo"
+import { geoRobinson } from "d3-geo-projection"
 import { feature } from "topojson-client"
 
 const require = createRequire(import.meta.url)
 const countries = require("world-countries")
-// 110m is enough for a dotted silhouette; 50m makes generate:geo much slower
-// for little pin-map benefit once Antarctica is excluded from the fit.
-const landTopo = require("world-atlas/land-110m.json")
+// 110m for fast hex sampling; 50m only to recover small islands / Arctic tips
+// that 110m flattens away (Pacific, Caribbean, Canadian archipelago, Svalbard).
+const land110Topo = require("world-atlas/land-110m.json")
+const land50Topo = require("world-atlas/land-50m.json")
 
 const here = dirname(fileURLToPath(import.meta.url))
 const out = (name) => join(here, "..", "src", "lib", name)
 
-/** Compact viewBox — Natural Earth is ~1.9:1; padding keeps coast dots inset. */
-const WIDTH = 96
-const HEIGHT = 50
-/** Hex-ish diagonal spacing (matches prior dotted-map “diagonal” look). */
-const STEP = 1.05
 /**
- * Keep Arctic tip fills on the same visual rhythm as the hex grid — a looser
- * MIN_DIST previously let Peary Land vertices clump into overlapping blobs.
+ * Robinson silhouette (~1.97:1). Larger viewBox + denser step than the old
+ * 96×50 grid so Canada/Russia north and Pacific islands read against the
+ * reference compromise map (Antarctica omitted).
  */
+const WIDTH = 168
+const HEIGHT = 85
+const STEP = 0.82
 const MIN_DIST = STEP * 0.9
-/**
- * Drop Antarctica from fit + sampling. Site-traffic pins never land there,
- * and including it in Natural Earth crush-fits Greenland against the top
- * pad so the island reads as truncated.
- */
+/** Drop Antarctica — reference traffic maps end south of Tierra del Fuego / NZ. */
 const ANTARCTICA_MAX_LAT = -55
+/** Steradians; roughly “one hex cell or smaller” on a world map. */
+const SMALL_ISLAND_AREA = 0.00012
 
 /**
  * world-atlas `land` is a GeometryCollection → FeatureCollection of polygons.
@@ -69,21 +68,23 @@ function landWithoutAntarctica(topo) {
   }
 }
 
-const landFeature = landWithoutAntarctica(landTopo)
-const projection = geoNaturalEarth1().fitExtent(
+const land110 = landWithoutAntarctica(land110Topo)
+const land50 = landWithoutAntarctica(land50Topo)
+
+const projection = geoRobinson().fitExtent(
   [
-    [1.5, 2.4],
-    [WIDTH - 1.5, HEIGHT - 1.5],
+    [1.8, 2.2],
+    [WIDTH - 1.8, HEIGHT - 1.8],
   ],
-  landFeature
+  land110
 )
-// Leave air above Cape Morris Jesup so the tip is not flush with the card edge.
+// Slight south bias so Greenland / Ellesmere tip sits inside the frame.
 projection.translate([
   projection.translate()[0],
-  projection.translate()[1] + 0.5,
+  projection.translate()[1] + 0.7,
 ])
 
-const pad = 1.2
+const pad = 1.4
 const cell = MIN_DIST
 const buckets = new Map()
 const dots = []
@@ -113,55 +114,69 @@ function addDot(x, y) {
   return true
 }
 
+function validLandSample(x, y, land) {
+  const ll = projection.invert([x, y])
+  if (!ll || !Number.isFinite(ll[0]) || !Number.isFinite(ll[1])) return null
+  if (Math.abs(ll[1]) > 90 || Math.abs(ll[0]) > 180) return null
+  // Invert can be multi-valued near the frame — require round-trip.
+  const back = projection(ll)
+  if (!back || Math.hypot(back[0] - x, back[1] - y) > 0.6) return null
+  if (!geoContains(land, ll)) return null
+  return ll
+}
+
 const ystep = STEP * Math.sqrt(3) * 0.5
 
-// 1) Main diagonal hex grid — the visual rhythm for the whole map.
+// 1) Main diagonal hex grid against 110m land (fast path).
 for (let row = 0, y = pad; y < HEIGHT - pad; row++, y += ystep) {
   const x0 = pad + (row % 2) * (STEP * 0.5)
   for (let x = x0; x < WIDTH - pad; x += STEP) {
-    const ll = projection.invert([x, y])
-    if (!ll || !Number.isFinite(ll[0]) || !Number.isFinite(ll[1])) continue
-    if (Math.abs(ll[1]) > 90 || Math.abs(ll[0]) > 180) continue
-    // Natural Earth invert is multi-valued near the frame — reject samples
-    // that do not round-trip (ghost Arctic rows above the true coastline).
-    const back = projection(ll)
-    if (!back || Math.hypot(back[0] - x, back[1] - y) > 0.55) continue
-    if (!geoContains(landFeature, ll)) continue
+    if (!validLandSample(x, y, land110)) continue
     addDot(x, y)
   }
 }
 
-// 2) Sparse Arctic tip fill on the same hex lattice. Natural Earth flattens
-// 80–84°N into less than one hex step, so the main grid alone chops Greenland;
-// we only place dots that still clear MIN_DIST (≈ hex spacing).
+// 2) Extra Arctic hex rows on 110m — Robinson flattens 80–84°N.
 const tipY = projection([-33.5, 83.6])[1]
-const tipRow0 = Math.floor((Math.min(tipY, pad) - pad) / ystep)
-for (let row = tipRow0; row < tipRow0 + 4; row++) {
-  if (row < 0) continue
-  const y = pad + row * ystep
-  if (y > tipY + ystep * 1.2) continue
+for (let row = 0, y = pad; y < tipY + ystep * 1.5; row++, y += ystep) {
   const x0 = pad + (row % 2) * (STEP * 0.5)
   for (let x = x0; x < WIDTH - pad; x += STEP) {
-    // Only the Greenland / NE Canada longitude band needs the tip rescue.
-    if (x < 34 || x > 48) continue
-    const ll = projection.invert([x, y])
-    if (!ll || !Number.isFinite(ll[0]) || !Number.isFinite(ll[1])) continue
-    if (ll[1] < 79) continue
-    const back = projection(ll)
-    if (!back || Math.hypot(back[0] - x, back[1] - y) > 0.55) continue
-    if (!geoContains(landFeature, ll)) continue
+    const ll = validLandSample(x, y, land110)
+    if (!ll || ll[1] < 78) continue
     addDot(x, y)
   }
 }
 
-// 3) At most a few peak vertices (Cape Morris Jesup etc.), still hex-spaced.
-for (const poly of landFeature.geometry.coordinates) {
+// 3) 50m small-island centroids — Pacific / Caribbean / Aleutians / Svalbard
+// often fall between hex cells on 110m.
+let islandSeeds = 0
+for (const poly of land50.geometry.coordinates) {
+  const feat = {
+    type: "Feature",
+    properties: {},
+    geometry: { type: "Polygon", coordinates: poly },
+  }
+  const area = geoArea(feat)
+  if (area > SMALL_ISLAND_AREA) continue
+  const [lng, lat] = geoCentroid(feat)
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
+  if (lat < ANTARCTICA_MAX_LAT) continue
+  const xy = projection([lng, lat])
+  if (!xy) continue
+  if (addDot(xy[0], xy[1])) islandSeeds++
+}
+
+// 4) 50m high-latitude coastline vertices (sparse via MIN_DIST) for jagged
+// Arctic archipelago detail that 110m smooths over.
+let arcticVerts = 0
+for (const poly of land50.geometry.coordinates) {
   for (const ring of poly) {
-    for (const [lng, lat] of ring) {
-      if (lat < 82.5) continue
+    for (let i = 0; i < ring.length; i += 3) {
+      const [lng, lat] = ring[i]
+      if (lat < 70) continue
       const xy = projection([lng, lat])
       if (!xy) continue
-      addDot(xy[0], xy[1])
+      if (addDot(xy[0], xy[1])) arcticVerts++
     }
   }
 }
@@ -173,7 +188,7 @@ const mapAsset = {
   width: WIDTH,
   height: HEIGHT,
   projection: {
-    name: "naturalEarth1",
+    name: "robinson",
     scale: Number(projection.scale().toFixed(6)),
     translate: [Number(tx.toFixed(4)), Number(ty.toFixed(4))],
   },
@@ -187,7 +202,7 @@ export interface WorldDotMap {
   width: number
   height: number
   projection: {
-    name: "naturalEarth1"
+    name: "robinson"
     scale: number
     translate: readonly [number, number]
   }
@@ -213,22 +228,14 @@ export const COUNTRY_CENTROIDS: Record<string, readonly [number, number]> = ${JS
 `
 )
 
-const jesup = projection([-33.5, 83.6])
+const pacific = dots.filter((d) => {
+  const ll = projection.invert([d.x, d.y])
+  return ll && ll[0] > 130 && ll[0] < 180 && ll[1] > -50 && ll[1] < 30
+})
 const arctic = dots.filter((d) => {
   const ll = projection.invert([d.x, d.y])
-  return ll && ll[1] >= 80 && ll[0] >= -75 && ll[0] <= -10
+  return ll && ll[1] >= 70
 })
-const ys = arctic.map((d) => d.y)
-const minPair = (() => {
-  let min = Infinity
-  for (let i = 0; i < arctic.length; i++) {
-    for (let j = i + 1; j < arctic.length; j++) {
-      const d = Math.hypot(arctic[i].x - arctic[j].x, arctic[i].y - arctic[j].y)
-      if (d < min) min = d
-    }
-  }
-  return min
-})()
 console.log(
-  `dots: ${dots.length}, arctic≥80°: ${arctic.length}, minArcticDist: ${minPair.toFixed(2)}, jesup y: ${jesup[1].toFixed(2)}, yMin: ${Math.min(...ys).toFixed(2)}`
+  `dots: ${dots.length}, islands: ${islandSeeds}, arcticVerts: ${arcticVerts}, arctic≥70°: ${arctic.length}, pacific: ${pacific.length}`
 )

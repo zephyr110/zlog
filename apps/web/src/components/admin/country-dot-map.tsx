@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Maximize2 } from "lucide-react"
 import { hasFlag } from "country-flag-icons"
 import * as Flags from "country-flag-icons/react/3x2"
-import { geoNaturalEarth1 } from "d3-geo"
+import { geoRobinson } from "d3-geo-projection"
 import { WORLD_DOT_MAP } from "@/lib/world-dot-map"
 import { COUNTRY_CENTROIDS } from "@/lib/country-centroids"
 import { TruncateTooltip } from "@/components/ui/truncate-tooltip"
@@ -45,8 +45,8 @@ interface PinTooltip extends PinData {
 
 type LegendMode = "scroll" | "grid"
 
-/** Same Natural Earth params as the precomputed land dots. */
-const PIN_PROJECTION = geoNaturalEarth1()
+/** Same Robinson params as the precomputed land dots. */
+const PIN_PROJECTION = geoRobinson()
   .scale(WORLD_DOT_MAP.projection.scale)
   .translate([
     WORLD_DOT_MAP.projection.translate[0],
@@ -56,7 +56,7 @@ const PIN_PROJECTION = geoNaturalEarth1()
 const { width: MAP_WIDTH, height: MAP_HEIGHT, dots: LAND_DOTS } = WORLD_DOT_MAP
 
 /** Background dot radius; pins scale with sqrt share of the max country. */
-const DOT_RADIUS = 0.28
+const DOT_RADIUS = 0.32
 /** Invisible hit target floor — map coords are tiny; without this, phone
  *  taps miss the pin core entirely. */
 const PIN_HIT_MIN = 2.2
@@ -171,9 +171,9 @@ function useLocalizedCountries(countries: CountryDatum[]) {
 }
 
 /**
- * Natural Earth dotted land + projected traffic pins. `legend="scroll"`
- * keeps the compact card chip row; `legend="grid"` wraps every country
- * in the expand dialog so nothing hides behind horizontal scroll.
+ * Robinson dotted land + projected traffic pins. `legend="scroll"` keeps
+ * the compact card chip row; `legend="grid"` wraps every country in the
+ * expand dialog so nothing hides behind horizontal scroll.
  */
 function CountryMapView({
   countries,
