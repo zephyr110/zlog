@@ -1002,7 +1002,7 @@ export function TrafficSkeleton() {
         <PanelChrome titleWidth="w-24" action>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
             <div className="flex min-h-0 flex-1 items-center">
-              <Skeleton className="aspect-[73/48] w-full rounded-md" />
+              <Skeleton className="aspect-[96/50] w-full rounded-md" />
             </div>
             <ul className="flex min-w-0 shrink-0 gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]">
               {["w-[4.5rem]", "w-24", "w-16", "w-28", "w-20", "w-[5.5rem]"].map(
