@@ -5,7 +5,7 @@ import { Maximize2 } from "lucide-react"
 import { hasFlag } from "country-flag-icons"
 import * as Flags from "country-flag-icons/react/3x2"
 import { geoRobinson } from "d3-geo-projection"
-import { WORLD_DOT_MAP } from "@/lib/world-dot-map"
+import { WORLD_LAND_MAP } from "@/lib/world-land-map"
 import { COUNTRY_CENTROIDS } from "@/lib/country-centroids"
 import { TruncateTooltip } from "@/components/ui/truncate-tooltip"
 import { Button } from "@/components/ui/button"
@@ -45,18 +45,20 @@ interface PinTooltip extends PinData {
 
 type LegendMode = "scroll" | "grid"
 
-/** Same Robinson params as the precomputed land dots. */
+/** Same Robinson params as the precomputed land path. */
 const PIN_PROJECTION = geoRobinson()
-  .scale(WORLD_DOT_MAP.projection.scale)
+  .scale(WORLD_LAND_MAP.projection.scale)
   .translate([
-    WORLD_DOT_MAP.projection.translate[0],
-    WORLD_DOT_MAP.projection.translate[1],
+    WORLD_LAND_MAP.projection.translate[0],
+    WORLD_LAND_MAP.projection.translate[1],
   ])
 
-const { width: MAP_WIDTH, height: MAP_HEIGHT, dots: LAND_DOTS } = WORLD_DOT_MAP
+const {
+  width: MAP_WIDTH,
+  height: MAP_HEIGHT,
+  path: LAND_PATH,
+} = WORLD_LAND_MAP
 
-/** Background dot radius; pins scale with sqrt share of the max country. */
-const DOT_RADIUS = 0.32
 /** Invisible hit target floor — map coords are tiny; without this, phone
  *  taps miss the pin core entirely. */
 const PIN_HIT_MIN = 2.2
@@ -171,9 +173,9 @@ function useLocalizedCountries(countries: CountryDatum[]) {
 }
 
 /**
- * Robinson dotted land + projected traffic pins. `legend="scroll"` keeps
- * the compact card chip row; `legend="grid"` wraps every country in the
- * expand dialog so nothing hides behind horizontal scroll.
+ * Robinson filled-land silhouette + projected traffic pins. `legend="scroll"`
+ * keeps the compact card chip row; `legend="grid"` wraps every country in
+ * the expand dialog so nothing hides behind horizontal scroll.
  */
 function CountryMapView({
   countries,
@@ -215,7 +217,7 @@ function CountryMapView({
         code: c.code,
         name: c.name,
         users: c.users,
-        radius: 0.5 + 0.55 * Math.sqrt(c.users / max),
+        radius: 0.65 + 0.7 * Math.sqrt(c.users / max),
       })
     }
     return out
@@ -277,18 +279,12 @@ function CountryMapView({
       >
         <svg
           viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
-          className="h-auto w-full text-muted-foreground/30"
+          className="h-auto w-full text-muted-foreground/25"
           aria-hidden="true"
         >
-          {LAND_DOTS.map((d, i) => (
-            <circle
-              key={i}
-              cx={d.x}
-              cy={d.y}
-              r={DOT_RADIUS}
-              fill="currentColor"
-            />
-          ))}
+          {/* Continuous Robinson land fill — preserves polar tips / jagged
+              coasts that a hex-dot grid flattens. Generated offline. */}
+          <path d={LAND_PATH} fill="currentColor" />
           {pins.map((pin, i) => {
             const active = tooltip?.name === pin.name
             return (
