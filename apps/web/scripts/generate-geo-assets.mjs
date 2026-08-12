@@ -26,9 +26,12 @@ const out = (name) => join(here, "..", "src", "lib", name)
 const WIDTH = 96
 const HEIGHT = 50
 /** Hex-ish diagonal spacing (matches prior dotted-map “diagonal” look). */
-const STEP = 1.0
-/** Min screen distance between dots (avoids stacking without killing polar tips). */
-const MIN_DIST = 0.42
+const STEP = 1.05
+/**
+ * Keep Arctic tip fills on the same visual rhythm as the hex grid — a looser
+ * MIN_DIST previously let Peary Land vertices clump into overlapping blobs.
+ */
+const MIN_DIST = STEP * 0.9
 /**
  * Drop Antarctica from fit + sampling. Site-traffic pins never land there,
  * and including it in Natural Earth crush-fits Greenland against the top
@@ -80,14 +83,10 @@ projection.translate([
   projection.translate()[1] + 0.5,
 ])
 
-const pad = 1.15
+const pad = 1.2
 const cell = MIN_DIST
 const buckets = new Map()
 const dots = []
-
-function cellKey(x, y) {
-  return `${Math.floor(x / cell)};${Math.floor(y / cell)}`
-}
 
 function addDot(x, y) {
   if (x < pad || x > WIDTH - pad || y < pad || y > HEIGHT - pad) return false
@@ -106,7 +105,7 @@ function addDot(x, y) {
     }
   }
   const point = { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) }
-  const key = cellKey(point.x, point.y)
+  const key = `${Math.floor(point.x / cell)};${Math.floor(point.y / cell)}`
   const list = buckets.get(key)
   if (list) list.push(point)
   else buckets.set(key, [point])
@@ -114,40 +113,9 @@ function addDot(x, y) {
   return true
 }
 
-// 1) High-latitude land vertices FIRST — Peary Land / Cape Morris Jesup are
-// thinner than the hex step in Natural Earth screen space, so a uniform grid
-// alone leaves a flat chopped top on Greenland.
-for (const poly of landFeature.geometry.coordinates) {
-  for (const ring of poly) {
-    for (let i = 0; i < ring.length; i++) {
-      const [lng, lat] = ring[i]
-      if (lat < 74) continue
-      const xy = projection([lng, lat])
-      if (!xy) continue
-      addDot(xy[0], xy[1])
-      // Edge midpoint densifies the tip silhouette between sparse vertices.
-      const [lng2, lat2] = ring[(i + 1) % ring.length]
-      if (lat2 < 74) continue
-      const mid = projection([(lng + lng2) / 2, (lat + lat2) / 2])
-      if (mid && geoContains(landFeature, [(lng + lng2) / 2, (lat + lat2) / 2])) {
-        addDot(mid[0], mid[1])
-      }
-    }
-  }
-}
-
-// 2) Geographic Arctic fill for the band the hex grid tends to skip (~80–84°N).
-for (let lat = 78; lat <= 84; lat += 0.35) {
-  for (let lng = -80; lng <= -10; lng += 0.7) {
-    if (!geoContains(landFeature, [lng, lat])) continue
-    const xy = projection([lng, lat])
-    if (!xy) continue
-    addDot(xy[0], xy[1])
-  }
-}
-
-// 3) Main diagonal hex grid for the rest of the world.
 const ystep = STEP * Math.sqrt(3) * 0.5
+
+// 1) Main diagonal hex grid — the visual rhythm for the whole map.
 for (let row = 0, y = pad; y < HEIGHT - pad; row++, y += ystep) {
   const x0 = pad + (row % 2) * (STEP * 0.5)
   for (let x = x0; x < WIDTH - pad; x += STEP) {
@@ -157,14 +125,44 @@ for (let row = 0, y = pad; y < HEIGHT - pad; row++, y += ystep) {
     // Natural Earth invert is multi-valued near the frame — reject samples
     // that do not round-trip (ghost Arctic rows above the true coastline).
     const back = projection(ll)
-    if (
-      !back ||
-      Math.hypot(back[0] - x, back[1] - y) > 0.55
-    ) {
-      continue
-    }
+    if (!back || Math.hypot(back[0] - x, back[1] - y) > 0.55) continue
     if (!geoContains(landFeature, ll)) continue
     addDot(x, y)
+  }
+}
+
+// 2) Sparse Arctic tip fill on the same hex lattice. Natural Earth flattens
+// 80–84°N into less than one hex step, so the main grid alone chops Greenland;
+// we only place dots that still clear MIN_DIST (≈ hex spacing).
+const tipY = projection([-33.5, 83.6])[1]
+const tipRow0 = Math.floor((Math.min(tipY, pad) - pad) / ystep)
+for (let row = tipRow0; row < tipRow0 + 4; row++) {
+  if (row < 0) continue
+  const y = pad + row * ystep
+  if (y > tipY + ystep * 1.2) continue
+  const x0 = pad + (row % 2) * (STEP * 0.5)
+  for (let x = x0; x < WIDTH - pad; x += STEP) {
+    // Only the Greenland / NE Canada longitude band needs the tip rescue.
+    if (x < 34 || x > 48) continue
+    const ll = projection.invert([x, y])
+    if (!ll || !Number.isFinite(ll[0]) || !Number.isFinite(ll[1])) continue
+    if (ll[1] < 79) continue
+    const back = projection(ll)
+    if (!back || Math.hypot(back[0] - x, back[1] - y) > 0.55) continue
+    if (!geoContains(landFeature, ll)) continue
+    addDot(x, y)
+  }
+}
+
+// 3) At most a few peak vertices (Cape Morris Jesup etc.), still hex-spaced.
+for (const poly of landFeature.geometry.coordinates) {
+  for (const ring of poly) {
+    for (const [lng, lat] of ring) {
+      if (lat < 82.5) continue
+      const xy = projection([lng, lat])
+      if (!xy) continue
+      addDot(xy[0], xy[1])
+    }
   }
 }
 
@@ -218,11 +216,19 @@ export const COUNTRY_CENTROIDS: Record<string, readonly [number, number]> = ${JS
 const jesup = projection([-33.5, 83.6])
 const arctic = dots.filter((d) => {
   const ll = projection.invert([d.x, d.y])
-  return ll && ll[1] >= 81 && ll[0] >= -75 && ll[0] <= -10
+  return ll && ll[1] >= 80 && ll[0] >= -75 && ll[0] <= -10
 })
-const maxLat = Math.max(
-  ...arctic.map((d) => projection.invert([d.x, d.y])[1])
-)
+const ys = arctic.map((d) => d.y)
+const minPair = (() => {
+  let min = Infinity
+  for (let i = 0; i < arctic.length; i++) {
+    for (let j = i + 1; j < arctic.length; j++) {
+      const d = Math.hypot(arctic[i].x - arctic[j].x, arctic[i].y - arctic[j].y)
+      if (d < min) min = d
+    }
+  }
+  return min
+})()
 console.log(
-  `dots: ${dots.length}, jesup y: ${jesup[1].toFixed(2)}, arctic≥81°: ${arctic.length}, maxLat: ${maxLat.toFixed(2)}, yMin arctic: ${Math.min(...arctic.map((d) => d.y)).toFixed(2)}`
+  `dots: ${dots.length}, arctic≥80°: ${arctic.length}, minArcticDist: ${minPair.toFixed(2)}, jesup y: ${jesup[1].toFixed(2)}, yMin: ${Math.min(...ys).toFixed(2)}`
 )
