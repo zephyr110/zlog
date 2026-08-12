@@ -17,20 +17,21 @@ const countries = createRequire(import.meta.url)("world-countries")
 const here = dirname(fileURLToPath(import.meta.url))
 const out = (name) => join(here, "..", "src", "lib", name)
 
-// Height 48 with an explicit world region yields ~1.8:1 (88×48) — close to
-// the prior ~2:1 card silhouette without shipping a much larger JSON.
+// Height 48 with lat −56…84 / lng ±180 yields ~73×48 (~1.52:1) — still a
+// landscape card silhouette without shipping a much larger JSON.
 //
 // Explicit region (vs dotted-map’s default lat -56…71 / lng ±168):
 //   - lng -180…180 → NZ + Samoa/Tonga/etc. across the date line
-//   - lat.max 78    → Greenland + Svalbard (higher values crush the
-//                     aspect ratio under Mercator)
-// Antarctica (AQ, ~-90°) stays excluded — Mercator blows it up and it is
-// not meaningful for site-traffic pins.
+//   - lat.max 84   → full Greenland (Cape Morris Jesup ~83.6°N) + high
+//                    Arctic approaches; higher values crush the aspect
+//                    under Mercator for little traffic value
+//   - lat.min -56  → Antarctica (AQ, ~-90°) stays excluded — Mercator
+//                    blows it up and it is not meaningful for site-traffic pins
 const mapJson = getMapJSON({
   height: 48,
   grid: "diagonal",
   region: {
-    lat: { min: -56, max: 78 },
+    lat: { min: -56, max: 84 },
     lng: { min: -180, max: 180 },
   },
 })

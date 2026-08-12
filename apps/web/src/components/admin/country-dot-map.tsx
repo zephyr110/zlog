@@ -45,7 +45,7 @@ interface PinTooltip extends PinData {
 
 type LegendMode = "scroll" | "grid"
 
-// Parsed once at module load — the 90KB JSON is a precomputed dot grid, so
+// Parsed once at module load — the ~50KB JSON is a precomputed dot grid, so
 // no country polygons or projection math ship to the client bundle.
 const MAP_DATA = JSON.parse(WORLD_DOT_MAP_JSON) as MapData
 
