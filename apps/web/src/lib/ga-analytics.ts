@@ -6,6 +6,7 @@ import {
   type Dispatcher,
 } from "undici"
 import { isPublicTrafficPath } from "@/lib/analytics-paths"
+import { foldChinaRegions } from "@/lib/analytics-countries"
 
 export type AnalyticsRange = "today" | "7d" | "30d"
 
@@ -559,11 +560,13 @@ export async function fetchAnalyticsReport(
       os: dimValue(row, 0),
       users: metricValue(row, 0),
     })),
-    countries: (reports[6]?.rows ?? []).map((row) => ({
-      country: dimValue(row, 0),
-      countryId: dimValue(row, 1),
-      users: metricValue(row, 0),
-    })),
+    countries: foldChinaRegions(
+      (reports[6]?.rows ?? []).map((row) => ({
+        country: dimValue(row, 0),
+        countryId: dimValue(row, 1),
+        users: metricValue(row, 0),
+      }))
+    ),
   }
 
   reportCache.set(range, { expires: Date.now() + CACHE_TTL_MS, report })

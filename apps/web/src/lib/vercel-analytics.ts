@@ -3,6 +3,7 @@ import {
   type AnalyticsRange,
   type AnalyticsReport,
 } from "@/lib/ga-analytics"
+import { foldChinaRegions } from "@/lib/analytics-countries"
 import { isPublicTrafficPath } from "@/lib/analytics-paths"
 
 const CACHE_TTL_MS = 10 * 60 * 1000
@@ -235,16 +236,18 @@ export async function fetchVercelAnalyticsReport(
           os: r.osName!,
           users: num(r.visitors),
         })),
-      countries: (countries.data ?? [])
-        .filter((r) => r.country && r.country !== "Others")
-        .map((r) => {
-          const id = countryCode(r.country)
-          return {
-            country: id,
-            countryId: id,
-            users: num(r.visitors),
-          }
-        }),
+      countries: foldChinaRegions(
+        (countries.data ?? [])
+          .filter((r) => r.country && r.country !== "Others")
+          .map((r) => {
+            const id = countryCode(r.country)
+            return {
+              country: id,
+              countryId: id,
+              users: num(r.visitors),
+            }
+          })
+      ),
     }
 
     reportCache.set(range, { expires: Date.now() + CACHE_TTL_MS, report })
