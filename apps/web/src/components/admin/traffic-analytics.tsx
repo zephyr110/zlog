@@ -1001,7 +1001,7 @@ export function TrafficSkeleton() {
         {/* Countries — map + horizontally scrolling flag chips */}
         <PanelChrome titleWidth="w-24" action>
           <div className="flex min-w-0 flex-col gap-3">
-            <Skeleton className="aspect-[95/48] w-full rounded-md" />
+            <Skeleton className="aspect-[88/48] w-full rounded-md" />
             <ul className="flex min-w-0 gap-1.5 overflow-x-auto [scrollbar-width:thin]">
               {["w-[4.5rem]", "w-24", "w-16", "w-28", "w-20", "w-[5.5rem]"].map(
                 (w, j) => (
