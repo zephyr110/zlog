@@ -28,6 +28,13 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useT } from "@/components/layout/trans"
 import { apiFetch } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
@@ -707,32 +714,30 @@ export function TrafficAnalytics() {
           {t("admin.traffic")}
         </h2>
         <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
-          <div
-            className="flex items-center gap-1 rounded-lg bg-muted/60 p-1"
-            role="group"
-            aria-label={t("admin.analyticsSource")}
+          <Select
+            value={source}
+            onValueChange={(v) => {
+              if (v == null || v === source) return
+              if (!(SOURCES as readonly string[]).includes(v)) return
+              setSource(v as AnalyticsSource)
+              setState({ status: "loading" })
+            }}
           >
-            {SOURCES.map((s) => (
-              <button
-                key={s}
-                type="button"
-                aria-pressed={source === s}
-                onClick={() => {
-                  if (s === source) return
-                  setSource(s)
-                  setState({ status: "loading" })
-                }}
-                className={cn(
-                  "cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                  source === s
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {sourceLabel(s)}
-              </button>
-            ))}
-          </div>
+            <SelectTrigger
+              size="sm"
+              aria-label={t("admin.analyticsSource") as string}
+              className="w-40"
+            >
+              <SelectValue>{sourceLabel(source)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent align="end">
+              {SOURCES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {sourceLabel(s)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div
             className="flex items-center gap-1 rounded-lg bg-muted/60 p-1"
             role="group"

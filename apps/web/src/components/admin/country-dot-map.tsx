@@ -29,6 +29,8 @@ export interface CountryDatum {
 }
 
 interface PinData {
+  /** ISO 3166-1 alpha-2 — drives the tooltip flag emoji. */
+  code: string
   name: string
   users: number
   radius: number
@@ -146,6 +148,7 @@ function CountryMapView({
         lat: centroid[0],
         lng: centroid[1],
         data: {
+          code: c.code,
           name: c.name,
           users: c.users,
           radius: 0.55 + 0.5 * Math.sqrt(c.users / max),
@@ -195,6 +198,8 @@ function CountryMapView({
     window.addEventListener("pointerdown", onPointerDown)
     return () => window.removeEventListener("pointerdown", onPointerDown)
   }, [tooltip, canHover])
+
+  const tooltipFlag = tooltip ? countryFlagEmoji(tooltip.code) : null
 
   return (
     <div className="flex min-w-0 flex-col gap-3" data-country-map>
@@ -276,7 +281,7 @@ function CountryMapView({
             overflow-hidden would otherwise clip it. */}
         {tooltip && (
           <div
-            className="pointer-events-none absolute z-10 flex flex-col gap-0.5 whitespace-nowrap rounded-md border bg-popover px-2.5 py-1.5 text-xs shadow-lg"
+            className="pointer-events-none absolute z-10 flex items-start gap-2 whitespace-nowrap rounded-md border bg-popover px-2.5 py-1.5 text-xs shadow-lg"
             style={{
               left: `${tooltip.xPct}%`,
               top: `${tooltip.yPct}%`,
@@ -293,10 +298,20 @@ function CountryMapView({
               }`,
             }}
           >
-            <span className="font-medium">{tooltip.name}</span>
-            <span className="tabular-nums text-muted-foreground">
-              {usersLabel}: {tooltip.users.toLocaleString()}
-            </span>
+            {tooltipFlag ? (
+              <span
+                className="mt-0.5 shrink-0 text-base leading-none"
+                aria-hidden
+              >
+                {tooltipFlag}
+              </span>
+            ) : null}
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="font-medium">{tooltip.name}</span>
+              <span className="tabular-nums text-muted-foreground">
+                {usersLabel}: {tooltip.users.toLocaleString()}
+              </span>
+            </div>
           </div>
         )}
       </div>
