@@ -217,6 +217,8 @@ function CountryMapView({
         code: c.code,
         name: c.name,
         users: c.users,
+        // Slightly larger than the old dotted-land pins so markers stay
+        // readable against a continuous silhouette fill.
         radius: 0.65 + 0.7 * Math.sqrt(c.users / max),
       })
     }

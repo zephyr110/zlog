@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/ui/empty-state"
 import { TruncateTooltip } from "@/components/ui/truncate-tooltip"
 import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
-import { CountriesPanel } from "@/components/admin/country-dot-map"
+import { CountriesPanel } from "@/components/admin/country-map"
 import {
   CHART_COLORS,
   ChartContainer,

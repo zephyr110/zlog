@@ -76,8 +76,17 @@ projection.translate([
   projection.translate()[1] + 0.7,
 ])
 
+const pathGen = geoPath(projection)
+const [[minX, minY], [maxX, maxY]] = pathGen.bounds(landFeature)
+if (minX < 0 || minY < 0 || maxX > WIDTH || maxY > HEIGHT) {
+  throw new Error(
+    `land silhouette overflows viewBox ${WIDTH}×${HEIGHT}: ` +
+      `bbox [${minX.toFixed(2)},${minY.toFixed(2)}]–[${maxX.toFixed(2)},${maxY.toFixed(2)}]`
+  )
+}
+
 // digits(1) keeps the path compact while preserving polar tips/jagged coasts.
-const landPath = geoPath(projection).digits(1)(landFeature)
+const landPath = pathGen.digits(1)(landFeature)
 if (!landPath) {
   throw new Error("geoPath produced an empty land silhouette")
 }
