@@ -15,6 +15,8 @@ import { feature } from "topojson-client"
 
 const require = createRequire(import.meta.url)
 const countries = require("world-countries")
+// 110m is enough for a dotted silhouette; 50m makes generate:geo much slower
+// for little pin-map benefit once Antarctica is excluded from the fit.
 const landTopo = require("world-atlas/land-110m.json")
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -24,22 +26,58 @@ const out = (name) => join(here, "..", "src", "lib", name)
 const WIDTH = 96
 const HEIGHT = 50
 /** Hex-ish diagonal spacing (matches prior dotted-map “diagonal” look). */
-const STEP = 1.15
+const STEP = 1.1
+/**
+ * Drop Antarctica from fit + sampling. Site-traffic pins never land there,
+ * and including it in Natural Earth crush-fits Greenland against the top
+ * pad so the island reads as truncated.
+ */
+const ANTARCTICA_MAX_LAT = -55
 
-const landFeature = feature(landTopo, landTopo.objects.land)
+/**
+ * world-atlas `land` is a GeometryCollection → FeatureCollection of polygons.
+ * Keep any polygon whose outer ring reaches north of Antarctica.
+ */
+function landWithoutAntarctica(topo) {
+  const fc = feature(topo, topo.objects.land)
+  const feats = fc.type === "FeatureCollection" ? fc.features : [fc]
+  const coordinates = []
+  for (const f of feats) {
+    const g = f.geometry
+    if (!g) continue
+    const polys = g.type === "Polygon" ? [g.coordinates] : g.coordinates
+    for (const poly of polys) {
+      let maxLat = -90
+      for (const ring of poly) {
+        for (const [, lat] of ring) {
+          if (lat > maxLat) maxLat = lat
+        }
+      }
+      if (maxLat < ANTARCTICA_MAX_LAT) continue
+      coordinates.push(poly)
+    }
+  }
+  return {
+    type: "Feature",
+    properties: {},
+    geometry: { type: "MultiPolygon", coordinates },
+  }
+}
+
+const landFeature = landWithoutAntarctica(landTopo)
 const projection = geoNaturalEarth1().fitExtent(
   [
-    [1.2, 1.2],
-    [WIDTH - 1.2, HEIGHT - 1.2],
+    [1.5, 1.5],
+    [WIDTH - 1.5, HEIGHT - 1.5],
   ],
   landFeature
 )
 
 const ystep = STEP * Math.sqrt(3) * 0.5
 const dots = []
-for (let row = 0, y = 1.2; y < HEIGHT - 1.2; row++, y += ystep) {
-  const x0 = 1.2 + (row % 2) * (STEP * 0.5)
-  for (let x = x0; x < WIDTH - 1.2; x += STEP) {
+for (let row = 0, y = 1.5; y < HEIGHT - 1.5; row++, y += ystep) {
+  const x0 = 1.5 + (row % 2) * (STEP * 0.5)
+  for (let x = x0; x < WIDTH - 1.5; x += STEP) {
     const ll = projection.invert([x, y])
     if (!ll || !Number.isFinite(ll[0]) || !Number.isFinite(ll[1])) continue
     // Skip poles that invert outside the sphere (Natural Earth can yield NaN).
