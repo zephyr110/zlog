@@ -1,5 +1,6 @@
 import { type Client } from "@libsql/client"
 import { getDb } from "./db"
+import { scheduleSync } from "./sync"
 
 // ── Schema ──────────────────────────────────────────────────────────────
 
@@ -84,6 +85,8 @@ export async function insertMedia(record: {
       record.githubSha ?? null,
     ],
   })
+
+  scheduleSync()
 }
 
 /** Backfill the GitHub sha after the Contents API push succeeds. */
@@ -210,5 +213,6 @@ export async function deleteMedia(
     sql: "DELETE FROM media WHERE filename = ?",
     args: [filename],
   })
+  scheduleSync()
   return existing
 }

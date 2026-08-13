@@ -1,5 +1,6 @@
 import { type Client } from "@libsql/client"
 import { requireDb, createTableGuard } from "./db"
+import { scheduleSync } from "./sync"
 
 // ── Schema ──────────────────────────────────────────────────────────────
 // Self-hosted comments (replaces giscus). Guest comments are public on
@@ -190,6 +191,7 @@ export async function createComment(input: {
       input.parentId,
     ]
   )
+  scheduleSync()
   return rowToComment(result.rows[0] as unknown as Record<string, unknown>)
 }
 
@@ -225,6 +227,7 @@ export async function createReply(input: {
   )
   const row = result.rows[0]
   if (!row) return null
+  scheduleSync()
   return rowToComment(row as unknown as Record<string, unknown>)
 }
 
@@ -288,7 +291,9 @@ export async function markCommentRead(id: number): Promise<boolean> {
     `UPDATE comments SET is_read = 1 WHERE id = ?`,
     [id]
   )
-  return Number(result.rowsAffected) > 0
+  const marked = Number(result.rowsAffected) > 0
+  if (marked) scheduleSync()
+  return marked
 }
 
 /** Delete a comment — deleting a root takes its replies with it (a
@@ -309,8 +314,10 @@ export async function deleteComment(
     `DELETE FROM comments WHERE id = ? OR parent_id = ?`,
     [id, id]
   )
+  const removed = Number(result.rowsAffected)
+  if (removed > 0) scheduleSync()
   return {
-    removed: Number(result.rowsAffected),
+    removed,
     removedUnread: Number(unread.rows[0]?.n ?? 0),
   }
 }

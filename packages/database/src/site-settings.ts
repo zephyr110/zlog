@@ -1,5 +1,6 @@
 import { type Client } from "@libsql/client"
 import { getDb } from "./db"
+import { scheduleSync } from "./sync"
 
 // ── Schema ──────────────────────────────────────────────────────────────
 // Singleton row (id = 1) for editable site identity + social links.
@@ -166,5 +167,6 @@ export async function upsertSiteSettings(
     ],
   })
 
+  scheduleSync()
   return next
 }

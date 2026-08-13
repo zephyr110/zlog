@@ -1,5 +1,6 @@
 import { type Client } from "@libsql/client"
 import { getDb } from "./db"
+import { scheduleSync } from "./sync"
 import { type Post, type PostSummary } from "@zlog/core"
 import { toPostSummary } from "@zlog/core"
 import { safeSlug } from "@zlog/core"
@@ -214,6 +215,8 @@ export async function savePost(
       p.reading_time,
     ],
   })
+
+  scheduleSync()
 }
 
 export async function deletePost(slug: string): Promise<boolean> {
@@ -226,7 +229,9 @@ export async function deletePost(slug: string): Promise<boolean> {
     args: [clean],
   })
 
-  return result.rowsAffected > 0
+  const deleted = result.rowsAffected > 0
+  if (deleted) scheduleSync()
+  return deleted
 }
 
 export async function movePost(
@@ -239,6 +244,7 @@ export async function movePost(
   post.draft = toDraft
   await savePost(post)
 
+  scheduleSync()
   return post
 }
 
@@ -268,6 +274,7 @@ export async function setPostPinned(
     args: [pinnedAt, clean],
   })
   const row = result.rows[0]
+  if (row) scheduleSync()
   return row ? rowToPost(row) : null
 }
 
