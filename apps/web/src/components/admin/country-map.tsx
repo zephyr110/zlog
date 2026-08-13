@@ -477,6 +477,10 @@ export function CountriesPanel({
 }) {
   const { t } = useT()
   const [open, setOpen] = useState(false)
+  // Card + dialog each mount a full land SVG. While the exit overlay is
+  // still fading, the card map would flash through underneath — hide it for
+  // the whole open→exit cycle (cleared in onOpenChangeComplete).
+  const [hideCardMap, setHideCardMap] = useState(false)
   const empty = countries.length === 0
 
   return (
@@ -491,7 +495,10 @@ export function CountriesPanel({
                 variant="ghost"
                 size="icon-xs"
                 aria-label={t("admin.analyticsExpandCountries")}
-                onClick={() => setOpen(true)}
+                onClick={() => {
+                  setHideCardMap(true)
+                  setOpen(true)
+                }}
                 className="text-muted-foreground hover:text-foreground"
               >
                 <Maximize2 />
@@ -505,17 +512,39 @@ export function CountriesPanel({
           {empty ? (
             <AdminBlockEmpty className="min-h-0 flex-1" />
           ) : (
-            <CountryMapView
-              countries={countries}
-              usersLabel={usersLabel}
-              legend="scroll"
-            />
+            // Keep flex-1 on the wrapper so the card map still fills xl row height.
+            <div
+              className={cn(
+                "flex min-h-0 flex-1 flex-col",
+                hideCardMap && "invisible"
+              )}
+            >
+              <CountryMapView
+                countries={countries}
+                usersLabel={usersLabel}
+                legend="scroll"
+              />
+            </div>
           )}
         </div>
       </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex max-h-[min(94vh,56rem)] w-full max-w-[min(56rem,calc(100%_-_1.5rem))] flex-col gap-0 overflow-hidden p-0 xl:max-h-[min(94vh,68rem)] xl:max-w-[min(72rem,calc(100%_-_3rem))] 2xl:max-w-[min(84rem,calc(100%_-_4rem))]">
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next)
+          if (next) setHideCardMap(true)
+        }}
+        onOpenChangeComplete={(next) => {
+          if (!next) setHideCardMap(false)
+        }}
+      >
+        {/* Fade-only exit: twMerge won't drop DialogContent's zoom-out-95, so
+            pin --tw-exit-scale via style (wins over the utility). */}
+        <DialogContent
+          style={{ ["--tw-exit-scale" as string]: "1" }}
+          className="flex max-h-[min(94vh,56rem)] w-full max-w-[min(56rem,calc(100%_-_1.5rem))] flex-col gap-0 overflow-hidden p-0 xl:max-h-[min(94vh,68rem)] xl:max-w-[min(72rem,calc(100%_-_3rem))] 2xl:max-w-[min(84rem,calc(100%_-_4rem))]"
+        >
           <DialogHeader className="shrink-0 space-y-1 border-b px-4 py-3 pr-12 text-left">
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
