@@ -1,5 +1,5 @@
 /** Country row shape shared by GA and Vercel Traffic reports. */
-export type AnalyticsCountry = {
+type AnalyticsCountry = {
   country: string
   countryId: string
   users: number

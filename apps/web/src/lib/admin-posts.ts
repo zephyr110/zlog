@@ -1,7 +1,7 @@
 import { apiFetch } from "@/lib/api-client"
 import { type PostSummary } from "@zlog/database"
 
-export type AdminPostsResult =
+type AdminPostsResult =
   | { ok: true; posts: PostSummary[] }
   | { ok: false }
 

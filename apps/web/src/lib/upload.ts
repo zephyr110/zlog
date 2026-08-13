@@ -12,7 +12,7 @@ export {
   isUploadableImage,
 } from "@/lib/upload-constants"
 
-export type UploadResult =
+type UploadResult =
   | { ok: true; url: string; name?: string }
   | {
       ok: false

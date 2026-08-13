@@ -14,7 +14,7 @@ type ParticleShape = "circle" | "square" | "diamond" | "triangle" | "ring" | "cr
 const SHAPES: ParticleShape[] = ["circle", "square", "diamond", "triangle", "ring", "cross"]
 const HUES = [185, 190, 195, 200, 205, 210, 275, 280, 290, 300, 320, 330]
 
-export interface ParticleDef {
+interface ParticleDef {
   left: string
   top?: string
   size: number

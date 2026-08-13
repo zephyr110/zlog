@@ -5,7 +5,6 @@ import type { LocaleMessages } from "./locale-messages"
 const zh = {
 
 minRead: (n: number) => `${n} 分钟`,
-comments: "评论",
 commentsCount: (n: number) => `评论 (${n})`,
 commentAuthorPlaceholder: "昵称（可选）",
 commentEmailPlaceholder: "邮箱（可选）",
@@ -56,7 +55,6 @@ shortDate: (d: Date) =>
 const en = {
 
 minRead: (n: number) => `${n} min`,
-comments: "Comments",
 commentsCount: (n: number) => `Comments (${n})`,
 commentAuthorPlaceholder: "Name (optional)",
 commentEmailPlaceholder: "Email (optional)",
