@@ -141,6 +141,8 @@
   html {
     @apply font-sans;
     scroll-behavior: smooth;
+    /* Reserve scrollbar space so modal scroll-lock doesn't shift fixed UI. */
+    scrollbar-gutter: stable;
   }
   /* Native <button> / role=button — match the Button component's pointer. */
   button:not(:disabled),
