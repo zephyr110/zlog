@@ -6,6 +6,7 @@
     "dev": "pnpm --filter @zlog/web dev",
     "dev:watch": "pnpm --filter @zlog/web dev:watch",
     "build": "pnpm --filter @zlog/web build",
+    "build:desktop": "NEXT_DESKTOP=true pnpm --filter @zlog/web build",
     "export": "pnpm --filter @zlog/web export",
     "start": "pnpm --filter @zlog/web start",
     "lint": "pnpm --filter @zlog/web lint",
