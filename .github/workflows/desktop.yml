@@ -3,7 +3,8 @@ name: desktop
 on:
   push:
     tags:
-      - "desktop-v*"
+      # 桌面端版本号取 tag（如 v1.2.3）；语义化 tag 推送即触发三平台构建
+      - "v*"
   workflow_dispatch: {}
 
 jobs:
@@ -28,7 +29,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        # macos-13 = Intel (x64 dmg)，macos-latest = arm64 dmg；
+        # 原生模块（sharp/@libsql）随各自 runner 架构安装（npmRebuild: false）
+        os: [macos-13, macos-latest, windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +41,11 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Sync version from tag
+        if: startsWith(github.ref, 'refs/tags/')
+        # electron-builder 的版本号取自 package.json；把 tag（v1.2.3 → 1.2.3）
+        # 同步进去，产物名即为 Zlog-1.2.3-arm64.dmg / Zlog-Setup-1.2.3.exe
+        run: node -e "const fs=require('fs');const p='apps/desktop/package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.version=process.env.GITHUB_REF_NAME.replace(/^v/,'');fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')"
       - run: pnpm --filter @zlog/desktop package
       - uses: actions/upload-artifact@v4
         with:
@@ -47,7 +55,7 @@ jobs:
 
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -59,7 +67,14 @@ jobs:
           path: artifacts
       - uses: softprops/action-gh-release@v2
         with:
-          # 只挂安装器产物：asar:false 的全量包有数百个内部文件，
-          # 逐个上传会触发 GitHub 次级限流（Task 12 实测 403/rate-limit）
-          files: artifacts/**/Zlog*
+          # 只挂安装器产物（显式扩展名，命名确定后不再用 Zlog* 通配，
+          # 避免产物改名时静默漏挂）；asar:false 的全量包有数百个内部
+          # 文件，逐个上传会触发 GitHub 次级限流（Task 12 实测 403）
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.exe
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+            artifacts/**/*.blockmap
           draft: true
