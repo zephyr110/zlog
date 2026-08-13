@@ -16,10 +16,14 @@ const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
 } else {
-  main().catch((err) => {
-    dialog.showErrorBox("Zlog 启动失败", String(err))
-    app.exit(1)
-  })
+  // Tray 与 BrowserWindow 都必须在 ready 之后创建，否则
+  // "Cannot create Tray before app is ready"（模块级调用 main 会先于 ready）。
+  void app.whenReady().then(() =>
+    main().catch((err) => {
+      dialog.showErrorBox("Zlog 启动失败", String(err))
+      app.exit(1)
+    })
+  )
 }
 
 async function main() {
@@ -28,7 +32,7 @@ async function main() {
   // standalone 产物嵌套路径（Task 1 spike 结论）：trace root 为 workspace 根
   const serverJsPath = app.isPackaged
     ? join(process.resourcesPath, "standalone", "apps", "web", "server.js")
-    : join(app.getAppPath(), "..", "..", "web", ".next", "standalone", "apps", "web", "server.js")
+    : join(app.getAppPath(), "..", "..", "apps", "web", ".next", "standalone", "apps", "web", "server.js")
 
   let server: ServerManager | null = null
   let mainWindow: BrowserWindow | null = null
