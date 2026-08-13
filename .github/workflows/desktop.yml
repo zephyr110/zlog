@@ -29,9 +29,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macos-13 = Intel (x64 dmg)，macos-latest = arm64 dmg；
-        # 原生模块（sharp/@libsql）随各自 runner 架构安装（npmRebuild: false）
-        os: [macos-13, macos-latest, windows-latest, ubuntu-latest]
+        # 只出 arm64 dmg：macos-13（Intel/x64）runner 排队可达数小时，
+        # 且原生模块（sharp/@libsql）需随 runner 架构安装，无法在同一
+        # runner 上交叉产出（npmRebuild: false）。决策：不构建 x64 dmg。
+        os: [macos-latest, windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
