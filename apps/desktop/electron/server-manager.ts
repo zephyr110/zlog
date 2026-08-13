@@ -34,6 +34,10 @@ export class ServerManager {
     this.currentPort = await this.reservePort()
     mkdirSync(this.logDir, { recursive: true })
     this.logStream = createWriteStream(join(this.logDir, "server.log"), { flags: "a" })
+    // 日志流是尽力而为：fs.open 异步落地，目录被删/流已停止后到达的
+    // open 或写入会触发 'error'（ENOENT）—— 不监听会变成未捕获异常
+    // （CI Linux 实测：测试删目录后 open 落地导致 vitest 报 unhandled error）
+    this.logStream.on("error", () => {})
     this.child = spawn(process.execPath, [this.serverJsPath], {
       env: {
         ...process.env,
