@@ -14,6 +14,11 @@ describe("buildServerEnv", () => {
     const env = buildServerEnv(base, "/data/zlog.db")
     expect(env.TURSO_DATABASE_URL).toBe("file:/data/zlog.db")
     expect(env.ADMIN_USERNAME).toBe("admin")
+    // 服务器端 @zlog/database 按 base64 解码 ADMIN_PASSWORD_HASH：
+    // 配置里的原始 bcrypt 哈希须编码后再传入 env
+    expect(env.ADMIN_PASSWORD_HASH).toBe(
+      Buffer.from("$2b$10$x", "utf8").toString("base64")
+    )
     expect(env.ZLOG_DESKTOP_KEY).toBe("k")
     expect(env.TURSO_SYNC_URL).toBeUndefined()
   })

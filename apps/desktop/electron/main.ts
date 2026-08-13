@@ -29,10 +29,14 @@ if (!gotLock) {
 async function main() {
   const configStore = new ConfigStore(app.getPath("userData"))
   const dbPath = join(app.getPath("userData"), "zlog.db")
-  // standalone 产物嵌套路径（Task 1 spike 结论）：trace root 为 workspace 根
+  // standalone 产物嵌套路径（Task 1 spike 结论）：trace root 为 workspace 根。
+  // 用 __dirname 而非 app.getAppPath()：`electron .` 时两者一致，但
+  // `electron dist/main.js`（Playwright 冒烟测试的启动方式）下 getAppPath()
+  // 是主脚本所在目录（apps/desktop/dist），会拼出 apps/apps/web 的错误路径。
+  // dist/../../.. 才是 workspace 根（dist → desktop → apps → 根）。
   const serverJsPath = app.isPackaged
     ? join(process.resourcesPath, "standalone", "apps", "web", "server.js")
-    : join(app.getAppPath(), "..", "..", "apps", "web", ".next", "standalone", "apps", "web", "server.js")
+    : join(__dirname, "..", "..", "..", "apps", "web", ".next", "standalone", "apps", "web", "server.js")
 
   let server: ServerManager | null = null
   let mainWindow: BrowserWindow | null = null
@@ -111,7 +115,7 @@ async function main() {
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },
     })
-    void win.loadFile(join(app.getAppPath(), "renderer", "settings.html"), {
+    void win.loadFile(join(__dirname, "..", "renderer", "settings.html"), {
       query: { mode: "settings" },
     })
   }
