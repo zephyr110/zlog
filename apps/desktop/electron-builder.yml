@@ -34,6 +34,12 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
 linux:
+  # 包名 @zlog/desktop 的 '@' 不能进产物文件名（Task 12 CI 实测 AppImage
+  # 报 executableName 非法字符），显式指定可执行文件名
+  executableName: zlog
+  # deb 的默认 artifactName 用原始包名，@zlog/ 会变成不存在的路径段
+  # （本地 fpm 实测 "Parent directory does not exist ... release/@zlog"）
+  artifactName: Zlog-${version}-${arch}.${ext}
   target:
     - AppImage
     - deb

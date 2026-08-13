@@ -29,6 +29,9 @@ try {
       cwd: repoRoot,
       env: { ...process.env, NEXT_DESKTOP: "true" }, // 必须与 next.config 的 === "true" 判断一致（Task 2 修正）
       stdio: "inherit",
+      // Windows 上 pnpm 是 .cmd shim：无 shell 时 spawnSync 无法启动，
+      // 返回空对象（status undefined）→ 上方 ?? 1 会静默失败（Task 12 CI 实测）
+      shell: process.platform === "win32",
     })
     if (res.status !== 0) exitCode = res.status ?? 1
   }

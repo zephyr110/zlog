@@ -2,6 +2,7 @@
   "name": "@zlog/desktop",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://github.com/zephyr110/zlog",
   "type": "commonjs",
   "main": "dist/main.js",
   "scripts": {
