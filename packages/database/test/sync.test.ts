@@ -37,7 +37,10 @@ describe("sync", () => {
 
   it("配置后 runSync 记录 lastSyncAt 且并发互斥", async () => {
     process.env.TURSO_SYNC_URL = "libsql://example.turso.io"
+    const syncsBefore = mockSyncLog.length
     await Promise.all([runSync(), runSync()])
+    // 并发互斥：两次并发调用只触发一次 client.sync()。
+    expect(mockSyncLog.length).toBe(syncsBefore + 1)
     const status = getSyncStatus()
     expect(status.configured).toBe(true)
     expect(status.lastSyncAt).toBeTruthy()
