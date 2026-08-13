@@ -52,14 +52,28 @@ export class ServerManager {
     this.child.stdout?.on("data", (d: Buffer) => this.logStream?.write(d))
     this.child.stderr?.on("data", (d: Buffer) => this.logStream?.write(d))
     const child = this.child
+    let aborted = false
     child.on("exit", (code) => {
       // 仅当仍是当前子进程时才清除引用：旧子进程（stop 或崩溃）延迟到达的
       // exit 事件不得清掉新启动的子进程，否则新进程失去管理（stop 无法
       // 终止它、重复服务器抢占同一个 db）。
       if (this.child === child) this.child = null
-      this.onExit(code)
+      // 健康检查失败时我们主动终止的子进程不算崩溃：不触发 onExit，
+      // 否则 main 的 onServerExit 会把一次失败启动误判为服务崩溃。
+      if (!aborted) this.onExit(code)
     })
-    await this.waitHealthy(this.currentPort, 30_000)
+    try {
+      await this.waitHealthy(this.currentPort, 30_000)
+    } catch (err) {
+      // 回滚：未就绪即失败时终止刚拉起的子进程，否则它残留运行、
+      // 占住端口与 db（stop() 的引用已清空，无法再终止它）。
+      aborted = true
+      child.kill()
+      if (this.child === child) this.child = null
+      this.logStream?.end()
+      this.logStream = null
+      throw err
+    }
   }
 
   get url(): string {

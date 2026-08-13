@@ -68,6 +68,20 @@ describe("ServerManager", () => {
     expect(onExit).toHaveBeenCalledWith(1)
   })
 
+  it("健康检查失败时终止刚拉起的子进程、拒绝 start 且不触发 onExit", async () => {
+    const child = fakeChild()
+    spawnMock.mockReturnValue(child)
+    const onExit = vi.fn()
+    const mgr = new ServerManager("/fake/server.js", dir, onExit, async () => {
+      throw new Error("health check timeout")
+    })
+    await expect(
+      mgr.start({ TURSO_DATABASE_URL: "file:test.db", SESSION_SECRET: "s" })
+    ).rejects.toThrow("health check timeout")
+    expect(child.kill).toHaveBeenCalled()
+    expect(onExit).not.toHaveBeenCalled()
+  })
+
   it("stop 终止子进程", async () => {
     const child = fakeChild()
     spawnMock.mockReturnValue(child)

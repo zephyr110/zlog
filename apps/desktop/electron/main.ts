@@ -88,14 +88,17 @@ async function main() {
   }
 
   function showMainWindow() {
-    if (!serverManager.url) return
+    // url 恒为真（端口 0 时返回 http://127.0.0.1:0），必须用 port 判断服务是否已启动
+    if (serverManager.port <= 0) return
     if (!mainWindow || mainWindow.isDestroyed()) {
       mainWindow = new BrowserWindow({
         width: 1280,
         height: 800,
         title: "Zlog",
         autoHideMenuBar: true,
-        webPreferences: { preload: join(__dirname, "preload.js") },
+        // 博客窗口渲染用户可发布的内容，不给 preload：window.zlog 会暴露
+        // sessionSecret / adminPasswordHash / desktopKey / syncToken，
+        // 博客侧任何 XSS 都可能把这些密钥送出（settings / 首启向导窗口才需要）。
       })
       mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         if (url.startsWith("http")) void shell.openExternal(url)
@@ -166,9 +169,19 @@ async function main() {
     if (server) {
       stopping = true
       server.stop()
+    }
+    try {
       await startServerAndShow(config)
-    } else {
-      await startServerAndShow(config)
+    } catch (err) {
+      // 重启失败（如 30s 健康检查超时）：弹窗告知；finally 复位 stopping，
+      // 否则后续每次 onServerExit 都被吞掉，崩溃处理整场会话失效。
+      dialog.showErrorBox(
+        "Zlog 博客服务启动失败",
+        `本地博客服务启动失败：${String(err)}。\n数据目录：${app.getPath("userData")}\n日志：${join(logDir, "server.log")}`
+      )
+      return { ok: false }
+    } finally {
+      stopping = false
     }
     firstRunWindow?.close()
     firstRunWindow = null
