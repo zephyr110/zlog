@@ -74,6 +74,19 @@ CI 执行 `pnpm export`（`NEXT_EXPORT=true`），在**构建时**查询 Turso�
 
 详细图示与清单见[部署指南](https://zephyr110.vercel.app/posts/zlog-deployment-guide)。
 
+## 桌面应用（macOS / Windows / Linux）
+
+把整个博客——阅读与写作——作为桌面应用运行。应用内置本地 standalone 服务器和本地 SQLite 数据库；配置了 sync URL 后，本地副本会与你的 Turso 数据库保持双向同步（离线时的写入会在联网后同步回来）。
+
+- 构建：`pnpm --filter @zlog/desktop package`（按平台分别打包）
+- 开发：`pnpm --filter @zlog/desktop build:standalone && pnpm --filter @zlog/desktop dev`
+- 首次启动：创建你的管理员账号；可选地在向导中粘贴 Turso 数据库 URL + token 以启用同步。
+- 数据与日志：用户数据目录（`zlog.db`、`zlog-config.json`、`logs/`）。备份该目录即备份博客。
+
+> 免签名构建：macOS Gatekeeper 与 Windows SmartScreen 会提示警告——macOS 右键 → 打开，Windows「更多信息 → 仍要运行」。
+
+设计文档：`docs/superpowers/specs/2026-08-13-desktop-app-design.md`
+
 ## Getting Started
 
 ### 环境要求
