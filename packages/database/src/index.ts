@@ -60,3 +60,4 @@ export type {
 export { safeSlug, slugify, computeReadingStats, toPostSummary } from "@zlog/core"
 export type { Post, PostSummary, AuthUser } from "@zlog/core"
 export type { UserRecord } from "./users"
+export { runSync, scheduleSync, getSyncStatus, isSyncConfigured } from "./sync"
