@@ -174,7 +174,7 @@ export function MediaPickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-h-[min(calc(100dvh-2rem),85vh)] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t("admin.media")}</DialogTitle>
           <DialogDescription>

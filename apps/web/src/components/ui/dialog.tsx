@@ -60,7 +60,9 @@ function DialogContent({
         <DialogPrimitive.Popup
           data-slot="dialog-content"
           className={cn(
-            "pointer-events-auto relative z-50 grid w-full max-w-[min(28rem,100%)] gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+            // min-h-0: flex items ignore max-h without it (content min-size).
+            // max-h: viewport is inset-0 with p-4 — stay inside that box.
+            "pointer-events-auto relative z-50 grid w-full min-h-0 max-h-[calc(100dvh-2rem)] max-w-[min(28rem,100%)] gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
             className
           )}
           {...props}

@@ -62,7 +62,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       {/* The dialog shell never scrolls — only the body below does, so
           the header (and its close button) stays fixed while the cards
           scroll. */}
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden p-5">
+      <DialogContent className="flex max-h-[min(calc(100dvh-2rem),85vh)] max-w-3xl flex-col overflow-hidden p-5">
         <DialogHeader className="shrink-0 pr-10">
           <DialogTitle className="text-lg">{t("admin.settings")}</DialogTitle>
           <DialogDescription>

@@ -515,7 +515,7 @@ export function CountriesPanel({
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex max-h-[min(94vh,56rem)] w-full max-w-[min(56rem,100%)] flex-col gap-0 overflow-hidden p-0 xl:max-h-[min(94vh,68rem)] xl:max-w-[min(72rem,100%)] 2xl:max-w-[min(84rem,100%)]">
+        <DialogContent className="flex max-h-[min(calc(100dvh-2rem),56rem)] w-full max-w-[min(56rem,100%)] flex-col gap-0 overflow-hidden p-0 xl:max-h-[min(calc(100dvh-2rem),68rem)] xl:max-w-[min(72rem,100%)] 2xl:max-w-[min(84rem,100%)]">
           <DialogHeader className="shrink-0 space-y-1 border-b px-4 py-3 pr-12 text-left">
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
