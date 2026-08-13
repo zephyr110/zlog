@@ -1782,6 +1782,117 @@ git commit -m "test(desktop): add playwright smoke test for boot, serve and admi
 
 ---
 
+### Task 11b: 桌面构建注入 force-dynamic（修复首页静态预渲染，M2 补）
+
+> 来源：Task 11 冒烟测试发现的真实产品缺陷（已获用户确认修复）。设计假设"现有前端零改动"对构建期查库的页面不成立：Next 默认静态预渲染会烧入构建机数据（本地构建=生产快照；CI 无凭据=空首页且构建可能失败）。修复方案已验证：字面量 `export const dynamic = "force-dynamic"` 注入后 `/` 变为 `ƒ` 动态渲染（Next 16 拒绝计算式导出，字面量注入可行）。
+
+**Files:**
+- Create: `apps/web/scripts/toggle-force-dynamic.mjs`
+- Modify: `apps/desktop/scripts/prepare-standalone.mjs`
+
+**Interfaces:**
+- Consumes: Task 2 的 `NEXT_DESKTOP=true` 构建链；现有 `toggle-force-static.mjs` 模式
+- Produces: 桌面构建时全部 `page.tsx` 注入 `export const dynamic = "force-dynamic"`（构建后移除，含失败路径）；Vercel/export 构建不受影响
+
+- [ ] **Step 1: 实现 toggle-force-dynamic.mjs**
+
+仿照 `apps/web/scripts/toggle-force-static.mjs`（route.ts 版本）写 page.tsx 版本，Create `apps/web/scripts/toggle-force-dynamic.mjs`：
+
+```js
+import { readFileSync, writeFileSync, readdirSync } from "fs"
+import { resolve, dirname } from "path"
+import { fileURLToPath } from "url"
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const root = resolve(__dirname, "..")
+
+const HEADER = 'export const dynamic = "force-dynamic"\n'
+
+/** 递归查找 src/app 下所有 page.tsx/page.jsx（构建期查库的页面需要动态渲染） */
+function findPages(dir) {
+  const results = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const fp = resolve(dir, entry.name)
+    if (entry.isDirectory()) {
+      results.push(...findPages(fp))
+    } else if (entry.name === "page.tsx" || entry.name === "page.jsx") {
+      results.push(fp)
+    }
+  }
+  return results
+}
+
+const action = process.argv[2] // "add" or "remove"
+const pages = findPages(resolve(root, "src/app"))
+
+for (const file of pages) {
+  const content = readFileSync(file, "utf-8")
+  if (action === "add" && !content.startsWith(HEADER)) {
+    writeFileSync(file, HEADER + content)
+    console.log(`Added force-dynamic: ${file}`)
+  } else if (action === "remove" && content.startsWith(HEADER)) {
+    writeFileSync(file, content.slice(HEADER.length))
+    console.log(`Removed force-dynamic: ${file}`)
+  }
+}
+```
+
+注意：只匹配 `page.tsx`/`page.jsx`，不动 `route.ts`（与 toggle-force-static 互补，二者互不冲突）。注入后所有页面动态渲染（= Vercel 默认 SSR 行为），admin 客户端页面无实际成本。
+
+- [ ] **Step 2: 接入 prepare-standalone.mjs（含失败清理）**
+
+Edit `apps/desktop/scripts/prepare-standalone.mjs`——构建步骤改为：
+
+```js
+// 1) 注入 force-dynamic（构建期查库的页面必须动态渲染，否则烧入构建机数据：
+//    本地构建=生产快照，CI 构建=空首页/构建失败。Task 11b）
+const toggle = join(webDir, "scripts", "toggle-force-dynamic.mjs")
+const toggleAdd = () =>
+  spawnSync(process.execPath, [toggle, "add"], { cwd: webDir, stdio: "inherit" }).status
+const toggleRemove = () =>
+  spawnSync(process.execPath, [toggle, "remove"], { cwd: webDir, stdio: "inherit" }).status
+
+if (toggleAdd() !== 0) process.exit(1)
+try {
+  const res = spawnSync("pnpm", ["--filter", "@zlog/web", "build"], {
+    cwd: repoRoot,
+    env: { ...process.env, NEXT_DESKTOP: "true" }, // 必须与 next.config 的 === "true" 判断一致（Task 2 修正）
+    stdio: "inherit",
+  })
+  if (res.status !== 0) process.exit(res.status ?? 1)
+} finally {
+  // 构建失败也要移除注入，否则污染工作树并破坏后续 export 构建
+  toggleRemove()
+}
+```
+
+（原 `const res = spawnSync(...)` 块替换；`join` 已在文件顶部导入。）
+
+- [ ] **Step 3: 验证**
+
+Run:
+```bash
+pnpm --filter @zlog/desktop build:standalone 2>&1 | grep -E "ƒ /|○ /" | head -5
+git status --short   # page.tsx 必须全部干净（注入已移除）
+pnpm --filter @zlog/web build 2>&1 | tail -2   # 回归：普通 SSR 构建不受影响（无 force-dynamic 注入）
+```
+Expected: 首页等 DB 页面显示 `ƒ`（动态）；工作树干净；普通构建成功。
+
+- [ ] **Step 4: 重跑冒烟测试确认首页行为**
+
+Run:
+```bash
+pnpm --filter @zlog/desktop test:smoke
+```
+Expected: PASS（此前的 3 连跑基线不变；若 CI 化后首页断言变强可后续加强）。
+
+- [ ] **Step 5: 提交**
+
+```bash
+git add apps/web/scripts/toggle-force-dynamic.mjs apps/desktop/scripts/prepare-standalone.mjs
+git commit -m "fix(desktop): force dynamic rendering for DB pages in desktop builds"
+```
+
 ### Task 12: GitHub Actions 三平台构建 + 发布（M3）
 
 **Files:**
