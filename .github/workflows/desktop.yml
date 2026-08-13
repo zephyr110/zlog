@@ -72,10 +72,10 @@ jobs:
           # 避免产物改名时静默漏挂）；asar:false 的全量包有数百个内部
           # 文件，逐个上传会触发 GitHub 次级限流（Task 12 实测 403）
           files: |
-            artifacts/**/*.dmg
-            artifacts/**/*.zip
-            artifacts/**/*.exe
-            artifacts/**/*.AppImage
-            artifacts/**/*.deb
+            artifacts/**/Zlog-*.dmg
+            artifacts/**/Zlog-*.zip
+            artifacts/**/Zlog-Setup*.exe
+            artifacts/**/Zlog-*.AppImage
+            artifacts/**/Zlog-*.deb
             artifacts/**/*.blockmap
           draft: true
