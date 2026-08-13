@@ -59,5 +59,7 @@ jobs:
           path: artifacts
       - uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          # 只挂安装器产物：asar:false 的全量包有数百个内部文件，
+          # 逐个上传会触发 GitHub 次级限流（Task 12 实测 403/rate-limit）
+          files: artifacts/**/Zlog*
           draft: true
