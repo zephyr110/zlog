@@ -37,9 +37,10 @@ Run:
 cd /Users/zephyr/Code/zlog/.claude/worktrees/footer-refine
 # 在 next.config.ts 临时加入 output:"standalone"（只做验证，不提交），然后：
 pnpm --filter @zlog/web build 2>&1 | tail -5
-ls apps/web/.next/standalone/server.js
+ls apps/web/.next/standalone/apps/web/server.js
 ```
 Expected: `server.js` 存在。若 Next 16 弃用 standalone 或路径变化 → **停止并上报**。
+> **Spike 结论（Task 1，已记录）：** 本 monorepo 的 trace root 是 workspace 根（`turbopack.root` 所致），standalone 产物**嵌套**在 `apps/web/.next/standalone/apps/web/server.js`。全计划统一按此嵌套路径处理，不设 `outputFileTracingRoot`（避免 workspace 包追踪断裂）。`.next/static` 与 `public/*` 需显式拷入 standalone（见 Task 10）。
 
 - [ ] **Step 2: 验证 PORT/HOSTNAME 与运行**
 
@@ -141,10 +142,10 @@ Edit 根 `package.json` scripts，加入：
 Run:
 ```bash
 pnpm build:desktop 2>&1 | tail -3
-ls apps/web/.next/standalone/server.js
+ls apps/web/.next/standalone/apps/web/server.js   # 嵌套路径（见 Task 1 spike 结论）
 pnpm build 2>&1 | tail -3   # 回归：普通 SSR 构建不受影响
 ```
-Expected: standalone 产物存在；普通构建仍成功。
+Expected: standalone 产物存在（嵌套路径）；普通构建仍成功。
 
 - [ ] **Step 5: 提交**
 
@@ -1129,9 +1130,10 @@ if (!gotLock) {
 async function main() {
   const configStore = new ConfigStore(app.getPath("userData"))
   const dbPath = join(app.getPath("userData"), "zlog.db")
+  // standalone 产物嵌套路径（Task 1 spike 结论）：trace root 为 workspace 根
   const serverJsPath = app.isPackaged
-    ? join(process.resourcesPath, "standalone", "server.js")
-    : join(app.getAppPath(), "..", "..", "web", ".next", "standalone", "server.js")
+    ? join(process.resourcesPath, "standalone", "apps", "web", "server.js")
+    : join(app.getAppPath(), "..", "..", "web", ".next", "standalone", "apps", "web", "server.js")
 
   let server: ServerManager | null = null
   let mainWindow: BrowserWindow | null = null
@@ -1576,7 +1578,8 @@ const here = dirname(fileURLToPath(import.meta.url))
 const desktopDir = join(here, "..")
 const repoRoot = join(desktopDir, "..", "..")
 const webDir = join(repoRoot, "apps", "web")
-const standaloneDir = join(webDir, ".next", "standalone")
+// 嵌套路径（Task 1 spike 结论）：trace root 为 workspace 根
+const standaloneAppDir = join(webDir, ".next", "standalone", "apps", "web")
 
 // 1) 以 NEXT_DESKTOP=1 构建 web（spawn env 方式，跨平台安全）
 const res = spawnSync("pnpm", ["--filter", "@zlog/web", "build"], {
@@ -1586,20 +1589,20 @@ const res = spawnSync("pnpm", ["--filter", "@zlog/web", "build"], {
 })
 if (res.status !== 0) process.exit(res.status ?? 1)
 
-// 2) 按 standalone 契约补齐 .next/static 与 public
-cpSync(join(webDir, ".next", "static"), join(standaloneDir, ".next", "static"), {
+// 2) 按 standalone 契约补齐 .next/static 与 public（拷入嵌套的 app 目录）
+cpSync(join(webDir, ".next", "static"), join(standaloneAppDir, ".next", "static"), {
   recursive: true,
 })
 if (existsSync(join(webDir, "public"))) {
-  cpSync(join(webDir, "public"), join(standaloneDir, "public"), { recursive: true })
+  cpSync(join(webDir, "public"), join(standaloneAppDir, "public"), { recursive: true })
 }
 
-// 3) 清理旧产物中的 .env 引用（无）——确认 server.js 存在
-if (!existsSync(join(standaloneDir, "server.js"))) {
+// 3) 确认 server.js 存在
+if (!existsSync(join(standaloneAppDir, "server.js"))) {
   console.error("standalone server.js missing — build failed?")
   process.exit(1)
 }
-console.log("standalone ready:", standaloneDir)
+console.log("standalone ready:", standaloneAppDir)
 ```
 
 - [ ] **Step 2: 实现 electron-builder 配置**
@@ -1646,10 +1649,10 @@ npmRebuild: false
 Run:
 ```bash
 pnpm --filter @zlog/desktop package:dir   # 免安装目录产物，最快验证
-ls apps/desktop/release/mac*/Zlog.app/Contents/Resources/standalone/server.js
+ls apps/desktop/release/mac*/Zlog.app/Contents/Resources/standalone/apps/web/server.js
 ls apps/desktop/release/mac*/Zlog.app/Contents/Resources/app/dist/main.js
 ```
-Expected: 两个路径都存在（standalone 与 electron 主进程均已入包）。
+Expected: 两个路径都存在（standalone 与 electron 主进程均已入包；standalone 为嵌套路径，见 Task 1 spike 结论）。
 
 - [ ] **Step 4: 启动打包产物验证**
 
