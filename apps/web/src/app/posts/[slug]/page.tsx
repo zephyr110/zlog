@@ -22,6 +22,9 @@ interface PostPageProps {
 }
 
 export async function generateStaticParams() {
+  // 桌面 standalone 构建（NEXT_DESKTOP=true）无数据库：不枚举静态路径，
+  // 运行时按需渲染（force-dynamic 不跳过 generateStaticParams，Task 12 CI 实测）
+  if (process.env.NEXT_DESKTOP === "true") return []
   const posts = await getPublishedPosts()
   return posts.map((post) => ({ slug: post.slug }))
 }
