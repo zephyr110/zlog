@@ -47,8 +47,12 @@ export class ServerManager {
     })
     this.child.stdout?.on("data", (d: Buffer) => this.logStream?.write(d))
     this.child.stderr?.on("data", (d: Buffer) => this.logStream?.write(d))
-    this.child.on("exit", (code) => {
-      this.child = null
+    const child = this.child
+    child.on("exit", (code) => {
+      // 仅当仍是当前子进程时才清除引用：旧子进程（stop 或崩溃）延迟到达的
+      // exit 事件不得清掉新启动的子进程，否则新进程失去管理（stop 无法
+      // 终止它、重复服务器抢占同一个 db）。
+      if (this.child === child) this.child = null
       this.onExit(code)
     })
     await this.waitHealthy(this.currentPort, 30_000)

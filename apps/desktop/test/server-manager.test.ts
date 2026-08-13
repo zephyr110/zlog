@@ -25,10 +25,20 @@ describe("ServerManager", () => {
     dir = mkdtempSync(join(tmpdir(), "zlog-srv-"))
     spawnMock.mockReset()
   })
-  // createWriteStream 的 fs.open 是异步的：先让事件循环排空未决的打开/写回调，再删临时目录，
-  // 否则删除后到达的 open 会抛出未捕获的 ENOENT
+  // createWriteStream 的 fs.open 是异步的：删除目录可能撞上 open 落地，
+  // 触发 ENOTEMPTY（或删除后到达的 open 抛未捕获 ENOENT）—— 短暂重试
+  // 直到目录可删，提高稳定性。
   afterEach(async () => {
     await new Promise((resolve) => setImmediate(resolve))
+    for (let attempt = 0; attempt < 20; attempt++) {
+      try {
+        rmSync(dir, { recursive: true, force: true })
+        return
+      } catch (err) {
+        if ((err as { code?: string }).code !== "ENOTEMPTY") throw err
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      }
+    }
     rmSync(dir, { recursive: true, force: true })
   })
 
@@ -65,5 +75,22 @@ describe("ServerManager", () => {
     await mgr.start({ TURSO_DATABASE_URL: "file:test.db", SESSION_SECRET: "s" })
     mgr.stop()
     expect(child.kill).toHaveBeenCalled()
+  })
+
+  it("旧子进程延迟的 exit 不清掉新子进程引用，stop 仍能终止新子进程", async () => {
+    const child1 = fakeChild()
+    const child2 = fakeChild()
+    spawnMock.mockReturnValueOnce(child1).mockReturnValueOnce(child2)
+    const onExit = vi.fn()
+    const mgr = new ServerManager("/fake/server.js", dir, onExit, async () => {})
+    await mgr.start({ TURSO_DATABASE_URL: "file:test.db", SESSION_SECRET: "s" })
+    mgr.stop()
+    await mgr.start({ TURSO_DATABASE_URL: "file:test.db", SESSION_SECRET: "s" })
+    // 第一次 stop 的旧子进程的 exit 事件延迟到达（在新子进程启动之后）
+    child1.emit("exit", 143)
+    expect(onExit).toHaveBeenCalledWith(143)
+    // 引用未被旧 exit 事件清掉：stop 应终止当前（新的）子进程
+    mgr.stop()
+    expect(child2.kill).toHaveBeenCalled()
   })
 })
