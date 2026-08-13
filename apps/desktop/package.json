@@ -1,0 +1,30 @@
+{
+  "name": "@zlog/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "pnpm build && electron .",
+    "start": "electron .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:smoke": "playwright test",
+    "package": "pnpm gen:icons && pnpm build && pnpm build:standalone && electron-builder --publish never",
+    "package:dir": "pnpm gen:icons && pnpm build && pnpm build:standalone && electron-builder --dir --publish never",
+    "gen:icons": "node scripts/gen-icons.mjs",
+    "build:standalone": "node scripts/prepare-standalone.mjs"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.1",
+    "@types/node": "^20",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5",
+    "vitest": "^3.2.4"
+  }
+}
