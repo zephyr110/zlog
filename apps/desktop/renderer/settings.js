@@ -1,4 +1,7 @@
-const zlog = window.zlog
+// preload 的 contextBridge.exposeInMainWorld("zlog", …) 已在全局声明同名
+// 绑定，这里再 `const zlog = window.zlog` 会抛 "Identifier 'zlog' has
+// already been declared" 使整个脚本失效——必须换名。
+const zlogApi = window.zlog
 const mode = new URLSearchParams(location.search).get("mode") || "settings"
 const isFirstRun = mode === "firstrun"
 
@@ -25,7 +28,7 @@ function renderStatus(s) {
 }
 
 async function refreshStatus() {
-  renderStatus(await zlog.getSyncStatus())
+  renderStatus(await zlogApi.getSyncStatus())
 }
 
 const saveBtn = document.getElementById("saveBtn")
@@ -45,7 +48,7 @@ saveBtn.addEventListener("click", async () => {
   saveBtn.disabled = true
   showStatus("保存中…")
   try {
-    const res = await zlog.saveConfig(cfg)
+    const res = await zlogApi.saveConfig(cfg)
     if (res && res.ok) {
       showStatus("已保存，博客即将打开。")
       if (!isFirstRun) refreshStatus()
@@ -67,9 +70,9 @@ if (isFirstRun) {
 }
 
 document.getElementById("syncBtn").addEventListener("click", async () => {
-  await zlog.runSyncNow()
+  await zlogApi.runSyncNow()
   refreshStatus()
 })
 
-document.getElementById("openBtn").addEventListener("click", () => zlog.openDataDir())
+document.getElementById("openBtn").addEventListener("click", () => zlogApi.openDataDir())
 refreshStatus()

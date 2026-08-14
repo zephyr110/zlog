@@ -208,7 +208,9 @@ async function main() {
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },
     })
-    void firstRunWindow.loadFile(join(app.getAppPath(), "renderer", "settings.html"), {
+    // 与 serverJsPath 同理：`electron dist/main.js` 下 getAppPath() 指向
+    // dist/，必须用 __dirname 相对路径（dist/../renderer）。
+    void firstRunWindow.loadFile(join(__dirname, "..", "renderer", "settings.html"), {
       query: { mode: "firstrun" },
     })
   } else {
