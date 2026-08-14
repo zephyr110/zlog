@@ -17,5 +17,12 @@ export function buildServerEnv(
   }
   if (cfg.syncUrl) env.TURSO_SYNC_URL = cfg.syncUrl
   if (cfg.syncToken) env.TURSO_AUTH_TOKEN = cfg.syncToken
+  // 流量分析（线上站点只读报表）：有值才传，未配置则仪表盘显示空状态
+  if (cfg.vercelApiToken) env.VERCEL_API_TOKEN = cfg.vercelApiToken
+  if (cfg.vercelProjectId) env.VERCEL_ANALYTICS_PROJECT_ID = cfg.vercelProjectId
+  if (cfg.vercelTeamId) env.VERCEL_ANALYTICS_TEAM_ID = cfg.vercelTeamId
+  if (cfg.gaPropertyId) env.GA_PROPERTY_ID = cfg.gaPropertyId
+  if (cfg.gaClientEmail) env.GA_CLIENT_EMAIL = cfg.gaClientEmail
+  if (cfg.gaPrivateKey) env.GA_PRIVATE_KEY = cfg.gaPrivateKey
   return env
 }

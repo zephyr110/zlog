@@ -9,6 +9,14 @@ export interface DesktopConfig {
   desktopKey: string
   syncUrl?: string
   syncToken?: string
+  /** 流量分析（线上站点只读报表）：Vercel Analytics */
+  vercelApiToken?: string
+  vercelProjectId?: string
+  vercelTeamId?: string
+  /** 流量分析（线上站点只读报表）：GA4 Data API */
+  gaPropertyId?: string
+  gaClientEmail?: string
+  gaPrivateKey?: string
 }
 
 /** 本地配置读写。路径可注入以便测试（主进程传 userData 目录）。 */

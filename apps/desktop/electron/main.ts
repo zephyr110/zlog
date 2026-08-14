@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { ConfigStore, type DesktopConfig } from "./config-store"
 import { ServerManager } from "./server-manager"
 import { buildServerEnv } from "./server-env"
+import { isValidSyncUrl } from "./validate"
 import { createTray, updateTraySyncStatus, type TrayActions } from "./tray"
 
 // 测试与 CI：可覆盖 userData 目录（Playwright 冒烟测试使用）。
@@ -42,6 +43,12 @@ async function main() {
   let mainWindow: BrowserWindow | null = null
   let firstRunWindow: BrowserWindow | null = null
   let config: DesktopConfig | null = configStore.load()
+  // 旧版本可能写入过非法 syncUrl（校验是后加的）——启动时兜底清除，
+  // 否则 libsql 原生客户端解析 panic、服务器每次启动即崩溃
+  if (config?.syncUrl && !isValidSyncUrl(config.syncUrl)) {
+    config = { ...config, syncUrl: undefined, syncToken: undefined }
+    configStore.save(config)
+  }
   const logDir = join(app.getPath("userData"), "logs")
 
   const tray = createTray({
@@ -100,9 +107,38 @@ async function main() {
         // sessionSecret / adminPasswordHash / desktopKey / syncToken，
         // 博客侧任何 XSS 都可能把这些密钥送出（settings / 首启向导窗口才需要）。
       })
+      // 站内跳转策略：admin 的「查看线上」等链接是相对路径（target=_blank，
+      // 解析后指向本地 origin）——在应用内导航而非丢给浏览器；外部链接
+      // （GitHub/社交/远程站点，仅 http/https）仍走系统浏览器。同窗口点击
+      // 外部链接时也不让窗口离开应用（拦截后转交浏览器）。
+      //
+      // 每次事件实时求值（不缓存 origin）：config:save 会重启服务器并换端口，
+      // 缓存的旧 origin 会让保存后的所有站内链接被误判为外部。
+      const isLocalUrl = (raw: string): boolean => {
+        try {
+          const u = new URL(raw)
+          if (u.protocol !== "http:" && u.protocol !== "https:") return false
+          return u.origin === new URL(serverManager.url).origin
+        } catch {
+          return false
+        }
+      }
+      const openExternalIfWeb = (raw: string) => {
+        if (/^https?:\/\//.test(raw)) void shell.openExternal(raw)
+      }
       mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        if (url.startsWith("http")) void shell.openExternal(url)
+        if (isLocalUrl(url)) {
+          void mainWindow?.loadURL(url)
+        } else {
+          openExternalIfWeb(url) // javascript:/file:/自定义协议一律丢弃
+        }
         return { action: "deny" }
+      })
+      mainWindow.webContents.on("will-navigate", (event, url) => {
+        if (!isLocalUrl(url)) {
+          event.preventDefault()
+          openExternalIfWeb(url)
+        }
       })
       mainWindow.on("closed", () => { mainWindow = null })
     }
@@ -111,20 +147,35 @@ async function main() {
   }
 
   function openSettingsWindow() {
+    // 640 宽容纳左侧栏（176px）+ 内容区；面板切换后内容高度变化，
+    // 窗口内滚动即可（body 无固定高度）
     const win = new BrowserWindow({
-      width: 560,
-      height: 640,
+      width: 640,
+      height: 720,
       title: "Zlog 设置",
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },
     })
+    openExternalLinksInBrowser(win)
     void win.loadFile(join(__dirname, "..", "renderer", "settings.html"), {
       query: { mode: "settings" },
     })
   }
 
+  /** 设置类窗口中的外链（Turso 控制台/文档）一律交给系统浏览器，
+   *  不在应用内新开窗口。 */
+  function openExternalLinksInBrowser(win: BrowserWindow) {
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        void shell.openExternal(url)
+      }
+      return { action: "deny" }
+    })
+  }
+
   async function requestSyncNow(): Promise<void> {
-    if (!serverManager.url) return
+    // url 恒为真（端口 0 时返回 http://127.0.0.1:0），必须用 port 判断
+    if (serverManager.port <= 0) return
     try {
       const res = await fetch(`${serverManager.url}/api/sync`, {
         method: "POST",
@@ -150,7 +201,18 @@ async function main() {
 
   // ── IPC ──
   ipcMain.handle("config:load", () => configStore.load())
-  ipcMain.handle("config:save", async (_e, cfg: { username?: string; password?: string; syncUrl?: string; syncToken?: string }) => {
+  ipcMain.handle("config:save", async (_e, cfg: {
+    username?: string
+    password?: string
+    syncUrl?: string
+    syncToken?: string
+    vercelApiToken?: string
+    vercelProjectId?: string
+    vercelTeamId?: string
+    gaPropertyId?: string
+    gaClientEmail?: string
+    gaPrivateKey?: string
+  }) => {
     if (!config) {
       const passwordHash = bcrypt.hashSync(String(cfg.password ?? ""), 10)
       config = {
@@ -162,7 +224,24 @@ async function main() {
         syncToken: cfg.syncToken?.trim() || undefined,
       }
     } else {
-      config = { ...config, syncUrl: cfg.syncUrl?.trim() || undefined, syncToken: cfg.syncToken?.trim() || undefined }
+      config = {
+        ...config,
+        syncUrl: cfg.syncUrl?.trim() || undefined,
+        syncToken: cfg.syncToken?.trim() || undefined,
+        // 流量分析（可选，仅设置模式填写）
+        vercelApiToken: cfg.vercelApiToken?.trim() || undefined,
+        vercelProjectId: cfg.vercelProjectId?.trim() || undefined,
+        vercelTeamId: cfg.vercelTeamId?.trim() || undefined,
+        gaPropertyId: cfg.gaPropertyId?.trim() || undefined,
+        gaClientEmail: cfg.gaClientEmail?.trim() || undefined,
+        gaPrivateKey: cfg.gaPrivateKey?.trim() || undefined,
+      }
+    }
+    // 与渲染层同源的防御性校验（唯一权威实现见 validate.ts）：非法
+    // syncUrl 会让 libsql 原生客户端解析时 panic、拖垮整个服务器进程
+    // （真实事故：URL 字段误填用户名）。校验先于 config 合并执行。
+    if (cfg.syncUrl?.trim() && !isValidSyncUrl(cfg.syncUrl.trim())) {
+      return { ok: false, error: "数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io" }
     }
     configStore.save(config)
     // 配置变更（同步信息）后重启服务器使 env 生效
@@ -183,6 +262,11 @@ async function main() {
     } finally {
       stopping = false
     }
+    // 首启/配置变更后立即执行一次初始同步（设计文档 §4 承诺"首次同步
+    // 全量拉取"；libsql 的 syncInterval 首个周期要等 300s，不能依赖它）。
+    if (config.syncUrl) {
+      void requestSyncNow()
+    }
     firstRunWindow?.close()
     firstRunWindow = null
     return { ok: true }
@@ -198,16 +282,24 @@ async function main() {
   if (!config) {
     firstRunWindow = new BrowserWindow({
       width: 560,
-      height: 680,
+      height: 920,
       title: "Zlog 首次设置",
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },
     })
-    void firstRunWindow.loadFile(join(app.getAppPath(), "renderer", "settings.html"), {
+    openExternalLinksInBrowser(firstRunWindow)
+    // 与 serverJsPath 同理：`electron dist/main.js` 下 getAppPath() 指向
+    // dist/，必须用 __dirname 相对路径（dist/../renderer）。
+    void firstRunWindow.loadFile(join(__dirname, "..", "renderer", "settings.html"), {
       query: { mode: "firstrun" },
     })
   } else {
     await startServerAndShow(config)
+    // 启动路径同样立即执行首次同步（与 config:save 后一致），
+    // 否则要等 libsql syncInterval（300s）首个周期
+    if (config.syncUrl) {
+      void requestSyncNow()
+    }
   }
 
   app.on("second-instance", () => showMainWindow())

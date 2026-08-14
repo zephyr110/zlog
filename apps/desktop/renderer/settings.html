@@ -5,60 +5,536 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Zlog</title>
   <style>
-    :root { color-scheme: light dark; }
+    /* ── shadcn tokens（与 apps/web/src/app/globals.css 同源）───────
+       跟随系统主题：浅色为 :root，深色由 prefers-color-scheme 覆盖。 */
+    :root {
+      color-scheme: light;
+      --background: oklch(1 0 0);
+      --foreground: oklch(0.145 0 0);
+      --muted: oklch(0.97 0 0);
+      --muted-foreground: oklch(0.556 0 0);
+      --accent: oklch(0.97 0 0);
+      --accent-foreground: oklch(0.205 0 0);
+      --destructive: oklch(0.577 0.245 27.325);
+      --border: oklch(0.922 0 0);
+      --input: oklch(0.922 0 0);
+      --ring: oklch(0.708 0 0);
+      --primary: oklch(0.205 0 0);
+      --primary-foreground: oklch(0.985 0 0);
+      --radius: 0.625rem;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --background: oklch(0.145 0 0);
+        --foreground: oklch(0.985 0 0);
+        --muted: oklch(0.269 0 0);
+        --muted-foreground: oklch(0.708 0 0);
+        --accent: oklch(0.269 0 0);
+        --accent-foreground: oklch(0.985 0 0);
+        --destructive: oklch(0.704 0.191 22.216);
+        --border: oklch(1 0 0 / 10%);
+        --input: oklch(1 0 0 / 15%);
+        --ring: oklch(0.556 0 0);
+        --primary: oklch(0.922 0 0);
+        --primary-foreground: oklch(0.205 0 0);
+      }
+    }
+
+    /* ── 基础 ─────────────────────────────────────────────────────── */
+    * { box-sizing: border-box; }
     body {
-      font: 14px/1.6 -apple-system, "Segoe UI", Roboto, sans-serif;
-      margin: 0; padding: 24px; max-width: 480px;
-      background: Canvas; color: CanvasText;
+      margin: 0;
+      padding: 28px 24px 24px;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      animation: rise-in 0.14s ease-out;
     }
-    h1 { font-size: 18px; margin: 0 0 16px; }
-    label { display: block; margin: 12px 0 4px; font-weight: 600; }
+    @keyframes rise-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body { animation: none; }
+    }
+    /* 设置模式：左侧栏布局，去掉内容区外边距 */
+    body.mode-settings {
+      padding: 0;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── lucide 图标（内联 SVG，stroke 继承 currentColor） ───────── */
+    .icon {
+      width: 16px;
+      height: 16px;
+      flex: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    /* ── 左侧栏（设置模式） ──────────────────────────────────────── */
+    .sidebar {
+      display: none;
+    }
+    body.mode-settings .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      width: 176px;
+      flex: none;
+      padding: 16px 10px;
+      background: var(--muted);
+      border-right: 1px solid var(--border);
+    }
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .sidebar-brand img {
+      width: 22px;
+      height: 22px;
+      border-radius: calc(var(--radius) - 2px);
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      height: 32px;
+      padding: 0 10px;
+      font: inherit;
+      font-size: 13px;
+      color: var(--muted-foreground);
+      background: none;
+      border: none;
+      border-radius: calc(var(--radius) - 2px);
+      cursor: pointer;
+      outline: none;
+      transition: background-color 0.12s ease, color 0.12s ease;
+    }
+    .nav-item:hover { background: color-mix(in oklch, var(--accent) 70%, transparent); color: var(--accent-foreground); }
+    .nav-item.active { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+    .nav-item:focus-visible {
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+    }
+
+    /* ── 内容区 ───────────────────────────────────────────────────── */
+    .content {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+    }
+    .content header { margin-bottom: 20px; }
+    .content h1 {
+      margin: 0 0 4px;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .subtitle {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted-foreground);
+    }
+
+    /* ── 首启模式的品牌头部（设置模式隐藏） ─────────────────────── */
+    .brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    /* 特异性盖过 .content header 的 20px：首启间距由 divider 承担 */
+    .content header.brand { margin-bottom: 0; }
+    .brand-logo {
+      width: 44px;
+      height: 44px;
+      border-radius: calc(var(--radius) * 1.4);
+      box-shadow: 0 1px 2px oklch(0 0 0 / 0.08);
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .brand .subtitle { text-align: center; }
+    body.mode-settings .brand { display: none; }
+
+    /* ── 分区分隔（首启模式） ────────────────────────────────────── */
+    .divider {
+      margin: 0 0 20px;
+      border: 0;
+      border-top: 1px solid var(--border);
+    }
+    body.mode-settings .divider { display: none; }
+
+    /* ── 面板 ─────────────────────────────────────────────────────── */
+    .panel { display: block; }
+    body.mode-settings .panel { display: none; }
+    body.mode-settings .panel.active { display: block; }
+    .section { display: flex; flex-direction: column; gap: 16px; }
+    /* 区块间距仅首启模式需要（账号区与同步区间）；设置模式下账号区隐藏，
+       兄弟选择器仍按 DOM 匹配会给同步区加 22px，破坏三个面板的 20px 一致 */
+    body.mode-firstrun .section + .section { margin-top: 22px; }
+    .section-title {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin: 0;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: -0.005em;
+    }
+    .section-title .tag {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted-foreground);
+    }
+    .section-title .tag.req { color: var(--destructive); }
+
+    .field { display: flex; flex-direction: column; }
+    label {
+      margin-bottom: 6px;
+      font-size: 13px;
+      font-weight: 500;
+    }
     input {
-      width: 100%; box-sizing: border-box; padding: 8px 10px;
-      border: 1px solid GrayText; border-radius: 6px;
-      background: Canvas; color: CanvasText; font: inherit;
+      width: 100%;
+      height: 36px;
+      padding: 0 12px;
+      font: inherit;
+      color: var(--foreground);
+      background: var(--background);
+      border: 1px solid var(--input);
+      border-radius: calc(var(--radius) - 2px);
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
-    .hint { color: GrayText; font-size: 12px; margin-top: 2px; }
-    button {
-      margin-top: 18px; padding: 9px 18px; border: none; border-radius: 6px;
-      background: -apple-system-controlAccent; background: AccentColor;
-      color: Canvas; font: inherit; font-weight: 600; cursor: pointer;
+    input::placeholder { color: var(--muted-foreground); opacity: 0.6; }
+    input:hover { border-color: oklch(0.708 0 0); }
+    input:focus-visible {
+      border-color: var(--ring);
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
     }
-    button.secondary { background: transparent; border: 1px solid GrayText; color: CanvasText; }
-    .status { margin-top: 16px; font-size: 12px; color: GrayText; white-space: pre-line; }
-    .row { display: flex; gap: 8px; }
-    .row button { flex: 1; }
-    #passwordFields { border-top: 1px dashed GrayText; margin-top: 16px; padding-top: 8px; }
+    input[aria-invalid="true"] {
+      border-color: var(--destructive);
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px color-mix(in oklch, var(--destructive) 35%, transparent);
+    }
+    .hint {
+      margin: 8px 0 0; /* 输入框下方留出呼吸空间（含聚焦环） */
+      font-size: 12px;
+      color: var(--muted-foreground);
+    }
+    a {
+      color: var(--primary);
+      text-decoration: none;
+      border-radius: 2px;
+    }
+    a:hover { text-decoration: underline; }
+    a:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+    }
+    .section-footer {
+      display: flex;
+      align-items: center; /* 图标与文字基线垂直居中对齐 */
+      gap: 6px;
+      margin: 10px 0 0; /* 与上方字段提示（hint）拉开节奏 */
+      font-size: 12px;
+      color: var(--muted-foreground);
+    }
+    .section-footer .help-icon {
+      width: 14px; /* 与 12px 正文等高的视觉比例 */
+      height: 14px;
+      flex: none;
+    }
+
+    /* 面板内标题：设置模式由内容区头部承载，此处隐藏（仅首启模式显示） */
+    body.mode-settings .panel-title { display: none; }
+
+    /* ── 状态区与操作栏间距（hairline 分隔） ─────────────────────── */
+    .status {
+      min-height: 40px;
+      margin-top: 18px;
+      font-size: 12px;
+      color: var(--muted-foreground);
+      white-space: pre-line;
+    }
+    .status.error { color: var(--destructive); }
+    .actions-bar {
+      margin-top: 14px;
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    body.mode-firstrun .actions-bar {
+      border-top: none;
+      margin-top: 4px;
+      padding-top: 0;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    /* ── 按钮 ─────────────────────────────────────────────────────── */
+    button.primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 40px;
+      padding: 0 18px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--primary-foreground);
+      background: var(--primary);
+      border: 1px solid transparent;
+      border-radius: calc(var(--radius) - 2px);
+      cursor: pointer;
+      outline: none;
+      transition: background-color 0.15s ease, opacity 0.15s ease;
+    }
+    button.primary:hover:not(:disabled) { background: color-mix(in oklch, var(--primary) 90%, var(--background)); }
+    button.primary:focus-visible {
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+    }
+    button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    /* 首启模式：主按钮全宽 */
+    body.mode-firstrun button.primary { width: 100%; }
+
+    button.secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 40px;
+      padding: 0 18px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--accent-foreground);
+      background: var(--accent);
+      border: 1px solid transparent;
+      border-radius: calc(var(--radius) - 2px);
+      cursor: pointer;
+      outline: none;
+      transition: background-color 0.15s ease, opacity 0.15s ease;
+    }
+    button.secondary:hover:not(:disabled) { background: color-mix(in oklch, var(--accent) 80%, var(--background)); }
+    button.secondary:focus-visible {
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+    }
+    button.secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    button.link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted-foreground);
+      background: none;
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      outline: none;
+    }
+    button.link:hover { color: var(--foreground); text-decoration: underline; }
+    button.link:focus-visible {
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+    }
+
+    /* ── 按钮级 spinner ───────────────────────────────────────────── */
+    .spinner {
+      width: 14px;
+      height: 14px;
+      flex: none;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .spinner { animation-duration: 1.4s; }
+    }
+
+    /* 数据目录面板 */
+    .data-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) - 2px);
+      background: var(--muted);
+    }
+    .data-card .hint { margin: 0; }
   </style>
 </head>
 <body>
-  <h1 id="title">Zlog 首次设置</h1>
-  <p class="hint" id="subtitle">
-    创建管理员账号；同步可稍后在"设置"中补充（可选）。
-  </p>
+  <!-- 左侧栏（仅设置模式） -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="../assets/tray.png" alt="" />
+      <span>Zlog</span>
+    </div>
+    <nav>
+      <button class="nav-item active" data-panel="sync">
+        <svg class="icon" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
+        同步设置
+      </button>
+      <button class="nav-item" data-panel="analytics">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+        流量分析
+      </button>
+      <button class="nav-item" data-panel="data">
+        <svg class="icon" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+        数据目录
+      </button>
+    </nav>
+  </aside>
 
-  <div id="passwordFields">
-    <label for="username">管理员用户名</label>
-    <input id="username" autocomplete="username" placeholder="admin" />
-    <label for="password">密码</label>
-    <input id="password" type="password" autocomplete="new-password" />
-    <label for="password2">确认密码</label>
-    <input id="password2" type="password" autocomplete="new-password" />
-  </div>
+  <main class="content">
+    <!-- 首启模式品牌头部 -->
+    <header class="brand">
+      <img class="brand-logo" src="../assets/tray.png" alt="" />
+      <h1 id="title">Zlog 首次设置</h1>
+      <p class="subtitle" id="subtitle">
+        创建管理员账号；同步可稍后在设置中补充
+      </p>
+    </header>
 
-  <label for="syncUrl">同步数据库 URL（可选）</label>
-  <input id="syncUrl" placeholder="libsql://your-db.turso.io" />
-  <p class="hint">从 Turso 控制台复制。不填则纯本地运行，之后可补。</p>
-  <label for="syncToken">同步 Token（可选）</label>
-  <input id="syncToken" type="password" placeholder="eyJ..." />
+    <!-- 设置模式标题（内容区顶部） -->
+    <header class="content-header" id="contentHeader">
+      <h1 id="title2">同步设置</h1>
+      <p class="subtitle" id="subtitle2"></p>
+    </header>
 
-  <div class="status" id="status"></div>
+    <hr class="divider" />
 
-  <div class="row">
-    <button id="saveBtn">保存</button>
-    <button id="syncBtn" class="secondary">立即同步</button>
-    <button id="openBtn" class="secondary">打开数据目录</button>
-  </div>
+    <!-- 面板：同步设置 -->
+    <section class="panel active" id="panel-sync">
+      <div class="section" id="passwordFields">
+        <h2 class="section-title">管理员账号<span class="tag req">必填</span></h2>
+        <div class="field">
+          <label for="username">用户名</label>
+          <input id="username" autocomplete="username" placeholder="admin" />
+        </div>
+        <div class="field">
+          <label for="password">密码</label>
+          <input id="password" type="password" autocomplete="new-password" />
+        </div>
+        <div class="field">
+          <label for="password2">确认密码</label>
+          <input id="password2" type="password" autocomplete="new-password" />
+        </div>
+      </div>
+
+      <div class="section">
+        <!-- 面板标题由内容区头部承载；此标题仅首启模式（无头部）需要。
+             区块间距交给 .section + .section（首启两区块间 22px）；
+             设置模式下账号区隐藏后本区块紧跟头部 20px，与其余面板一致 -->
+        <h2 class="section-title panel-title">同步设置<span class="tag">可选</span></h2>
+        <div class="field">
+          <label for="syncUrl">数据库 URL</label>
+          <input id="syncUrl" placeholder="libsql://your-db.turso.io" />
+          <p class="hint">留空则纯本地运行，之后可在设置中补充</p>
+        </div>
+        <div class="field">
+          <label for="syncToken">数据库 Token</label>
+          <input id="syncToken" type="password" placeholder="eyJ..." />
+          <p class="hint">在 Turso 控制台创建</p>
+        </div>
+        <p class="section-footer">
+          <svg class="icon help-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+          <span>
+            首次使用 Turso？
+            <a href="https://app.turso.tech" target="_blank" rel="noopener">注册 / 登录</a> ·
+            <a href="https://docs.turso.tech/tursodb/quickstart" target="_blank" rel="noopener">创建数据库指南</a> ·
+            <a href="https://docs.turso.tech/cli/db/tokens/create" target="_blank" rel="noopener">Token 文档</a>
+          </span>
+        </p>
+      </div>
+    </section>
+
+    <!-- 面板：流量分析（默认铺开；面板标题由内容区头部承载） -->
+    <section class="panel" id="panel-analytics">
+      <div class="section">
+        <div class="field">
+          <label for="vercelApiToken">Vercel API Token</label>
+          <input id="vercelApiToken" type="password" placeholder="Vercel 控制台 → Settings → Tokens" />
+        </div>
+        <div class="field">
+          <label for="vercelProjectId">Vercel Project ID</label>
+          <input id="vercelProjectId" placeholder="项目 Settings → General 页面底部" />
+        </div>
+        <div class="field">
+          <label for="vercelTeamId">Vercel Team ID（团队项目才需要）</label>
+          <input id="vercelTeamId" placeholder="留空表示个人项目" />
+        </div>
+        <div class="field">
+          <label for="gaPropertyId">GA4 媒体资源 ID</label>
+          <input id="gaPropertyId" placeholder="123456789" />
+        </div>
+        <div class="field">
+          <label for="gaClientEmail">GA4 服务账号邮箱</label>
+          <input id="gaClientEmail" placeholder="xxx@project.iam.gserviceaccount.com" />
+        </div>
+        <div class="field">
+          <label for="gaPrivateKey">GA4 服务账号私钥</label>
+          <input id="gaPrivateKey" type="password" placeholder="-----BEGIN PRIVATE KEY-----" />
+        </div>
+        <p class="hint">服务账号需在 GA4 媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节</p>
+      </div>
+    </section>
+
+    <!-- 面板：数据目录 -->
+    <section class="panel" id="panel-data">
+      <div class="data-card">
+        <p class="hint">
+          数据保存在用户数据目录：<code>zlog.db</code>（本地数据库）、
+          <code>zlog-config.json</code>（配置）、<code>logs/</code>（日志）。
+          备份该目录即备份整个博客
+        </p>
+        <button class="link" id="openBtn2">
+          <svg class="icon" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+          打开数据目录
+        </button>
+      </div>
+    </section>
+
+    <div class="status" id="status" aria-live="polite"></div>
+
+    <div class="actions-bar">
+      <button class="primary" id="saveBtn">
+        <span id="saveBtnLabel">保存并启动</span>
+      </button>
+      <button class="secondary" id="syncBtn">立即同步</button>
+    </div>
+  </main>
 
   <script src="./settings.js"></script>
 </body>

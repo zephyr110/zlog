@@ -32,3 +32,32 @@ describe("buildServerEnv", () => {
     expect(env.TURSO_AUTH_TOKEN).toBe("tok")
   })
 })
+
+describe("buildServerEnv analytics", () => {
+  it("配置了流量分析时透传 Vercel/GA4 env", () => {
+    const env = buildServerEnv(
+      {
+        ...base,
+        vercelApiToken: "tok",
+        vercelProjectId: "prj_123",
+        vercelTeamId: "team_9",
+        gaPropertyId: "123456",
+        gaClientEmail: "svc@x.iam.gserviceaccount.com",
+        gaPrivateKey: "-----BEGIN PRIVATE KEY-----abc",
+      },
+      "/data/zlog.db"
+    )
+    expect(env.VERCEL_API_TOKEN).toBe("tok")
+    expect(env.VERCEL_ANALYTICS_PROJECT_ID).toBe("prj_123")
+    expect(env.VERCEL_ANALYTICS_TEAM_ID).toBe("team_9")
+    expect(env.GA_PROPERTY_ID).toBe("123456")
+    expect(env.GA_CLIENT_EMAIL).toBe("svc@x.iam.gserviceaccount.com")
+    expect(env.GA_PRIVATE_KEY).toBe("-----BEGIN PRIVATE KEY-----abc")
+  })
+
+  it("未配置流量分析时不注入相关 env", () => {
+    const env = buildServerEnv(base, "/data/zlog.db")
+    expect(env.VERCEL_API_TOKEN).toBeUndefined()
+    expect(env.GA_PROPERTY_ID).toBeUndefined()
+  })
+})
