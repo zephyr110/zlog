@@ -102,6 +102,17 @@
       font-size: 12px;
       color: var(--muted-foreground);
     }
+    /* 外链：跟随主题的 primary 色，hover 下划线 */
+    a {
+      color: var(--primary);
+      text-decoration: none;
+      border-radius: 2px;
+    }
+    a:hover { text-decoration: underline; }
+    a:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+    }
 
     /* 分区分隔：与应用 hairline 语言一致 */
     .divider {
@@ -185,12 +196,23 @@
     <div class="field">
       <label for="syncUrl">同步数据库 URL（可选）</label>
       <input id="syncUrl" placeholder="libsql://your-db.turso.io" />
-      <p class="hint">从 Turso 控制台复制。不填则纯本地运行，之后可补。</p>
+      <p class="hint">
+        从 Turso 控制台复制数据库 URL；不填则纯本地运行，之后可补。
+        <a href="https://docs.turso.tech/tursodb/quickstart" target="_blank" rel="noopener">创建数据库指南 →</a>
+      </p>
     </div>
     <div class="field">
       <label for="syncToken">同步 Token（可选）</label>
       <input id="syncToken" type="password" placeholder="eyJ..." />
+      <p class="hint">
+        在 Turso 控制台创建 API Token。
+        <a href="https://docs.turso.tech/cli/db/tokens/create" target="_blank" rel="noopener">Token 文档 →</a>
+      </p>
     </div>
+    <p class="hint" style="margin-top: 0">
+      没有 Turso 账号？
+      <a href="https://app.turso.tech" target="_blank" rel="noopener">注册 / 登录 Turso 控制台 →</a>
+    </p>
   </div>
 
   <div class="status" id="status" aria-live="polite"></div>

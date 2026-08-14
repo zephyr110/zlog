@@ -118,8 +118,20 @@ async function main() {
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },
     })
+    openExternalLinksInBrowser(win)
     void win.loadFile(join(__dirname, "..", "renderer", "settings.html"), {
       query: { mode: "settings" },
+    })
+  }
+
+  /** 设置类窗口中的外链（Turso 控制台/文档）一律交给系统浏览器，
+   *  不在应用内新开窗口。 */
+  function openExternalLinksInBrowser(win: BrowserWindow) {
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        void shell.openExternal(url)
+      }
+      return { action: "deny" }
     })
   }
 
@@ -208,6 +220,7 @@ async function main() {
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },
     })
+    openExternalLinksInBrowser(firstRunWindow)
     // 与 serverJsPath 同理：`electron dist/main.js` 下 getAppPath() 指向
     // dist/，必须用 __dirname 相对路径（dist/../renderer）。
     void firstRunWindow.loadFile(join(__dirname, "..", "renderer", "settings.html"), {
