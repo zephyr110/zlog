@@ -25,14 +25,32 @@ function showStatus(text, isError = false) {
   statusEl.textContent = text
   statusEl.classList.toggle("error", isError)
 }
+// 常见同步错误的用户可读说明（原始错误可能晦涩，如 libsql 的
+// "invalid local state: db file exists but metadata file does not"）
+const SYNC_ERROR_HINTS = [
+  {
+    match: /invalid local state/,
+    hint: "本地数据库由纯本地模式创建，无法原地启用同步。请删除用户数据目录中的 zlog.db（先备份）后重启应用。",
+  },
+]
+
 function renderStatus(s) {
   if (!s) return
+  let error = s.lastSyncError
+  if (error) {
+    for (const { match, hint } of SYNC_ERROR_HINTS) {
+      if (match.test(error)) {
+        error = `${hint}\n（原始错误：${error}）`
+        break
+      }
+    }
+  }
   const lines = [
     `同步：${s.configured ? "已配置" : "未配置"}${s.syncing ? "（同步中…）" : ""}`,
     s.lastSyncAt ? `上次同步：${new Date(s.lastSyncAt).toLocaleString()}` : "尚未同步",
-    s.lastSyncError ? `最近错误：${s.lastSyncError}` : "",
+    error ? `最近错误：${error}` : "",
   ]
-  showStatus(lines.filter(Boolean).join("\n"))
+  showStatus(lines.filter(Boolean).join("\n"), !!error)
 }
 
 async function refreshStatus() {
@@ -68,6 +86,15 @@ async function doSave() {
       return
     }
   }
+  // 同步 URL 格式校验：填错（如误填用户名）会导致 libsql 解析失败、
+  // 服务器进程 panic 崩溃（真实事故：syncUrl 被填成 "admin"）
+  if (cfg.syncUrl && !/^(libsql|file):\/\//.test(cfg.syncUrl)) {
+    const syncUrl = document.getElementById("syncUrl")
+    syncUrl.setAttribute("aria-invalid", "true")
+    syncUrl.focus()
+    showStatus("数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io。", true)
+    return
+  }
   // 保存期间禁用按钮，防止双击触发两次「停止→启动」竞态
   saveBtn.disabled = true
   showStatus("保存中…")
@@ -77,7 +104,7 @@ async function doSave() {
       showStatus("已保存，博客即将打开。")
       if (!isFirstRun) refreshStatus()
     } else {
-      showStatus("保存失败，请重试。", true)
+      showStatus((res && res.error) || "保存失败，请重试。", true)
       saveBtn.disabled = false
     }
   } catch {

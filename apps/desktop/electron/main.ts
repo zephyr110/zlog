@@ -176,6 +176,11 @@ async function main() {
     } else {
       config = { ...config, syncUrl: cfg.syncUrl?.trim() || undefined, syncToken: cfg.syncToken?.trim() || undefined }
     }
+    // 与渲染层同源的防御性校验：非法 syncUrl 会让 libsql 原生客户端
+    // 在解析时 panic、整个服务器进程崩溃（真实事故：URL 字段误填用户名）
+    if (config.syncUrl && !/^(libsql|file):\/\//.test(config.syncUrl)) {
+      return { ok: false, error: "数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io。" }
+    }
     configStore.save(config)
     // 配置变更（同步信息）后重启服务器使 env 生效
     if (server) {
@@ -228,6 +233,11 @@ async function main() {
     })
   } else {
     await startServerAndShow(config)
+    // 启动路径同样立即执行首次同步（与 config:save 后一致），
+    // 否则要等 libsql syncInterval（300s）首个周期
+    if (config.syncUrl) {
+      void requestSyncNow()
+    }
   }
 
   app.on("second-instance", () => showMainWindow())
