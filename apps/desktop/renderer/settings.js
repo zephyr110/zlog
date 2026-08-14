@@ -43,21 +43,17 @@ if (!isFirstRun) {
   }
 }
 
-// ── 流量分析折叠（lucide chevron-down / chevron-up） ────────────────
-const analyticsBody = document.getElementById("analyticsBody")
-const analyticsChevron = document.getElementById("analyticsChevron")
-const analyticsToggle = document.getElementById("analyticsToggle")
-const CHEVRON_DOWN = '<path d="m6 9 6 6 6-6"/>'
-const CHEVRON_UP = '<path d="m18 15-6-6-6 6"/>'
-function setAnalyticsExpanded(expanded) {
-  analyticsBody.style.display = expanded ? "block" : "none"
-  analyticsToggle.setAttribute("aria-expanded", String(expanded))
-  analyticsChevron.innerHTML = expanded ? CHEVRON_UP : CHEVRON_DOWN
+// ── 按钮级 spinner ────────────────────────────────────────────────────
+function setButtonSpinner(btn, on) {
+  if (on && !btn.querySelector(".spinner")) {
+    const span = document.createElement("span")
+    span.className = "spinner"
+    span.setAttribute("aria-hidden", "true")
+    btn.prepend(span)
+  } else if (!on) {
+    btn.querySelector(".spinner")?.remove()
+  }
 }
-analyticsToggle.addEventListener("click", () => {
-  setAnalyticsExpanded(analyticsToggle.getAttribute("aria-expanded") !== "true")
-})
-setAnalyticsExpanded(false) // 默认折叠
 
 // ── 状态区 ────────────────────────────────────────────────────────────
 const statusEl = document.getElementById("status")
@@ -89,6 +85,9 @@ function renderStatus(s) {
     error ? `最近错误：${error}` : "",
   ]
   showStatus(lines.filter(Boolean).join("\n"), !!error)
+  // 同步按钮 spinner 跟随同步状态（设置模式）
+  const syncBtn = document.getElementById("syncBtn")
+  if (syncBtn) setButtonSpinner(syncBtn, !!s.syncing)
 }
 
 async function refreshStatus() {
@@ -139,6 +138,7 @@ async function doSave() {
     return
   }
   saveBtn.disabled = true
+  setButtonSpinner(saveBtn, true)
   showStatus("保存中…")
   try {
     const res = await zlogApi.saveConfig(cfg)
@@ -148,10 +148,12 @@ async function doSave() {
     } else {
       showStatus((res && res.error) || "保存失败，请重试。", true)
       saveBtn.disabled = false
+      setButtonSpinner(saveBtn, false)
     }
   } catch {
     showStatus("保存失败，请重试。", true)
     saveBtn.disabled = false
+    setButtonSpinner(saveBtn, false)
   }
 }
 saveBtn.addEventListener("click", doSave)
