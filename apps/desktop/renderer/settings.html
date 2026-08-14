@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zlog</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font: 14px/1.6 -apple-system, "Segoe UI", Roboto, sans-serif;
+      margin: 0; padding: 24px; max-width: 480px;
+      background: Canvas; color: CanvasText;
+    }
+    h1 { font-size: 18px; margin: 0 0 16px; }
+    label { display: block; margin: 12px 0 4px; font-weight: 600; }
+    input {
+      width: 100%; box-sizing: border-box; padding: 8px 10px;
+      border: 1px solid GrayText; border-radius: 6px;
+      background: Canvas; color: CanvasText; font: inherit;
+    }
+    .hint { color: GrayText; font-size: 12px; margin-top: 2px; }
+    button {
+      margin-top: 18px; padding: 9px 18px; border: none; border-radius: 6px;
+      background: -apple-system-controlAccent; background: AccentColor;
+      color: Canvas; font: inherit; font-weight: 600; cursor: pointer;
+    }
+    button.secondary { background: transparent; border: 1px solid GrayText; color: CanvasText; }
+    .status { margin-top: 16px; font-size: 12px; color: GrayText; white-space: pre-line; }
+    .row { display: flex; gap: 8px; }
+    .row button { flex: 1; }
+    #passwordFields { border-top: 1px dashed GrayText; margin-top: 16px; padding-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1 id="title">Zlog 首次设置</h1>
+  <p class="hint" id="subtitle">
+    创建管理员账号；同步可稍后在"设置"中补充（可选）。
+  </p>
+
+  <div id="passwordFields">
+    <label for="username">管理员用户名</label>
+    <input id="username" autocomplete="username" placeholder="admin" />
+    <label for="password">密码</label>
+    <input id="password" type="password" autocomplete="new-password" />
+    <label for="password2">确认密码</label>
+    <input id="password2" type="password" autocomplete="new-password" />
+  </div>
+
+  <label for="syncUrl">同步数据库 URL（可选）</label>
+  <input id="syncUrl" placeholder="libsql://your-db.turso.io" />
+  <p class="hint">从 Turso 控制台复制。不填则纯本地运行，之后可补。</p>
+  <label for="syncToken">同步 Token（可选）</label>
+  <input id="syncToken" type="password" placeholder="eyJ..." />
+
+  <div class="status" id="status"></div>
+
+  <div class="row">
+    <button id="saveBtn">保存</button>
+    <button id="syncBtn" class="secondary">立即同步</button>
+    <button id="openBtn" class="secondary">打开数据目录</button>
+  </div>
+
+  <script src="./settings.js"></script>
+</body>
+</html>

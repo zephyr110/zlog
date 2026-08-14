@@ -1,0 +1,51 @@
+appId: com.zephyr110.zlog
+productName: Zlog
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*.js
+  - renderer/**/*
+  - assets/tray.png
+extraResources:
+  # electron-builder hard-excludes a top-level "node_modules" in
+  # extraResources (fileMatcher/filter.js), so the standalone tree is copied
+  # in two pieces — otherwise the .pnpm store the standalone's symlinks
+  # depend on would be dropped, leaving dangling links that break mac
+  # signing. Result: Resources/standalone/apps/web/server.js (main.ts).
+  - from: ../web/.next/standalone/apps
+    to: standalone/apps
+    filter:
+      - "**/*"
+  - from: ../web/.next/standalone/node_modules
+    to: standalone/node_modules
+    filter:
+      - "**/*"
+asar: false
+mac:
+  category: public.app-category.weblog
+  # 版本号来自 tag（CI 同步进 package.json），arch 为 x64/arm64
+  artifactName: Zlog-${version}-${arch}.${ext}
+  target:
+    - dmg
+    - zip
+win:
+  artifactName: Zlog-Setup-${version}.${ext}
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+linux:
+  # 包名 @zlog/desktop 的 '@' 不能进产物文件名（Task 12 CI 实测 AppImage
+  # 报 executableName 非法字符），显式指定可执行文件名
+  executableName: zlog
+  # deb 的默认 artifactName 用原始包名，@zlog/ 会变成不存在的路径段
+  # （本地 fpm 实测 "Parent directory does not exist ... release/@zlog"）
+  artifactName: Zlog-${version}-${arch}.${ext}
+  target:
+    - AppImage
+    - deb
+  category: Network
+  maintainer: zephyr110
+npmRebuild: false

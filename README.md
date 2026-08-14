@@ -74,6 +74,25 @@ Writing happens on local `pnpm dev` or on the Vercel `/admin`; the Pages site is
 
 See the [deployment guide](https://zephyr110.vercel.app/posts/zlog-deployment-guide) for diagrams and checklists.
 
+## Desktop App (macOS / Windows / Linux)
+
+Run the whole blog — reading and writing — as a desktop application. The
+app bundles a local standalone server and a local SQLite database; when a
+sync URL is configured it keeps the local copy in two-way sync with your
+Turso database (offline writes sync back when you are online).
+
+- Build: `pnpm --filter @zlog/desktop package` (per platform)
+- Dev: `pnpm --filter @zlog/desktop build:standalone && pnpm --filter @zlog/desktop dev`
+- First launch: create your admin account; optionally paste your Turso
+  database URL + token in the wizard to enable sync.
+- Data & logs: user data directory (`zlog.db`, `zlog-config.json`,
+  `logs/`). Back up the directory to back up the blog.
+
+> Unsigned builds: macOS Gatekeeper and Windows SmartScreen will warn —
+> right-click → Open on macOS, "More info → Run anyway" on Windows.
+
+Design spec: `docs/superpowers/specs/2026-08-13-desktop-app-design.md`
+
 ## Getting Started
 
 ### Prerequisites

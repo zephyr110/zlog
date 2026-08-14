@@ -41,6 +41,9 @@ export async function GET(
  * deployment model.
  */
 export async function generateStaticParams(): Promise<{ name: string }[]> {
+  // 桌面 standalone 构建（NEXT_DESKTOP=true）无数据库：不枚举静态路径，
+  // 运行时按需读本地库（force-dynamic 不跳过 generateStaticParams，Task 12 CI 实测）
+  if (process.env.NEXT_DESKTOP === "true") return []
   const media = await listMedia()
   return media.map((m) => ({ name: m.name }))
 }

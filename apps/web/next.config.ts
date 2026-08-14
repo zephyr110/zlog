@@ -2,6 +2,7 @@ import path from "node:path"
 import type { NextConfig } from "next"
 
 const isExport = process.env.NEXT_EXPORT === "true"
+const isDesktop = process.env.NEXT_DESKTOP === "true"
 
 const nextConfig: NextConfig = {
   ...(isExport
@@ -9,7 +10,12 @@ const nextConfig: NextConfig = {
         output: "export" as const,
         images: { unoptimized: true },
       }
-    : {
+    : isDesktop
+      ? {
+          // Desktop only — self-contained server for the Electron shell.
+          output: "standalone" as const,
+        }
+      : {
         // Server/Vercel only — static export cannot emit redirects, so
         // apps/web/src/app/category/[name]/page.tsx handles that path.
         async redirects() {

@@ -2,7 +2,18 @@ packages:
   - packages/*
   - apps/*
 
+# electron-builder 26.15.3 declares @electron/get ^3.0.0 but its code uses
+# ElectronDownloadCacheMode (added in 3.1.0). Without the override the
+# lockfile's stale 3.0.0 pin crashes packaging with
+# "Cannot read properties of undefined (reading 'ReadWrite')".
+# Pinned to 3.1.0: the last version with a CJS build (4.x is ESM-only and
+# breaks electron-builder's require()).
+overrides:
+  "@electron/get": "3.1.0"
+
 allowBuilds:
+  electron: true
+  electron-winstaller: false
   esbuild: true
   sharp: true
   unrs-resolver: false
