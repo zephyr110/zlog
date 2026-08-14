@@ -269,8 +269,9 @@ function markProxyAttempted(err: unknown): never {
 }
 
 /**
- * If HTTPS_PROXY is set, try the proxy first (local Clash in CN), then
- * fall back to direct. Direct-only when no proxy is configured.
+ * If HTTPS_PROXY is set, try that proxy first, then fall back to
+ * direct. Direct-only when no proxy is configured — never a baked-in
+ * localhost port.
  */
 async function gaFetch(
   input: string,

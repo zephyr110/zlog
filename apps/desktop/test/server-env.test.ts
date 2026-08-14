@@ -70,17 +70,36 @@ describe("buildServerEnv analytics", () => {
   it("透传进程 HTTPS_PROXY 给服务器", () => {
     const prevHttps = process.env.HTTPS_PROXY
     const prevHttp = process.env.HTTP_PROXY
-    process.env.HTTPS_PROXY = "http://127.0.0.1:7892"
+    process.env.HTTPS_PROXY = "http://127.0.0.1:65534"
     delete process.env.HTTP_PROXY
     try {
       const env = buildServerEnv(base, "/data/zlog.db")
-      expect(env.HTTPS_PROXY).toBe("http://127.0.0.1:7892")
-      expect(env.HTTP_PROXY).toBe("http://127.0.0.1:7892")
+      expect(env.HTTPS_PROXY).toBe("http://127.0.0.1:65534")
+      expect(env.HTTP_PROXY).toBe("http://127.0.0.1:65534")
     } finally {
       if (prevHttps === undefined) delete process.env.HTTPS_PROXY
       else process.env.HTTPS_PROXY = prevHttps
       if (prevHttp === undefined) delete process.env.HTTP_PROXY
       else process.env.HTTP_PROXY = prevHttp
+    }
+  })
+
+  it("未设置进程代理时不注入 HTTPS_PROXY", () => {
+    const keys = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"] as const
+    const prev: Partial<Record<(typeof keys)[number], string | undefined>> = {}
+    for (const k of keys) {
+      prev[k] = process.env[k]
+      delete process.env[k]
+    }
+    try {
+      const env = buildServerEnv(base, "/data/zlog.db")
+      expect(env.HTTPS_PROXY).toBeUndefined()
+      expect(env.HTTP_PROXY).toBeUndefined()
+    } finally {
+      for (const k of keys) {
+        if (prev[k] === undefined) delete process.env[k]
+        else process.env[k] = prev[k]
+      }
     }
   })
 })
