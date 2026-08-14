@@ -3,10 +3,17 @@ import { randomBytes } from "node:crypto"
 import bcrypt from "bcryptjs"
 import { join } from "node:path"
 import { ConfigStore, type DesktopConfig } from "./config-store"
+import { LangFile, isLangPref, type LangPref, type ResolvedLang } from "./lang"
 import { ServerManager } from "./server-manager"
 import { buildServerEnv } from "./server-env"
 import { isValidSyncUrl } from "./validate"
-import { createTray, updateTraySyncStatus, type TrayActions } from "./tray"
+import { createTray, updateTrayLanguage, updateTraySyncStatus, type TrayActions } from "./tray"
+
+/** 设置类窗口标题（跟随生效语言；语言切换时由 setWindowTitles 更新）。 */
+const WINDOW_TITLES: Record<ResolvedLang, { settings: string; firstRun: string }> = {
+  zh: { settings: "Zlog 设置", firstRun: "Zlog 首次设置" },
+  en: { settings: "Zlog Settings", firstRun: "Zlog First-Time Setup" },
+}
 
 // 测试与 CI：可覆盖 userData 目录（Playwright 冒烟测试使用）。
 if (process.env.ZLOG_USER_DATA_DIR) {
@@ -41,8 +48,15 @@ async function main() {
 
   let server: ServerManager | null = null
   let mainWindow: BrowserWindow | null = null
+  let settingsWindow: BrowserWindow | null = null
   let firstRunWindow: BrowserWindow | null = null
   let config: DesktopConfig | null = configStore.load()
+
+  // ── 语言：单一事实源 = userData/lang.json（见 lang.ts）。
+  // systemLocale 只取启动时刻（跟随系统模式）；系统语言变更需重启生效。
+  const systemLocale = process.env.ZLOG_LANG || app.getLocale()
+  const langFile = new LangFile(app.getPath("userData"))
+  let currentLang: ResolvedLang = langFile.loadOrInit(systemLocale).resolved
   // 旧版本可能写入过非法 syncUrl（校验是后加的）——启动时兜底清除，
   // 否则 libsql 原生客户端解析 panic、服务器每次启动即崩溃
   if (config?.syncUrl && !isValidSyncUrl(config.syncUrl)) {
@@ -51,12 +65,15 @@ async function main() {
   }
   const logDir = join(app.getPath("userData"), "logs")
 
-  const tray = createTray({
-    onOpen: () => showMainWindow(),
-    onSettings: () => openSettingsWindow(),
-    onSyncNow: () => void requestSyncNow(),
-    onQuit: () => app.quit(),
-  })
+  const tray = createTray(
+    {
+      onOpen: () => showMainWindow(),
+      onSettings: () => openSettingsWindow(),
+      onSyncNow: () => void requestSyncNow(),
+      onQuit: () => app.quit(),
+    },
+    currentLang
+  )
 
   // 崩溃处理：自动重启一次（spec §6），再次崩溃只弹窗提示，不循环。
   let crashRestarts = 0
@@ -68,7 +85,7 @@ async function main() {
       stopping = false
       return
     }
-    updateTraySyncStatus(tray, "server-exited")
+    updateTraySyncStatus(tray, "server-exited", undefined, currentLang)
     if ((app as unknown as { isQuitting?: boolean }).isQuitting) return
     if (config && crashRestarts < 1) {
       crashRestarts++
@@ -89,7 +106,7 @@ async function main() {
   const serverManager = new ServerManager(serverJsPath, logDir, onServerExit)
 
   async function startServerAndShow(cfg: DesktopConfig) {
-    await serverManager.start(buildServerEnv(cfg, dbPath))
+    await serverManager.start(buildServerEnv(cfg, dbPath, langFile.filePath))
     server = serverManager
     showMainWindow()
   }
@@ -152,9 +169,13 @@ async function main() {
     const win = new BrowserWindow({
       width: 640,
       height: 720,
-      title: "Zlog 设置",
+      title: WINDOW_TITLES[currentLang].settings,
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },
+    })
+    settingsWindow = win
+    win.on("closed", () => {
+      settingsWindow = null
     })
     openExternalLinksInBrowser(win)
     void win.loadFile(join(__dirname, "..", "renderer", "settings.html"), {
@@ -182,10 +203,10 @@ async function main() {
         headers: { "X-Zlog-Desktop-Key": config?.desktopKey ?? "" },
       })
       const body = (await res.json()) as { status?: unknown }
-      updateTraySyncStatus(tray, res.ok ? "synced" : "error")
+      updateTraySyncStatus(tray, res.ok ? "synced" : "error", undefined, currentLang)
       return body.status as Promise<unknown> as unknown as void
     } catch {
-      updateTraySyncStatus(tray, "error")
+      updateTraySyncStatus(tray, "error", undefined, currentLang)
     }
   }
 
@@ -278,12 +299,45 @@ async function main() {
   })
   ipcMain.handle("app:quit", () => app.quit())
 
+  // ── 语言（单一事实源 lang.json；每次读盘，设置窗口与 /api/lang 共享）──
+  ipcMain.handle("lang:get", () => langFile.loadOrInit(systemLocale))
+  ipcMain.handle("lang:set", (_e, pref: unknown) => {
+    if (!isLangPref(pref)) return { ok: false, error: "invalid pref" }
+    const state = langFile.setPref(pref, systemLocale)
+    currentLang = state.resolved
+    // 设置类窗口标题 + 托盘菜单 + tooltip 后缀跟随新语言
+    updateTrayLanguage(tray, currentLang, {
+      onOpen: () => showMainWindow(),
+      onSettings: () => openSettingsWindow(),
+      onSyncNow: () => void requestSyncNow(),
+      onQuit: () => app.quit(),
+    })
+    for (const w of [settingsWindow, firstRunWindow]) {
+      if (w && !w.isDestroyed()) {
+        const isFirstRun = w === firstRunWindow
+        w.setTitle(
+          isFirstRun ? WINDOW_TITLES[currentLang].firstRun : WINDOW_TITLES[currentLang].settings
+        )
+      }
+    }
+    // 广播给博客/admin 主窗口（无 preload）：i18n-provider 监听
+    // "zlog-lang-change" 事件即时切换，无需刷新。
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      void mainWindow.webContents
+        .executeJavaScript(
+          `window.dispatchEvent(new CustomEvent("zlog-lang-change", { detail: ${JSON.stringify(state)} }))`
+        )
+        .catch(() => {})
+    }
+    return { ok: true, state }
+  })
+
   // ── 首启向导 ──
   if (!config) {
     firstRunWindow = new BrowserWindow({
       width: 560,
       height: 920,
-      title: "Zlog 首次设置",
+      title: WINDOW_TITLES[currentLang].firstRun,
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },
     })
@@ -311,6 +365,6 @@ async function main() {
 
   // 同步状态轮询（30s，仅供托盘 tooltip）
   setInterval(() => {
-    void getSyncStatus().then((s) => updateTraySyncStatus(tray, "idle", s))
+    void getSyncStatus().then((s) => updateTraySyncStatus(tray, "idle", s, currentLang))
   }, 30_000)
 }

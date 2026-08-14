@@ -60,4 +60,10 @@ describe("buildServerEnv analytics", () => {
     expect(env.VERCEL_API_TOKEN).toBeUndefined()
     expect(env.GA_PROPERTY_ID).toBeUndefined()
   })
+
+  it("传入 lang 文件路径时注入 DESKTOP_LANG_FILE（web /api/lang 依赖）", () => {
+    expect(buildServerEnv(base, "/data/zlog.db").DESKTOP_LANG_FILE).toBeUndefined()
+    const env = buildServerEnv(base, "/data/zlog.db", "/data/userData/lang.json")
+    expect(env.DESKTOP_LANG_FILE).toBe("/data/userData/lang.json")
+  })
 })

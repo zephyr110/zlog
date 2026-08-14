@@ -7,4 +7,6 @@ contextBridge.exposeInMainWorld("zlog", {
   getSyncStatus: () => ipcRenderer.invoke("sync:status"),
   openDataDir: () => ipcRenderer.invoke("app:openDataDir"),
   quit: () => ipcRenderer.invoke("app:quit"),
+  getLang: () => ipcRenderer.invoke("lang:get"),
+  setLang: (pref: string) => ipcRenderer.invoke("lang:set", pref),
 })
