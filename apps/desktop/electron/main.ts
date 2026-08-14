@@ -65,15 +65,15 @@ async function main() {
   }
   const logDir = join(app.getPath("userData"), "logs")
 
-  const tray = createTray(
-    {
-      onOpen: () => showMainWindow(),
-      onSettings: () => openSettingsWindow(),
-      onSyncNow: () => void requestSyncNow(),
-      onQuit: () => app.quit(),
-    },
-    currentLang
-  )
+  // 托盘动作单处构造（createTray 与 updateTrayLanguage 共用）：
+  // 两处手写字面量会随 TrayActions 成员演化而漂移
+  const trayActions: TrayActions = {
+    onOpen: () => showMainWindow(),
+    onSettings: () => openSettingsWindow(),
+    onSyncNow: () => void requestSyncNow(),
+    onQuit: () => app.quit(),
+  }
+  const tray = createTray(trayActions, currentLang)
 
   // 崩溃处理：自动重启一次（spec §6），再次崩溃只弹窗提示，不循环。
   let crashRestarts = 0
@@ -306,12 +306,7 @@ async function main() {
     const state = langFile.setPref(pref, systemLocale)
     currentLang = state.resolved
     // 设置类窗口标题 + 托盘菜单 + tooltip 后缀跟随新语言
-    updateTrayLanguage(tray, currentLang, {
-      onOpen: () => showMainWindow(),
-      onSettings: () => openSettingsWindow(),
-      onSyncNow: () => void requestSyncNow(),
-      onQuit: () => app.quit(),
-    })
+    updateTrayLanguage(tray, currentLang, trayActions)
     for (const w of [settingsWindow, firstRunWindow]) {
       if (w && !w.isDestroyed()) {
         const isFirstRun = w === firstRunWindow
@@ -327,7 +322,11 @@ async function main() {
         .executeJavaScript(
           `window.dispatchEvent(new CustomEvent("zlog-lang-change", { detail: ${JSON.stringify(state)} }))`
         )
-        .catch(() => {})
+        .catch((err) => {
+          // 页面正在导航/崩溃时广播失败：博客窗口停留在旧语言，
+          // 下次整页加载时 i18n-provider 会从 /api/lang 重新同步
+          console.warn("zlog-lang-change broadcast failed:", err)
+        })
     }
     return { ok: true, state }
   })
@@ -363,8 +362,12 @@ async function main() {
     serverManager.stop()
   })
 
-  // 同步状态轮询（30s，仅供托盘 tooltip）
+  // 同步状态轮询（30s，仅供托盘 tooltip）。同时从 lang.json 重读生效
+  // 语言：web 端（/api/lang）切换语言不会走 lang:set IPC，主进程内存值
+  // 会陈旧——轮询时顺带同步托盘菜单与 tooltip 语言（最长滞后一个周期）。
   setInterval(() => {
+    currentLang = langFile.loadOrInit(systemLocale).resolved
+    updateTrayLanguage(tray, currentLang, trayActions)
     void getSyncStatus().then((s) => updateTraySyncStatus(tray, "idle", s, currentLang))
   }, 30_000)
 }

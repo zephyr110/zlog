@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 
 /**
@@ -56,7 +56,12 @@ export async function POST(req: Request) {
   const state = { pref, resolved: pref }
   try {
     mkdirSync(dirname(p), { recursive: true, mode: 0o700 })
-    writeFileSync(p, JSON.stringify(state, null, 2), { mode: 0o600 })
+    // 原子写（tmp + rename）：与主进程 LangFile 可能并发写本文件，
+    // rename 保证读者看到的是完整内容（旧值或新值），而非半截 JSON。
+    // tmp 名带 pid：与主进程的 tmp 名区分，避免交错截断写被 rename 搬入
+    const tmp = `${p}.tmp-${process.pid}`
+    writeFileSync(tmp, JSON.stringify(state, null, 2), { mode: 0o600 })
+    renameSync(tmp, p)
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }

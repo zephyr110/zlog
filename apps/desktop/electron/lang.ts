@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 /**
@@ -54,29 +54,59 @@ export class LangFile {
 
   save(state: LangState): void {
     mkdirSync(this.dir, { recursive: true, mode: 0o700 })
-    writeFileSync(this.filePath, JSON.stringify(state, null, 2), { mode: 0o600 })
+    // 原子写（tmp + rename）：主进程与 web server（/api/lang）都可能写
+    // 本文件，直接 writeFileSync 的截断写会让并发读方读到半截 JSON；
+    // rename 对读者是原子的——读到的是旧值或新值，不会是撕裂内容。
+    // tmp 名带 pid：两个写入进程（主进程 / Next server 子进程）若共用
+    // 固定名，A 写完 tmp 后 B 截断重写，A 的 rename 会搬入 B 的半截内容。
+    const tmp = `${this.filePath}.tmp-${process.pid}`
+    writeFileSync(tmp, JSON.stringify(state, null, 2), { mode: 0o600 })
+    renameSync(tmp, this.filePath)
   }
 
   /**
    * 读取当前状态；文件缺失/损坏时按给定系统语言重建（默认跟随系统）。
    * 每次调用都读盘、不缓存——设置窗口与 web 端（/api/lang）可能各自
    * 写入，缓存会让另一端读到过期值。
+   * 写盘失败（目录只读等）不抛出：语言偏好尽力而为，坏了默认 zh，
+   * 不能让整个 app 启动失败。
    */
   loadOrInit(systemLocale: string): LangState {
+    // 上次崩溃可能留下 write+rename 之间的半成品 tmp（旧 pid 后缀），
+    // 启动时顺手清掉，避免 userData 里堆积未校验的垃圾文件
+    try {
+      for (const f of readdirSync(this.dir).filter((f) => f.startsWith("lang.json.tmp-"))) {
+        try {
+          unlinkSync(join(this.dir, f))
+        } catch {
+          // 清不掉不影响正确性（rename 覆盖旧值）
+        }
+      }
+    } catch {
+      // 目录不存在/不可读：跳过清理，load 自会处理
+    }
     const existing = this.load()
     if (existing) return existing
     const state: LangState = {
       pref: "system",
       resolved: resolveLang("system", systemLocale),
     }
-    this.save(state)
+    try {
+      this.save(state)
+    } catch {
+      // 读不到也写不了：返回默认状态，调用方照常渲染
+    }
     return state
   }
 
-  /** 更新偏好并重算生效语言；返回写盘后的状态。 */
+  /** 更新偏好并重算生效语言；返回写盘后的状态。写盘失败不抛（尽力而为）。 */
   setPref(pref: LangPref, systemLocale: string): LangState {
     const state: LangState = { pref, resolved: resolveLang(pref, systemLocale) }
-    this.save(state)
+    try {
+      this.save(state)
+    } catch {
+      // 写盘失败：本次会话仍按新语言渲染，重启后回落磁盘旧值
+    }
     return state
   }
 }

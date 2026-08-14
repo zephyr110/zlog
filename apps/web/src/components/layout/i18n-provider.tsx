@@ -6,6 +6,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
 } from "react"
 import { type Locale, defaultLocale } from "@/lib/i18n"
 
@@ -39,6 +40,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   // DocumentTitle re-runs on locale change (locale is in its effect deps),
   // so the deferred sync still corrects document.title.
   const [locale, setLocaleState] = useState<Locale>(defaultLocale)
+  // 挂载期 GET /api/lang 未返回时用户已切换：该响应是陈旧快照，须跳过。
+  // （默认 false：无切换时桌面源仍优先；setLocale 置位）
+  const userPickedRef = useRef(false)
 
   useEffect(() => {
     // 桌面端：语言单一事实源在主进程（lang.json，经 /api/lang）——
@@ -52,7 +56,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
         if (res.ok) {
           const state = (await res.json()) as { resolved?: unknown }
           if (state.resolved === "zh" || state.resolved === "en") {
-            if (!cancelled) setLocaleState(state.resolved)
+            // fetch 期间用户已手动切换过：陈旧响应不得覆盖（setLocale 置位）
+            if (!cancelled && !userPickedRef.current) setLocaleState(state.resolved)
             return
           }
         }
@@ -79,6 +84,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const setLocale = useCallback((l: Locale) => {
+    userPickedRef.current = true
     setLocaleState(l)
     try {
       localStorage.setItem(STORAGE_KEY, l)

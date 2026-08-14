@@ -70,7 +70,7 @@ const I18N = {
     "status.fillUsername": "请填写用户名。",
     "status.passwordRule": "密码至少 6 位，且两次输入一致。",
     "status.syncUrlInvalid": "数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io",
-    "status.sync": "同步：",
+    "status.sync": "同步",
     "status.configured": "已配置",
     "status.notConfigured": "未配置",
     "status.syncing": "（同步中…）",
@@ -78,6 +78,7 @@ const I18N = {
     "status.neverSynced": "尚未同步",
     "status.recentError": "最近错误：",
     "status.rawError": "（原始错误：",
+    "status.rawErrorClose": "）",
     "error.invalidState": "本地数据库由纯本地模式创建，无法原地启用同步。请删除用户数据目录中的 zlog.db（先备份）后重启应用。",
   },
   en: {
@@ -140,7 +141,7 @@ const I18N = {
     "status.fillUsername": "Please enter a username.",
     "status.passwordRule": "Password must be at least 6 characters and match the confirmation.",
     "status.syncUrlInvalid": "Database URL must start with libsql://, e.g. libsql://your-db.turso.io",
-    "status.sync": "Sync: ",
+    "status.sync": "Sync",
     "status.configured": "Configured",
     "status.notConfigured": "Not configured",
     "status.syncing": " (syncing…)",
@@ -148,10 +149,14 @@ const I18N = {
     "status.neverSynced": "Never synced",
     "status.recentError": "Recent error: ",
     "status.rawError": " (raw error: ",
+    "status.rawErrorClose": ")",
     "error.invalidState": "This local database was created in local-only mode and cannot enable sync in place. Delete zlog.db in the user data folder (back it up first) and restart the app.",
   },
 }
 let lang = "zh"
+// 最近一次同步状态（applyLang 重渲染状态区时复用，保证语言切换后
+// 动态文案也跟随；refreshStatus 是唯一写者）
+let lastStatus = null
 function t(key) {
   return I18N[lang][key] ?? I18N.zh[key] ?? key
 }
@@ -168,17 +173,23 @@ function applyLang() {
   }
   if (!isFirstRun) document.getElementById("saveBtnLabel").textContent = t("save.settings")
   renderPanelMeta()
+  // 动态状态区同样跟随语言（缓存的最近一次同步状态重渲染）
+  if (lastStatus) renderStatus(lastStatus)
 }
 
 // ── 模式差异 ──────────────────────────────────────────────────────────
 // 首启：品牌头部 + 全宽主按钮；隐藏侧栏、内容区标题、立即同步、流量分析
+// 与语言面板（首启跟随系统语言，不提供手动切换）
 if (isFirstRun) {
-  // 首启向导保持最小化：同步按钮、流量分析/数据面板、内容区标题全部隐藏
+  // 首启向导保持最小化：同步按钮、流量分析/数据/语言面板、内容区标题全部隐藏
   document.getElementById("syncBtn").style.display = "none"
   document.getElementById("panel-analytics").style.display = "none"
   document.getElementById("panel-data").style.display = "none"
+  document.getElementById("panel-lang").style.display = "none"
   document.getElementById("contentHeader").style.display = "none"
   document.getElementById("username").focus()
+} else {
+  document.getElementById("passwordFields").style.display = "none"
   // 预填已保存的配置（C1：表单必须回显存量值，否则空字段会被当
   // 成"清空"保存，静默抹掉流量分析凭据）。密码类字段同样回显，
   // 用户清空即表示删除。
@@ -194,8 +205,6 @@ if (isFirstRun) {
     set("gaClientEmail", cfg.gaClientEmail)
     set("gaPrivateKey", cfg.gaPrivateKey)
   })
-} else {
-  document.getElementById("passwordFields").style.display = "none"
 }
 
 // ── 侧栏面板切换（设置模式） ────────────────────────────────────────
@@ -225,26 +234,28 @@ if (!isFirstRun) {
 }
 
 // ── 语言（三态：跟随系统/中文/English） ─────────────────────────────
+// langSelect 在两种模式都存在（首启模式下面板被隐藏但元素在 DOM）：
+// 首启跟随系统语言渲染，设置模式同步下拉。先同步渲染一次 zh 默认，
+// 避免 IPC 往返期间窗口停留在 HTML 初值（标题 "Zlog"/"保存并启动"）。
+applyLang()
 const langSelect = document.getElementById("langSelect")
-if (langSelect) {
-  zlogApi.getLang().then((state) => {
+zlogApi
+  .getLang()
+  .then((state) => {
     if (!state) return
-    langSelect.value = state.pref
+    if (langSelect) langSelect.value = state.pref
     lang = state.resolved
     applyLang()
   })
+  .catch(() => {
+    // IPC 失败（如语言文件目录不可写）：保持 zh 默认，静态渲染已由
+    // 上方的同步 applyLang() 完成
+  })
+if (langSelect) {
   langSelect.addEventListener("change", async () => {
     const res = await zlogApi.setLang(langSelect.value)
     if (res && res.ok && res.state) {
       lang = res.state.resolved
-      applyLang()
-    }
-  })
-} else {
-  // 首启模式无侧栏语言面板：跟随系统语言渲染
-  zlogApi.getLang().then((state) => {
-    if (state) {
-      lang = state.resolved
       applyLang()
     }
   })
@@ -277,11 +288,12 @@ const SYNC_ERROR_HINTS = [
 ]
 function renderStatus(s) {
   if (!s) return
+  lastStatus = s
   let error = s.lastSyncError
   if (error) {
     for (const { match, hint } of SYNC_ERROR_HINTS) {
       if (match.test(error)) {
-        error = `${hint()}\n${t("status.rawError")}${error}）`
+        error = `${hint()}\n${t("status.rawError")}${error}${t("status.rawErrorClose")}`
         break
       }
     }
