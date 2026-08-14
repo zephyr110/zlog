@@ -126,9 +126,11 @@ async function main() {
   }
 
   function openSettingsWindow() {
+    // 640 宽容纳左侧栏（176px）+ 内容区；面板切换后内容高度变化，
+    // 窗口内滚动即可（body 无固定高度）
     const win = new BrowserWindow({
-      width: 560,
-      height: 700,
+      width: 640,
+      height: 720,
       title: "Zlog 设置",
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },

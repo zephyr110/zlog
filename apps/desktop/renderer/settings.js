@@ -4,38 +4,74 @@
 const zlogApi = window.zlog
 const mode = new URLSearchParams(location.search).get("mode") || "settings"
 const isFirstRun = mode === "firstrun"
+document.body.classList.add(isFirstRun ? "mode-firstrun" : "mode-settings")
 
-document.title = isFirstRun ? "Zlog 首次设置" : "Zlog 设置"
-document.getElementById("title").textContent = isFirstRun ? "Zlog 首次设置" : "Zlog 设置"
-document.getElementById("subtitle").textContent = isFirstRun
-  ? "创建管理员账号；同步可稍后在设置中补充（可选）。"
-  : "同步数据库 URL 与 Token 为空时不启用同步。"
-document.getElementById("saveBtn").textContent = isFirstRun ? "保存并启动" : "保存"
+// ── 模式差异 ──────────────────────────────────────────────────────────
+// 首启：品牌头部 + 全宽主按钮；隐藏侧栏、内容区标题、立即同步、流量分析
 if (isFirstRun) {
-  // 首启向导里服务器尚未启动，「立即同步」无意义——隐藏
+  // 首启向导保持最小化：同步按钮、流量分析/数据面板、内容区标题全部隐藏
   document.getElementById("syncBtn").style.display = "none"
-  // 流量分析属高级配置，首启保持最小化——整个区块隐藏
-  document.getElementById("analyticsSection").style.display = "none"
-  // 首字段自动聚焦，回车直接提交
+  document.getElementById("panel-analytics").style.display = "none"
+  document.getElementById("panel-data").style.display = "none"
+  document.getElementById("contentHeader").style.display = "none"
   document.getElementById("username").focus()
 } else {
   document.getElementById("passwordFields").style.display = "none"
+  document.getElementById("saveBtn").textContent = "保存"
+  document.getElementById("title2").textContent = "同步设置"
+  document.getElementById("subtitle2").textContent =
+    "配置 Turso 双向同步；未配置则纯本地运行。"
 }
 
+// ── 侧栏面板切换（设置模式） ────────────────────────────────────────
+const PANEL_META = {
+  sync: { title: "同步设置", subtitle: "配置 Turso 双向同步；未配置则纯本地运行。" },
+  analytics: { title: "流量分析", subtitle: "线上站点流量的只读报表；桌面端不发送埋点数据。" },
+  data: { title: "数据目录", subtitle: "博客数据与备份位置。" },
+}
+if (!isFirstRun) {
+  for (const btn of document.querySelectorAll(".nav-item")) {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b === btn))
+      for (const panel of document.querySelectorAll(".panel")) {
+        panel.classList.toggle("active", panel.id === `panel-${btn.dataset.panel}`)
+      }
+      const meta = PANEL_META[btn.dataset.panel]
+      document.getElementById("title2").textContent = meta.title
+      document.getElementById("subtitle2").textContent = meta.subtitle
+    })
+  }
+}
+
+// ── 流量分析折叠（lucide chevron-down / chevron-up） ────────────────
+const analyticsBody = document.getElementById("analyticsBody")
+const analyticsChevron = document.getElementById("analyticsChevron")
+const analyticsToggle = document.getElementById("analyticsToggle")
+const CHEVRON_DOWN = '<path d="m6 9 6 6 6-6"/>'
+const CHEVRON_UP = '<path d="m18 15-6-6-6 6"/>'
+function setAnalyticsExpanded(expanded) {
+  analyticsBody.style.display = expanded ? "block" : "none"
+  analyticsToggle.setAttribute("aria-expanded", String(expanded))
+  analyticsChevron.innerHTML = expanded ? CHEVRON_UP : CHEVRON_DOWN
+}
+analyticsToggle.addEventListener("click", () => {
+  setAnalyticsExpanded(analyticsToggle.getAttribute("aria-expanded") !== "true")
+})
+setAnalyticsExpanded(false) // 默认折叠
+
+// ── 状态区 ────────────────────────────────────────────────────────────
 const statusEl = document.getElementById("status")
 function showStatus(text, isError = false) {
   statusEl.textContent = text
   statusEl.classList.toggle("error", isError)
 }
-// 常见同步错误的用户可读说明（原始错误可能晦涩，如 libsql 的
-// "invalid local state: db file exists but metadata file does not"）
+// 常见同步错误的用户可读说明（原始错误可能晦涩）
 const SYNC_ERROR_HINTS = [
   {
     match: /invalid local state/,
     hint: "本地数据库由纯本地模式创建，无法原地启用同步。请删除用户数据目录中的 zlog.db（先备份）后重启应用。",
   },
 ]
-
 function renderStatus(s) {
   if (!s) return
   let error = s.lastSyncError
@@ -59,6 +95,7 @@ async function refreshStatus() {
   renderStatus(await zlogApi.getSyncStatus())
 }
 
+// ── 保存 ──────────────────────────────────────────────────────────────
 const saveBtn = document.getElementById("saveBtn")
 async function doSave() {
   const cfg = {
@@ -67,7 +104,6 @@ async function doSave() {
     password2: document.getElementById("password2").value,
     syncUrl: document.getElementById("syncUrl").value.trim(),
     syncToken: document.getElementById("syncToken").value.trim(),
-    // 流量分析（设置模式可见；首启模式下区块隐藏，值恒为空）
     vercelApiToken: document.getElementById("vercelApiToken").value.trim(),
     vercelProjectId: document.getElementById("vercelProjectId").value.trim(),
     vercelTeamId: document.getElementById("vercelTeamId").value.trim(),
@@ -75,7 +111,6 @@ async function doSave() {
     gaClientEmail: document.getElementById("gaClientEmail").value.trim(),
     gaPrivateKey: document.getElementById("gaPrivateKey").value.trim(),
   }
-  // 校验失败：定位到出问题的字段并给出 aria-invalid
   const username = document.getElementById("username")
   const password = document.getElementById("password")
   const password2 = document.getElementById("password2")
@@ -95,8 +130,7 @@ async function doSave() {
       return
     }
   }
-  // 同步 URL 格式校验：填错（如误填用户名）会导致 libsql 解析失败、
-  // 服务器进程 panic 崩溃（真实事故：syncUrl 被填成 "admin"）
+  // 同步 URL 格式校验：填错（如误填用户名）会让 libsql 解析 panic 崩溃
   if (cfg.syncUrl && !/^(libsql|file):\/\//.test(cfg.syncUrl)) {
     const syncUrl = document.getElementById("syncUrl")
     syncUrl.setAttribute("aria-invalid", "true")
@@ -104,7 +138,6 @@ async function doSave() {
     showStatus("数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io。", true)
     return
   }
-  // 保存期间禁用按钮，防止双击触发两次「停止→启动」竞态
   saveBtn.disabled = true
   showStatus("保存中…")
   try {
@@ -122,17 +155,20 @@ async function doSave() {
   }
 }
 saveBtn.addEventListener("click", doSave)
-// 回车即提交（首启主流程的键盘可达性）
 for (const id of ["username", "password", "password2", "syncUrl", "syncToken"]) {
   document.getElementById(id).addEventListener("keydown", (e) => {
     if (e.key === "Enter") doSave()
   })
 }
 
+// ── 其他操作 ──────────────────────────────────────────────────────────
 document.getElementById("syncBtn").addEventListener("click", async () => {
   await zlogApi.runSyncNow()
   refreshStatus()
 })
+for (const id of ["openBtn", "openBtn2"]) {
+  const btn = document.getElementById(id)
+  if (btn) btn.addEventListener("click", () => zlogApi.openDataDir())
+}
 
-document.getElementById("openBtn").addEventListener("click", () => zlogApi.openDataDir())
 refreshStatus()
