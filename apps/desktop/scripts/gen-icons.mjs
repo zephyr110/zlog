@@ -1,5 +1,5 @@
-import { deflateSync } from "node:zlib"
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { deflateSync, inflateSync } from "node:zlib"
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -13,21 +13,148 @@ const root = join(here, "..")
 const LOGO_SOURCE = join(root, "..", "..", "apps", "web", "public", "zlog-logo.png")
 const ICON_TARGET = join(root, "build", "icon.png")
 const TRAY_TARGET = join(root, "assets", "tray.png")
+// 菜单栏模板图标（macOS）：16pt @1x 与 @2x；文件名以 Template 结尾 →
+// Electron 自动标记模板图，@2x 相邻文件自动作为 Retina 尺寸。
+const TRAY_TEMPLATES = [
+  { size: 16, file: "trayTemplate.png" },
+  { size: 32, file: "trayTemplate@2x.png" },
+]
 
 if (existsSync(LOGO_SOURCE)) {
   mkdirSync(join(root, "assets"), { recursive: true })
   mkdirSync(join(root, "build"), { recursive: true })
   copyFileSync(LOGO_SOURCE, ICON_TARGET)
   copyFileSync(LOGO_SOURCE, TRAY_TARGET)
+  deriveTrayTemplates(LOGO_SOURCE)
   console.log("icons copied from", LOGO_SOURCE)
 } else {
   console.warn(`zlog-logo.png not found at ${LOGO_SOURCE} — generating placeholder icons`)
   generatePlaceholderIcons()
 }
 
-/** 占位图标生成器：纯色深灰方块（零依赖 PNG 编码）。 */
-function generatePlaceholderIcons() {
-  let crcTable = null
+// ── 菜单栏模板图标派生（macOS） ──────────────────────────────────────
+// 菜单栏图标必须是"模板图"：黑色图形 + alpha 透明通道，系统自动按
+// 浅色/深色菜单栏渲染黑/白（HIG）。logo 是深底白图的单色标识（角落
+// ~RGB 1、图形 ~RGB 250，亮度双峰分布），按阈值提取图形为黑色 + 透明
+// 背景即可自动派生。
+function deriveTrayTemplates(sourcePath) {
+  let src
+  try {
+    src = decodePng(readFileSync(sourcePath))
+  } catch (err) {
+    console.warn(`tray template derivation failed (${err.message}) — macOS will fall back to the colored icon`)
+    return
+  }
+  for (const { size, file } of TRAY_TEMPLATES) {
+    writeFileSync(join(root, "assets", file), pngFromRgba(size, boxDownsampleTemplate(src, size)))
+  }
+  console.log("generated assets/trayTemplate.png + trayTemplate@2x.png")
+}
+
+/** 解码 8-bit RGB/RGBA PNG（IHDR + IDAT + unfilter，零依赖）。 */
+function decodePng(buf) {
+  if (buf.readUInt32BE(0) !== 0x89504e47) throw new Error("not a PNG")
+  let pos = 8
+  let width = 0, height = 0, colorType = 0, bitDepth = 0
+  const idat = []
+  while (pos < buf.length) {
+    const len = buf.readUInt32BE(pos)
+    const type = buf.toString("ascii", pos + 4, pos + 8)
+    const data = buf.subarray(pos + 8, pos + 8 + len)
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0); height = data.readUInt32BE(4)
+      bitDepth = data[8]; colorType = data[9]
+    } else if (type === "IDAT") {
+      idat.push(data)
+    } else if (type === "IEND") break
+    pos += 12 + len
+  }
+  if (bitDepth !== 8 || (colorType !== 2 && colorType !== 6)) {
+    throw new Error(`unsupported PNG (bitDepth=${bitDepth} colorType=${colorType})`)
+  }
+  const bpp = colorType === 6 ? 4 : 3
+  const stride = width * bpp
+  const raw = inflateSync(Buffer.concat(idat))
+  const out = Buffer.alloc(width * height * 4)
+  const prev = Buffer.alloc(stride)
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)]
+    const line = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1))
+    const cur = Buffer.alloc(stride)
+    for (let x = 0; x < stride; x++) {
+      const a = x >= bpp ? cur[x - bpp] : 0
+      const b = prev[x]
+      const c = x >= bpp ? prev[x - bpp] : 0
+      let v = line[x]
+      switch (filter) {
+        case 1: v += a; break
+        case 2: v += b; break
+        case 3: v += (a + b) >> 1; break
+        case 4: {
+          const p = a + b - c
+          const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c)
+          v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c
+          break
+        }
+      }
+      cur[x] = v & 0xff
+    }
+    for (let x = 0; x < width; x++) {
+      const o = (y * width + x) * 4
+      out[o] = cur[x * bpp]
+      out[o + 1] = cur[x * bpp + 1]
+      out[o + 2] = cur[x * bpp + 2]
+      out[o + 3] = colorType === 6 ? cur[x * bpp + 3] : 255
+    }
+    prev.set(cur)
+  }
+  return { width, height, data: out }
+}
+
+/** 亮度 → 模板 alpha：亮部（图形）变黑色不透明，暗部（底色）变透明；
+ *  阈值附近的像素线性过渡，保留抗锯齿边缘。 */
+function toTemplateAlpha(src) {
+  const { width, height, data } = src
+  const out = Buffer.alloc(width * height * 4)
+  for (let i = 0; i < width * height; i++) {
+    const o = i * 4
+    const lum = (data[o] + data[o + 1] + data[o + 2]) / 3
+    const alpha = Math.max(0, Math.min(255, Math.round((lum - 128) * 2)))
+    out[o] = 0; out[o + 1] = 0; out[o + 2] = 0; out[o + 3] = alpha
+  }
+  return out
+}
+
+/** 盒式降采样：对 alpha 覆盖度平均，16px 下边缘平滑。 */
+function boxDownsampleTemplate(src, size) {
+  const alpha = toTemplateAlpha(src)
+  const { width, height } = src
+  const out = Buffer.alloc(size * size * 4)
+  const stepX = width / size, stepY = height / size
+  for (let y = 0; y < size; y++) {
+    const y0 = Math.floor(y * stepY)
+    const y1 = Math.max(y0 + 1, Math.floor((y + 1) * stepY))
+    for (let x = 0; x < size; x++) {
+      const x0 = Math.floor(x * stepX)
+      const x1 = Math.max(x0 + 1, Math.floor((x + 1) * stepX))
+      let sum = 0, n = 0
+      for (let sy = y0; sy < y1; sy++) {
+        for (let sx = x0; sx < x1; sx++) {
+          sum += alpha[(sy * width + sx) * 4 + 3]
+          n++
+        }
+      }
+      const o = (y * size + x) * 4
+      out[o] = 0; out[o + 1] = 0; out[o + 2] = 0
+      out[o + 3] = Math.round(sum / n)
+    }
+  }
+  return out
+}
+
+/** 由 RGBA 缓冲编码 PNG（filter 0）。 */
+// var：顶部复制分支在模块求值早期就会调用本链（TDZ 下 let 不可用）
+var crcTable = null
 function crc32(buf) {
   if (!crcTable) {
     crcTable = new Int32Array(256)
@@ -51,8 +178,30 @@ function chunk(type, data) {
   return Buffer.concat([len, typeBuf, data, crcBuf])
 }
 
-/** 纯色 RGBA PNG（8-bit，filter none）。 */
-function png(size, rgba) {
+function pngFromRgba(size, rgba) {
+  const stride = size * 4 + 1
+  const raw = Buffer.alloc(size * stride)
+  for (let y = 0; y < size; y++) {
+    raw[y * stride] = 0
+    rgba.copy(raw, y * stride + 1, y * size * 4, (y + 1) * size * 4)
+  }
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(size, 0)
+  ihdr.writeUInt32BE(size, 4)
+  ihdr[8] = 8 // bit depth
+  ihdr[9] = 6 // color type RGBA
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", ihdr),
+    chunk("IDAT", deflateSync(raw)),
+    chunk("IEND", Buffer.alloc(0)),
+  ])
+}
+
+/** 占位图标生成器：纯色深灰方块（真实 logo 缺失时的兜底）。 */
+function generatePlaceholderIcons() {
+  /** 纯色 RGBA PNG（8-bit，filter none）。 */
+  function png(size, rgba) {
   const stride = size * 4 + 1
   const raw = Buffer.alloc(size * stride)
   for (let y = 0; y < size; y++) {

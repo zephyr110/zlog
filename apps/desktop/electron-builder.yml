@@ -7,6 +7,7 @@ files:
   - dist/**/*.js
   - renderer/**/*
   - assets/tray.png
+  - assets/trayTemplate*.png
 extraResources:
   # electron-builder hard-excludes a top-level "node_modules" in
   # extraResources (fileMatcher/filter.js), so the standalone tree is copied
