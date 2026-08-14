@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron"
 import { randomBytes } from "node:crypto"
 import bcrypt from "bcryptjs"
-import { join } from "node:path"
+import { join, resolve, sep } from "node:path"
 import { ConfigStore, type DesktopConfig } from "./config-store"
 import { LangFile, isLangPref, type LangPref, type ResolvedLang } from "./lang"
 import {
@@ -190,7 +190,10 @@ async function main() {
     })
     settingsWindow = win
     win.on("closed", () => {
-      settingsWindow = null
+      // 只在自身仍是当前引用时清空：关闭后立即重开时，若旧窗口的
+      // closed 回调晚于新窗口赋值执行，会把新窗口的引用抹掉，
+      // 下次托盘点击又叠开一个窗口
+      if (settingsWindow === win) settingsWindow = null
     })
     openExternalLinksInBrowser(win)
     void win.loadFile(join(__dirname, "..", "renderer", "settings.html"), {
@@ -329,7 +332,6 @@ async function main() {
         hasUpdate,
         current,
         latest,
-        releaseUrl: release.htmlUrl,
         downloadUrl: hasUpdate
           ? (pickAssetUrl(release.assets, process.platform, process.arch) ?? undefined)
           : undefined,
@@ -342,9 +344,22 @@ async function main() {
     if (typeof url !== "string" || !url.startsWith("https://")) {
       return { ok: false, error: "invalid url" }
     }
-    const dest = join(updatesDir(), new URL(url).pathname.split("/").pop() ?? "update")
-    const sendProgress = (percent: number) =>
-      settingsWindow?.webContents.send("update:progress", { percent })
+    let dest: string
+    try {
+      // 文件名兜底空串（URL 尾 / 时 pathname 末段为空）→ 退化为 "update"
+      dest = join(updatesDir(), new URL(url).pathname.split("/").pop() || "update")
+    } catch {
+      return { ok: false, error: "invalid url" }
+    }
+    const sendProgress = (percent: number) => {
+      try {
+        // 窗口可能在下载中被关闭：webContents 已销毁时 send 抛异常，
+        // 捕获后下载继续（孤儿包留在 updatesDir，重开窗口可重新下载）
+        settingsWindow?.webContents.send("update:progress", { percent })
+      } catch {
+        // 忽略：进度无人接收，下载仍须完成
+      }
+    }
     try {
       await downloadUpdate(url, dest, sendProgress)
       // 只下载不自动打开：由用户在设置窗口确认后触发（update:open）
@@ -354,13 +369,15 @@ async function main() {
     }
   })
   ipcMain.handle("update:open", (_e, dest: unknown) => {
-    // 只允许打开 updatesDir 内的文件（渲染层传路径不可信）
+    // 只允许打开 updatesDir 内的文件（渲染层传路径不可信）。
+    // resolve 后校验：前缀匹配防不住 "../" 段，须归一化再比较
     if (typeof dest !== "string") return { ok: false, error: "invalid dest" }
-    const base = updatesDir()
-    if (dest !== base && !dest.startsWith(`${base}/`) && !dest.startsWith(`${base}\\`)) {
+    const base = resolve(updatesDir())
+    const target = resolve(dest)
+    if (target !== base && !target.startsWith(`${base}${sep}`)) {
       return { ok: false, error: "outside updates dir" }
     }
-    openDownloadedUpdate(dest)
+    openDownloadedUpdate(target)
     return { ok: true }
   })
 

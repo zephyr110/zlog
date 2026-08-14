@@ -623,9 +623,11 @@
           <span class="about-label" data-i18n="about.version">版本</span>
           <div class="about-row">
             <span id="appVersion" class="about-version">…</span>
-            <button class="secondary small" id="updateBtn" data-i18n="about.checkUpdate">检查更新</button>
+            <!-- 按钮/状态行由 settings.js 状态机维护文案（renderUpdateState），
+                 不挂 data-i18n——语言切换时按当前状态重渲染，不被静态字典覆盖 -->
+            <button class="secondary small" id="updateBtn">检查更新</button>
           </div>
-          <p class="hint" id="updateStatus" data-i18n="about.checkHint">自动检查 GitHub Releases 最新版本</p>
+          <p class="hint" id="updateStatus">自动检查 GitHub Releases 最新版本</p>
         </div>
 
         <div class="field">

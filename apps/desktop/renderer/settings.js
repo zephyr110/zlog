@@ -211,6 +211,80 @@ function applyLang() {
   renderPanelMeta()
   // 动态状态区同样跟随语言（缓存的最近一次同步状态重渲染）
   if (lastStatus) renderStatus(lastStatus)
+  // 关于面板的更新状态是 JS 维护的动态文案（不带 data-i18n）：
+  // 语言切换后按当前状态机重渲染，按钮/状态不回到初始值。
+  // 直接调用：renderUpdateState 内部自行 getElementById，不能引用
+  // 文件后段声明的 updateBtn（TDZ——applyLang 先于 about 区块执行）
+  renderUpdateState()
+}
+
+// ── 关于面板状态（声明先于 applyLang：语言初始化会在本文件后段
+// 的 about 逻辑执行前调用 applyLang，const 声明若在后面会触发 TDZ）──
+let updateInfo = null // 最近一次检查结果（含 downloadUrl）
+let updateChecked = false // 本窗口会话是否已自动检查过（失败也算一次）
+let updateBusy = false // 检查/下载进行中（按钮禁用）
+let updateDest = null // 下载完成后的本地路径
+let updateUiState = "idle" // 派生 UI 状态（renderUpdateState 的唯一输入）
+let updatePercent = 0 // 下载进度（downloading 状态用）
+
+function renderUpdateState() {
+  const updateBtn = document.getElementById("updateBtn")
+  const updateStatus = document.getElementById("updateStatus")
+  const latest = updateInfo?.latest
+  switch (updateUiState) {
+    case "checking":
+      updateBtn.textContent = t("about.checkUpdate")
+      updateBtn.disabled = true
+      updateStatus.textContent = t("about.checking")
+      updateStatus.classList.remove("error")
+      break
+    case "upToDate":
+      updateBtn.textContent = t("about.checkUpdate")
+      updateBtn.disabled = false
+      updateStatus.textContent = `${t("about.upToDate")} ${updateInfo?.current ?? ""}`
+      updateStatus.classList.remove("error")
+      break
+    case "found":
+      updateBtn.textContent = `${t("about.download")} v${latest}`
+      updateBtn.disabled = false
+      updateStatus.textContent = `${t("about.found")} v${latest}`
+      updateStatus.classList.remove("error")
+      break
+    case "noAsset":
+      updateBtn.textContent = t("about.checkUpdate")
+      updateBtn.disabled = false
+      updateStatus.textContent = `${t("about.found")} v${latest} — ${t("about.noAsset")}`
+      updateStatus.classList.add("error")
+      break
+    case "downloading":
+      updateBtn.disabled = true
+      updateStatus.textContent = `${t("about.downloading")} ${updatePercent}%`
+      updateStatus.classList.remove("error")
+      break
+    case "downloaded":
+      updateBtn.textContent = t("about.openPackage")
+      updateBtn.disabled = false
+      updateStatus.textContent = `${t("about.downloaded")} v${latest}`
+      updateStatus.classList.remove("error")
+      break
+    case "checkFailed":
+      updateBtn.textContent = t("about.checkUpdate")
+      updateBtn.disabled = false
+      updateStatus.textContent = t("about.checkFailed")
+      updateStatus.classList.add("error")
+      break
+    case "downloadFailed":
+      updateBtn.textContent = `${t("about.download")} v${latest}`
+      updateBtn.disabled = false
+      updateStatus.textContent = t("about.downloadFailed")
+      updateStatus.classList.add("error")
+      break
+    default:
+      updateBtn.textContent = t("about.checkUpdate")
+      updateBtn.disabled = false
+      updateStatus.textContent = t("about.checkHint")
+      updateStatus.classList.remove("error")
+  }
 }
 
 // ── 模式差异 ──────────────────────────────────────────────────────────
@@ -441,72 +515,62 @@ for (const id of [
 // ── 关于：版本 + 更新检查 ──────────────────────────────────────────
 // 状态机：idle → checking → up-to-date | update-available
 //   → downloading → downloaded →（手动确认）opening
+// 状态声明与 renderUpdateState 在文件上部（applyLang 之前）；这里只剩
+// 元素引用与交互逻辑。所有 UI 文案经 renderUpdateState() 集中渲染，
+// 语言切换（applyLang）或进度事件后调用，动态状态不因 data-i18n 重写丢失。
 const appVersionEl = document.getElementById("appVersion")
 const updateBtn = document.getElementById("updateBtn")
-const updateStatus = document.getElementById("updateStatus")
-let updateInfo = null // 最近一次检查结果（含 downloadUrl）
-let updateChecked = false // 本窗口会话是否已自动检查过
-let updateBusy = false // 检查/下载进行中（按钮禁用）
-let updateDest = null // 下载完成后的本地路径
-
-function setUpdateStatus(text, isError = false) {
-  updateStatus.textContent = text
-  updateStatus.classList.toggle("error", isError)
-}
 
 async function checkForUpdates() {
   if (updateBusy) return
   updateBusy = true
-  updateBtn.disabled = true
-  setUpdateStatus(t("about.checking"))
+  updateUiState = "checking"
+  renderUpdateState()
   const res = await zlogApi.checkForUpdates().catch(() => null)
   updateBusy = false
+  updateChecked = true // 失败也算检查过：避免每次切回面板都重发请求
   if (!res || !res.ok) {
-    setUpdateStatus(t("about.checkFailed"), true)
-    updateBtn.disabled = false
+    updateUiState = "checkFailed"
+    renderUpdateState()
     return
   }
   updateInfo = res
-  updateChecked = true
   if (!res.hasUpdate) {
-    setUpdateStatus(`${t("about.upToDate")} ${res.current}`)
-    updateBtn.textContent = t("about.checkUpdate")
-    updateBtn.disabled = false
+    updateUiState = "upToDate"
+    renderUpdateState()
     return
   }
   if (!res.downloadUrl) {
-    setUpdateStatus(`${t("about.found")} v${res.latest} — ${t("about.noAsset")}`, true)
-    updateBtn.textContent = t("about.checkUpdate")
-    updateBtn.disabled = false
+    updateUiState = "noAsset"
+    renderUpdateState()
     return
   }
-  setUpdateStatus(`${t("about.found")} v${res.latest}`)
-  updateBtn.textContent = `${t("about.download")} v${res.latest}`
-  updateBtn.disabled = false
+  updateUiState = "found"
+  renderUpdateState()
 }
 
 async function downloadUpdatePackage() {
   if (updateBusy || !updateInfo?.downloadUrl) return
   updateBusy = true
-  updateBtn.disabled = true
-  setUpdateStatus(`${t("about.downloading")} 0%`)
+  updatePercent = 0
+  updateUiState = "downloading"
+  renderUpdateState()
   const res = await zlogApi.downloadUpdate(updateInfo.downloadUrl).catch(() => null)
   updateBusy = false
   if (!res || !res.ok) {
-    setUpdateStatus(t("about.downloadFailed"), true)
-    updateBtn.textContent = `${t("about.download")} v${updateInfo.latest}`
-    updateBtn.disabled = false
+    updateUiState = "downloadFailed"
+    renderUpdateState()
     return
   }
   updateDest = res.dest
-  setUpdateStatus(`${t("about.downloaded")} v${updateInfo.latest}`)
-  updateBtn.textContent = t("about.openPackage")
-  updateBtn.disabled = false
+  updateUiState = "downloaded"
+  renderUpdateState()
 }
 
 // 主进程流式下载进度（百分比文本）
 zlogApi.onUpdateProgress(({ percent }) => {
-  if (updateBusy) setUpdateStatus(`${t("about.downloading")} ${percent}%`)
+  updatePercent = percent
+  if (updateUiState === "downloading") renderUpdateState()
 })
 
 updateBtn.addEventListener("click", () => {
@@ -521,9 +585,14 @@ updateBtn.addEventListener("click", () => {
 })
 
 // 版本号常驻显示（无需网络）
-zlogApi.getVersion().then((v) => {
-  if (v) appVersionEl.textContent = v
-})
+zlogApi
+  .getVersion()
+  .then((v) => {
+    if (v) appVersionEl.textContent = v
+  })
+  .catch(() => {
+    // IPC 失败时保留占位符（…），不产生未处理的 rejection
+  })
 
 // ── 其他操作 ──────────────────────────────────────────────────────────
 document.getElementById("syncBtn").addEventListener("click", async () => {

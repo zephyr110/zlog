@@ -59,6 +59,23 @@ describe("pickAssetUrl", () => {
     expect(pickAssetUrl(assets, "linux", "x64")).toBe("https://a/appimage")
   })
 
+  it("Linux x64 兼容 electron-builder 的 x64 形态（部分版本产出 -x64.AppImage）", () => {
+    const mixed = [
+      { name: "Zlog-1.1.0-x64.AppImage", browser_download_url: "https://a/x64.AppImage" },
+      { name: "Zlog-1.1.0-arm64.AppImage", browser_download_url: "https://a/arm64.AppImage" },
+      { name: "Zlog-1.1.0-aarch64.AppImage", browser_download_url: "https://a/aarch64.AppImage" },
+    ]
+    expect(pickAssetUrl(mixed, "linux", "x64")).toBe("https://a/x64.AppImage")
+    expect(pickAssetUrl(mixed, "linux", "arm64")).toBe("https://a/arm64.AppImage")
+  })
+
+  it("Linux arm64 兼容 aarch64 形态", () => {
+    const aarch = [
+      { name: "Zlog-1.1.0-aarch64.AppImage", browser_download_url: "https://a/aarch64.AppImage" },
+    ]
+    expect(pickAssetUrl(aarch, "linux", "arm64")).toBe("https://a/aarch64.AppImage")
+  })
+
   it("平台无资产时返回 null", () => {
     expect(pickAssetUrl([{ name: "Zlog-1.1.0-arm64.zip", browser_download_url: "x" }], "linux", "x64")).toBeNull()
     expect(pickAssetUrl([], "darwin", "arm64")).toBeNull()
