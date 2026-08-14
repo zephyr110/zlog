@@ -121,7 +121,8 @@ function toTemplateAlpha(src) {
   for (let i = 0; i < width * height; i++) {
     const o = i * 4
     const lum = (data[o] + data[o + 1] + data[o + 2]) / 3
-    const alpha = Math.max(0, Math.min(255, Math.round((lum - 128) * 2)))
+    // 系数 2.55：图形中心像素 alpha 达 255（2 会停在 244，菜单栏里约 4% 半透明）
+    const alpha = Math.max(0, Math.min(255, Math.round((lum - 128) * 2.55)))
     out[o] = 0; out[o + 1] = 0; out[o + 2] = 0; out[o + 3] = alpha
   }
   return out
@@ -156,12 +157,22 @@ function boxDownsampleTemplate(src, size) {
   const offX = Math.floor((size - sw) / 2)
   const offY = Math.floor((size - sh) / 2)
   const out = Buffer.alloc(size * size * 4)
+  // 面积平均：每个输出像素对源覆盖区域求 alpha 均值（最近邻会锯齿）
   for (let y = 0; y < sh; y++) {
-    const sy = Math.min(bh - 1, Math.floor(y / scale))
+    const sy0 = Math.floor(y / scale)
+    const sy1 = Math.max(sy0 + 1, Math.floor((y + 1) / scale))
     for (let x = 0; x < sw; x++) {
-      const sx = Math.min(bw - 1, Math.floor(x / scale))
-      out[((offY + y) * size + offX + x) * 4 + 3] =
-        alpha[((minY + sy) * width + (minX + sx)) * 4 + 3]
+      const sx0 = Math.floor(x / scale)
+      const sx1 = Math.max(sx0 + 1, Math.floor((x + 1) / scale))
+      let sum = 0
+      let n = 0
+      for (let sy = sy0; sy < sy1; sy++) {
+        for (let sx = sx0; sx < sx1; sx++) {
+          sum += alpha[((minY + sy) * width + (minX + sx)) * 4 + 3]
+          n++
+        }
+      }
+      out[((offY + y) * size + offX + x) * 4 + 3] = Math.round(sum / n)
     }
   }
   return out

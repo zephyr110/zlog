@@ -160,8 +160,9 @@
       flex-direction: column;
       align-items: center;
       gap: 10px;
-      margin-bottom: 0; /* 间距由紧随其后的 divider 承担（20px 节奏） */
     }
+    /* 特异性盖过 .content header 的 20px：首启间距由 divider 承担 */
+    .content header.brand { margin-bottom: 0; }
     .brand-logo {
       width: 44px;
       height: 44px;
@@ -484,37 +485,37 @@
       <div class="section">
         <div class="field">
           <label for="vercelApiToken">Vercel API Token</label>
-            <input id="vercelApiToken" type="password" placeholder="Vercel 控制台 → Settings → Tokens" />
-          </div>
-          <div class="field">
-            <label for="vercelProjectId">Vercel Project ID</label>
-            <input id="vercelProjectId" placeholder="项目 Settings → General 页面底部" />
-          </div>
-          <div class="field">
-            <label for="vercelTeamId">Vercel Team ID（团队项目才需要）</label>
-            <input id="vercelTeamId" placeholder="留空表示个人项目" />
-          </div>
-          <div class="field">
-            <label for="gaPropertyId">GA4 媒体资源 ID</label>
-            <input id="gaPropertyId" placeholder="123456789" />
-          </div>
-          <div class="field">
-            <label for="gaClientEmail">GA4 服务账号邮箱</label>
-            <input id="gaClientEmail" placeholder="xxx@project.iam.gserviceaccount.com" />
-          </div>
-          <div class="field">
-            <label for="gaPrivateKey">GA4 服务账号私钥</label>
-            <input id="gaPrivateKey" type="password" placeholder="-----BEGIN PRIVATE KEY-----" />
-          </div>
-          <p class="hint">服务账号需在 GA4 媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节</p>
+          <input id="vercelApiToken" type="password" placeholder="Vercel 控制台 → Settings → Tokens" />
         </div>
+        <div class="field">
+          <label for="vercelProjectId">Vercel Project ID</label>
+          <input id="vercelProjectId" placeholder="项目 Settings → General 页面底部" />
+        </div>
+        <div class="field">
+          <label for="vercelTeamId">Vercel Team ID（团队项目才需要）</label>
+          <input id="vercelTeamId" placeholder="留空表示个人项目" />
+        </div>
+        <div class="field">
+          <label for="gaPropertyId">GA4 媒体资源 ID</label>
+          <input id="gaPropertyId" placeholder="123456789" />
+        </div>
+        <div class="field">
+          <label for="gaClientEmail">GA4 服务账号邮箱</label>
+          <input id="gaClientEmail" placeholder="xxx@project.iam.gserviceaccount.com" />
+        </div>
+        <div class="field">
+          <label for="gaPrivateKey">GA4 服务账号私钥</label>
+          <input id="gaPrivateKey" type="password" placeholder="-----BEGIN PRIVATE KEY-----" />
+        </div>
+        <p class="hint">服务账号需在 GA4 媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节</p>
+      </div>
     </section>
 
     <!-- 面板：数据目录 -->
     <section class="panel" id="panel-data">
       <div class="data-card">
         <p class="hint">
-          博客数据保存在用户数据目录：<code>zlog.db</code>（本地数据库）、
+          数据保存在用户数据目录：<code>zlog.db</code>（本地数据库）、
           <code>zlog-config.json</code>（配置）、<code>logs/</code>（日志）。
           备份该目录即备份整个博客
         </p>
@@ -529,8 +530,7 @@
 
     <div class="actions-bar">
       <button class="primary" id="saveBtn">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg>
-        保存并启动
+        <span id="saveBtnLabel">保存并启动</span>
       </button>
       <button class="secondary" id="syncBtn">立即同步</button>
     </div>

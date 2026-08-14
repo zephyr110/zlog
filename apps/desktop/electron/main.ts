@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { ConfigStore, type DesktopConfig } from "./config-store"
 import { ServerManager } from "./server-manager"
 import { buildServerEnv } from "./server-env"
+import { isValidSyncUrl } from "./validate"
 import { createTray, updateTraySyncStatus, type TrayActions } from "./tray"
 
 // 测试与 CI：可覆盖 userData 目录（Playwright 冒烟测试使用）。
@@ -42,6 +43,12 @@ async function main() {
   let mainWindow: BrowserWindow | null = null
   let firstRunWindow: BrowserWindow | null = null
   let config: DesktopConfig | null = configStore.load()
+  // 旧版本可能写入过非法 syncUrl（校验是后加的）——启动时兜底清除，
+  // 否则 libsql 原生客户端解析 panic、服务器每次启动即崩溃
+  if (config?.syncUrl && !isValidSyncUrl(config.syncUrl)) {
+    config = { ...config, syncUrl: undefined, syncToken: undefined }
+    configStore.save(config)
+  }
   const logDir = join(app.getPath("userData"), "logs")
 
   const tray = createTray({
@@ -102,21 +109,35 @@ async function main() {
       })
       // 站内跳转策略：admin 的「查看线上」等链接是相对路径（target=_blank，
       // 解析后指向本地 origin）——在应用内导航而非丢给浏览器；外部链接
-      // （GitHub/社交/远程站点）仍走系统浏览器。同窗口点击外部链接时
-      // 也不让窗口离开应用（拦截后转交浏览器）。
-      const localOrigin = serverManager.url
+      // （GitHub/社交/远程站点，仅 http/https）仍走系统浏览器。同窗口点击
+      // 外部链接时也不让窗口离开应用（拦截后转交浏览器）。
+      //
+      // 每次事件实时求值（不缓存 origin）：config:save 会重启服务器并换端口，
+      // 缓存的旧 origin 会让保存后的所有站内链接被误判为外部。
+      const isLocalUrl = (raw: string): boolean => {
+        try {
+          const u = new URL(raw)
+          if (u.protocol !== "http:" && u.protocol !== "https:") return false
+          return u.origin === new URL(serverManager.url).origin
+        } catch {
+          return false
+        }
+      }
+      const openExternalIfWeb = (raw: string) => {
+        if (/^https?:\/\//.test(raw)) void shell.openExternal(raw)
+      }
       mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        if (url.startsWith(localOrigin)) {
+        if (isLocalUrl(url)) {
           void mainWindow?.loadURL(url)
         } else {
-          void shell.openExternal(url)
+          openExternalIfWeb(url) // javascript:/file:/自定义协议一律丢弃
         }
         return { action: "deny" }
       })
       mainWindow.webContents.on("will-navigate", (event, url) => {
-        if (!url.startsWith(localOrigin)) {
+        if (!isLocalUrl(url)) {
           event.preventDefault()
-          void shell.openExternal(url)
+          openExternalIfWeb(url)
         }
       })
       mainWindow.on("closed", () => { mainWindow = null })
@@ -153,7 +174,8 @@ async function main() {
   }
 
   async function requestSyncNow(): Promise<void> {
-    if (!serverManager.url) return
+    // url 恒为真（端口 0 时返回 http://127.0.0.1:0），必须用 port 判断
+    if (serverManager.port <= 0) return
     try {
       const res = await fetch(`${serverManager.url}/api/sync`, {
         method: "POST",
@@ -215,10 +237,11 @@ async function main() {
         gaPrivateKey: cfg.gaPrivateKey?.trim() || undefined,
       }
     }
-    // 与渲染层同源的防御性校验：非法 syncUrl 会让 libsql 原生客户端
-    // 在解析时 panic、整个服务器进程崩溃（真实事故：URL 字段误填用户名）
-    if (config.syncUrl && !/^(libsql|file):\/\//.test(config.syncUrl)) {
-      return { ok: false, error: "数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io。" }
+    // 与渲染层同源的防御性校验（唯一权威实现见 validate.ts）：非法
+    // syncUrl 会让 libsql 原生客户端解析时 panic、拖垮整个服务器进程
+    // （真实事故：URL 字段误填用户名）。校验先于 config 合并执行。
+    if (cfg.syncUrl?.trim() && !isValidSyncUrl(cfg.syncUrl.trim())) {
+      return { ok: false, error: "数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io" }
     }
     configStore.save(config)
     // 配置变更（同步信息）后重启服务器使 env 生效

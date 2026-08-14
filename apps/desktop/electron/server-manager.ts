@@ -63,7 +63,8 @@ export class ServerManager {
       if (!aborted) this.onExit(code)
     })
     try {
-      await this.waitHealthy(this.currentPort, 30_000)
+      // 60s：负载下 Next 冷启动可超过 30s（CI/本机并发时实测超时）
+      await this.waitHealthy(this.currentPort, 60_000)
     } catch (err) {
       // 回滚：未就绪即失败时终止刚拉起的子进程，否则它残留运行、
       // 占住端口与 db（stop() 的引用已清空，无法再终止它）。

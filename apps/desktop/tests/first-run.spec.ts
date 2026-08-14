@@ -35,7 +35,7 @@ test("first-run wizard saves config and boots the blog server", async () => {
     // 4) 向导关闭，博客窗口出现并加载本地服务器
     const blog = await app.waitForEvent("window", {
       predicate: (w) => w.url().startsWith("http://127.0.0.1:"),
-      timeout: 60_000,
+      timeout: 120_000,
     })
     await blog.waitForLoadState("domcontentloaded")
     expect(blog.url()).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/)
