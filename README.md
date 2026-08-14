@@ -91,6 +91,34 @@ Turso database (offline writes sync back when you are online).
 > Unsigned builds: macOS Gatekeeper and Windows SmartScreen will warn —
 > right-click → Open on macOS, "More info → Run anyway" on Windows.
 
+## Running web + desktop together (account model)
+
+The web deploy (Vercel), the desktop app and Turso are one system. Three
+rules keep all of them working at once:
+
+1. **One database.** Point the desktop's sync URL/token and the Vercel
+   `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` at the **same** Turso
+   database. That single DB is the shared source of truth.
+2. **One admin account.** The `users` table has a single row, seeded
+   from env only when the table is empty ("seed on first login").
+   Use the **same username and password** for the desktop wizard and
+   for Vercel's `ADMIN_USERNAME`/`ADMIN_PASSWORD_HASH`. If the two ends
+   seed different passwords before the first sync converges, the sync
+   (last-write-wins) overwrites one of them and that end can no longer
+   log in.
+3. **Order: web first, then desktop.** Deploy Vercel and log in once to
+   seed the admin, then install the desktop app and enter the same
+   credentials in the wizard. After the first sync both ends log in
+   with the same password. (Desktop `SESSION_SECRET` is generated per
+   install and independent of Vercel's — no conflict.)
+
+The image-hosting repo (`BLOG_IMG_*`) is **optional** everywhere: media
+bytes live in the Turso database and sync with it, so the desktop app
+needs no GitHub token at all; on Vercel, unset `BLOG_IMG_*` just means
+images are served from the database API instead of the jsdelivr CDN.
+GitHub Pages (static mirror) additionally needs `GH_PAT`, unrelated to
+the desktop app.
+
 Design spec: `docs/superpowers/specs/2026-08-13-desktop-app-design.md`
 
 ## Getting Started

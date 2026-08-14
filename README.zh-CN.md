@@ -85,6 +85,16 @@ CI 执行 `pnpm export`（`NEXT_EXPORT=true`），在**构建时**查询 Turso�
 
 > 免签名构建：macOS Gatekeeper 与 Windows SmartScreen 会提示警告——macOS 右键 → 打开，Windows「更多信息 → 仍要运行」。
 
+## Web 端与桌面端并用（账号模型）
+
+Web 端（Vercel）、桌面应用与 Turso 是一个整体。三条规则保证三者同时正常工作：
+
+1. **同一个数据库。** 桌面端的同步 URL/token 与 Vercel 的 `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` 必须指向**同一个** Turso 库——这个库就是共享的数据源。
+2. **同一个管理员账号。** `users` 表只有一行，且只在表为空时从环境变量 seed（"首次登录时播种"）。桌面向导与 Vercel 的 `ADMIN_USERNAME`/`ADMIN_PASSWORD_HASH` 必须使用**相同的用户名和密码**。若两端在首次同步收敛前用不同密码各自 seed，同步（last-write-wins）会覆盖其中一端的哈希，那一端将无法再登录。
+3. **顺序：先 Web 后桌面。** 先部署 Vercel 并登录一次种下管理员，再安装桌面应用，在向导中填入同一账号密码。首次同步后两端即可用同一密码登录。（桌面端的 `SESSION_SECRET` 每台安装随机生成，与 Vercel 独立，互不冲突。）
+
+图床仓库（`BLOG_IMG_*`）在**任何一端都是可选的**：媒体字节存放在 Turso 数据库中并随其同步，桌面端完全不需要 GitHub token；Vercel 上不配 `BLOG_IMG_*` 只是图片改为经数据库 API 提供而非 jsdelivr CDN。GitHub Pages（静态镜像）另外需要 `GH_PAT`，与桌面端无关。
+
 设计文档：`docs/superpowers/specs/2026-08-13-desktop-app-design.md`
 
 ## Getting Started
