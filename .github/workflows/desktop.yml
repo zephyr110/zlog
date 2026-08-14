@@ -3,8 +3,10 @@ name: desktop
 on:
   push:
     tags:
-      # 桌面端版本号取 tag（如 v1.2.3）；语义化 tag 推送即触发三平台构建
-      - "v*"
+      # 桌面端版本号取 tag（如 v1.2.3）；语义化 tag 推送即触发三平台构建。
+      # 只匹配 v 前缀 + 数字开头（v[0-9]*，glob 不支持完整 SemVer），
+      # 非 SemVer tag（如 vfoo、desktop-v0.1.0-ci）不触发（规范见 CLAUDE.md）
+      - "v[0-9]*"
   workflow_dispatch: {}
 
 jobs:
