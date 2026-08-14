@@ -127,8 +127,11 @@
       outline: none;
       transition: background-color 0.12s ease, color 0.12s ease;
     }
-    .nav-item:hover { background: color-mix(in oklch, var(--accent) 70%, transparent); color: var(--accent-foreground); }
-    .nav-item.active { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+    /* shadcn 侧栏交互：hover 与选中均为实色 accent 块（color-mix 半透明
+       在深色主题下会发灰且深浅不一）；active 不加粗（与 shadcn Sidebar
+       一致，层次靠背景色而非字重） */
+    .nav-item:hover { background: var(--accent); color: var(--accent-foreground); }
+    .nav-item.active { background: var(--accent); color: var(--accent-foreground); }
     .nav-item:focus-visible {
       box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
     }
@@ -151,7 +154,7 @@
       text-decoration: none;
       transition: background-color 0.12s ease, color 0.12s ease;
     }
-    .sidebar-footer a:hover { background: color-mix(in oklch, var(--accent) 70%, transparent); color: var(--accent-foreground); }
+    .sidebar-footer a:hover { background: var(--accent); color: var(--accent-foreground); }
     .sidebar-footer a:focus-visible {
       box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
       outline: none;
@@ -164,6 +167,8 @@
       display: flex;
       flex-direction: column;
       padding: 24px;
+      /* 显式声明（shadcn 内容区 = background）：不依赖 body 继承 */
+      background: var(--background);
     }
     .content header { margin-bottom: 20px; }
     .content h1 {
@@ -253,7 +258,7 @@
       transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
     input::placeholder { color: var(--muted-foreground); opacity: 0.6; }
-    input:hover { border-color: oklch(0.708 0 0); }
+    input:hover { border-color: var(--ring); }
     input:focus-visible {
       border-color: var(--ring);
       box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
