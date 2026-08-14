@@ -183,6 +183,11 @@ async function main() {
     } finally {
       stopping = false
     }
+    // 首启/配置变更后立即执行一次初始同步（设计文档 §4 承诺"首次同步
+    // 全量拉取"；libsql 的 syncInterval 首个周期要等 300s，不能依赖它）。
+    if (config.syncUrl) {
+      void requestSyncNow()
+    }
     firstRunWindow?.close()
     firstRunWindow = null
     return { ok: true }

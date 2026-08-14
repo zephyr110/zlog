@@ -24,6 +24,13 @@ async function refreshStatus() {
   renderStatus(await zlog.getSyncStatus())
 }
 
+// 首启向导里服务器尚未启动，「立即同步」会静默失败——禁用并给出原因提示
+if (isFirstRun) {
+  const syncBtn = document.getElementById("syncBtn")
+  syncBtn.disabled = true
+  syncBtn.title = "保存并启动博客后，可在设置中同步"
+}
+
 document.getElementById("saveBtn").addEventListener("click", async () => {
   const cfg = {
     username: document.getElementById("username").value.trim(),
