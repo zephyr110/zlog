@@ -1,5 +1,5 @@
 import { type Client } from "@libsql/client"
-import { getDb } from "./db"
+import { requireDb } from "./db"
 import { type Post, type PostSummary } from "@zlog/core"
 import { toPostSummary } from "@zlog/core"
 import { safeSlug } from "@zlog/core"
@@ -30,17 +30,6 @@ CREATE INDEX IF NOT EXISTS idx_posts_draft ON posts(draft);
 `
 
 // ── Helpers ─────────────────────────────────────────────────────────────
-
-function requireDb(): Client {
-  const db = getDb()
-  if (!db) {
-    throw new Error(
-      "TURSO_DATABASE_URL environment variable is required. " +
-        "Set it to a libsql:// or file: URL (and TURSO_AUTH_TOKEN for remote databases)."
-    )
-  }
-  return db
-}
 
 let tableReady: Promise<void> | null = null
 

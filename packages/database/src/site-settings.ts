@@ -1,5 +1,5 @@
 import { type Client } from "@libsql/client"
-import { getDb } from "./db"
+import { requireDb } from "./db"
 
 // ── Schema ──────────────────────────────────────────────────────────────
 // Singleton row (id = 1) for editable site identity + social links.
@@ -37,17 +37,6 @@ export interface SiteSettingsRecord {
 }
 
 export type SiteSettingsUpdate = Partial<SiteSettingsRecord>
-
-function requireDb(): Client {
-  const db = getDb()
-  if (!db) {
-    throw new Error(
-      "TURSO_DATABASE_URL environment variable is required. " +
-        "Set it to a libsql:// or file: URL (and TURSO_AUTH_TOKEN for remote databases)."
-    )
-  }
-  return db
-}
 
 let tableReady: Promise<void> | null = null
 

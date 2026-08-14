@@ -1,5 +1,5 @@
 import { type Client } from "@libsql/client"
-import { getDb } from "./db"
+import { requireDb } from "./db"
 
 // ── Schema ──────────────────────────────────────────────────────────────
 
@@ -18,17 +18,6 @@ CREATE INDEX IF NOT EXISTS idx_media_created ON media(created_at DESC);
 `
 
 // ── Helpers ─────────────────────────────────────────────────────────────
-
-function requireDb(): Client {
-  const db = getDb()
-  if (!db) {
-    throw new Error(
-      "TURSO_DATABASE_URL environment variable is required. " +
-        "Set it to a libsql:// or file: URL (and TURSO_AUTH_TOKEN for remote databases)."
-    )
-  }
-  return db
-}
 
 let tableReady: Promise<void> | null = null
 
