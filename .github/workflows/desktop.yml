@@ -31,10 +31,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 只出 arm64 dmg：macos-13（Intel/x64）runner 排队可达数小时，
-        # 且原生模块（sharp/@libsql）需随 runner 架构安装，无法在同一
-        # runner 上交叉产出（npmRebuild: false）。决策：不构建 x64 dmg。
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        # macOS 双架构：macos-latest（arm64）出 arm64 dmg；macos-15-intel
+        # 出 x64 dmg。macos-13（旧 Intel runner）已于 2025-12 退役；
+        # macos-15-intel 是 GitHub 提供的最后一个 Intel 镜像（2027-08 到期，
+        # 之后 GitHub Actions 不再有 x86_64 runner）。原生模块（sharp/
+        # @libsql）随 runner 架构安装（npmRebuild: false），无法交叉产出。
+        os: [macos-latest, macos-15-intel, windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
