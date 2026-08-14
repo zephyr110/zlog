@@ -4,6 +4,15 @@ import bcrypt from "bcryptjs"
 import { join } from "node:path"
 import { ConfigStore, type DesktopConfig } from "./config-store"
 import { LangFile, isLangPref, type LangPref, type ResolvedLang } from "./lang"
+import {
+  compareVersions,
+  downloadUpdate,
+  fetchLatestRelease,
+  openDownloadedUpdate,
+  pickAssetUrl,
+  updatesDir,
+  type UpdateCheckResult,
+} from "./updater"
 import { ServerManager } from "./server-manager"
 import { buildServerEnv } from "./server-env"
 import { isValidSyncUrl } from "./validate"
@@ -303,7 +312,57 @@ async function main() {
   ipcMain.handle("app:openDataDir", () => {
     void shell.openPath(app.getPath("userData"))
   })
+  ipcMain.handle("app:version", () => app.getVersion())
   ipcMain.handle("app:quit", () => app.quit())
+
+  // ── 更新检查与下载（关于面板） ───────────────────────────────────
+  // GitHub API 走 net.fetch（Chromium 栈，跟随系统代理）。
+  ipcMain.handle("update:check", async (): Promise<UpdateCheckResult> => {
+    const current = app.getVersion()
+    try {
+      const release = await fetchLatestRelease()
+      if (!release) return { ok: false, hasUpdate: false, current, error: "fetch" }
+      const latest = release.tag.replace(/^v/, "")
+      const hasUpdate = compareVersions(latest, current) > 0
+      return {
+        ok: true,
+        hasUpdate,
+        current,
+        latest,
+        releaseUrl: release.htmlUrl,
+        downloadUrl: hasUpdate
+          ? (pickAssetUrl(release.assets, process.platform, process.arch) ?? undefined)
+          : undefined,
+      }
+    } catch (err) {
+      return { ok: false, hasUpdate: false, current, error: String(err) }
+    }
+  })
+  ipcMain.handle("update:download", async (_e, url: unknown) => {
+    if (typeof url !== "string" || !url.startsWith("https://")) {
+      return { ok: false, error: "invalid url" }
+    }
+    const dest = join(updatesDir(), new URL(url).pathname.split("/").pop() ?? "update")
+    const sendProgress = (percent: number) =>
+      settingsWindow?.webContents.send("update:progress", { percent })
+    try {
+      await downloadUpdate(url, dest, sendProgress)
+      // 只下载不自动打开：由用户在设置窗口确认后触发（update:open）
+      return { ok: true, dest }
+    } catch (err) {
+      return { ok: false, error: String(err) }
+    }
+  })
+  ipcMain.handle("update:open", (_e, dest: unknown) => {
+    // 只允许打开 updatesDir 内的文件（渲染层传路径不可信）
+    if (typeof dest !== "string") return { ok: false, error: "invalid dest" }
+    const base = updatesDir()
+    if (dest !== base && !dest.startsWith(`${base}/`) && !dest.startsWith(`${base}\\`)) {
+      return { ok: false, error: "outside updates dir" }
+    }
+    openDownloadedUpdate(dest)
+    return { ok: true }
+  })
 
   // ── 语言（单一事实源 lang.json；每次读盘，设置窗口与 /api/lang 共享）──
   ipcMain.handle("lang:get", () => langFile.loadOrInit(systemLocale))

@@ -15,6 +15,7 @@ const I18N = {
     "nav.analytics": "流量分析",
     "nav.data": "数据目录",
     "nav.lang": "语言",
+    "nav.about": "关于",
     "firstrun.title": "Zlog 首次设置",
     "firstrun.subtitle": "创建管理员账号；同步可稍后在设置中补充",
     "settings.title": "Zlog 设置",
@@ -60,6 +61,23 @@ const I18N = {
     "lang.zh": "中文",
     "lang.en": "English",
     "lang.hint": "跟随系统时，系统语言为中文则显示中文；其他语言一律显示英文",
+    "about.title": "关于",
+    "about.subtitle": "版本信息与项目链接",
+    "about.version": "版本",
+    "about.checkUpdate": "检查更新",
+    "about.checking": "检查中…",
+    "about.upToDate": "已是最新版本",
+    "about.found": "发现新版本",
+    "about.download": "下载",
+    "about.downloading": "下载中",
+    "about.downloaded": "下载完成",
+    "about.openPackage": "打开安装包",
+    "about.checkFailed": "检查更新失败，请检查网络后重试",
+    "about.downloadFailed": "下载失败，请重试",
+    "about.noAsset": "当前平台暂无对应安装包",
+    "about.repository": "代码仓库",
+    "about.license": "开源协议",
+    "about.checkHint": "自动检查 GitHub Releases 最新版本",
     "save.firstRun": "保存并启动",
     "save.settings": "保存",
     "sync.now": "立即同步",
@@ -86,6 +104,7 @@ const I18N = {
     "nav.analytics": "Analytics",
     "nav.data": "Data Folder",
     "nav.lang": "Language",
+    "nav.about": "About",
     "firstrun.title": "Zlog First-Time Setup",
     "firstrun.subtitle": "Create an admin account; sync can be added later in Settings",
     "settings.title": "Zlog Settings",
@@ -131,6 +150,23 @@ const I18N = {
     "lang.zh": "中文",
     "lang.en": "English",
     "lang.hint": "With \"Follow System\", Chinese system languages show Chinese; anything else shows English",
+    "about.title": "About",
+    "about.subtitle": "Version info and project links",
+    "about.version": "Version",
+    "about.checkUpdate": "Check for Updates",
+    "about.checking": "Checking…",
+    "about.upToDate": "You're up to date",
+    "about.found": "New version available",
+    "about.download": "Download",
+    "about.downloading": "Downloading",
+    "about.downloaded": "Download complete",
+    "about.openPackage": "Open Installer",
+    "about.checkFailed": "Update check failed — check your network and retry",
+    "about.downloadFailed": "Download failed, please retry",
+    "about.noAsset": "No installer for this platform yet",
+    "about.repository": "Repository",
+    "about.license": "License",
+    "about.checkHint": "Automatically checks the latest GitHub Release",
     "save.firstRun": "Save & Start",
     "save.settings": "Save",
     "sync.now": "Sync Now",
@@ -181,11 +217,12 @@ function applyLang() {
 // 首启：品牌头部 + 全宽主按钮；隐藏侧栏、内容区标题、立即同步、流量分析
 // 与语言面板（首启跟随系统语言，不提供手动切换）
 if (isFirstRun) {
-  // 首启向导保持最小化：同步按钮、流量分析/数据/语言面板、内容区标题全部隐藏
+  // 首启向导保持最小化：同步按钮、流量分析/数据/语言/关于面板、内容区标题全部隐藏
   document.getElementById("syncBtn").style.display = "none"
   document.getElementById("panel-analytics").style.display = "none"
   document.getElementById("panel-data").style.display = "none"
   document.getElementById("panel-lang").style.display = "none"
+  document.getElementById("panel-about").style.display = "none"
   document.getElementById("contentHeader").style.display = "none"
   document.getElementById("username").focus()
 } else {
@@ -213,6 +250,7 @@ const PANEL_META = {
   analytics: { titleKey: "analytics.title", subtitleKey: "analytics.subtitle" },
   data: { titleKey: "data.title", subtitleKey: "data.subtitle" },
   lang: { titleKey: "lang.title", subtitleKey: "lang.subtitle" },
+  about: { titleKey: "about.title", subtitleKey: "about.subtitle" },
 }
 function renderPanelMeta() {
   const active = document.querySelector(".nav-item.active")
@@ -229,6 +267,8 @@ if (!isFirstRun) {
         panel.classList.toggle("active", panel.id === `panel-${btn.dataset.panel}`)
       }
       renderPanelMeta()
+      // 打开关于面板时自动检查一次（本窗口会话仅一次）
+      if (btn.dataset.panel === "about" && !updateChecked) void checkForUpdates()
     })
   }
 }
@@ -397,6 +437,93 @@ for (const id of [
     if (e.key === "Enter") doSave()
   })
 }
+
+// ── 关于：版本 + 更新检查 ──────────────────────────────────────────
+// 状态机：idle → checking → up-to-date | update-available
+//   → downloading → downloaded →（手动确认）opening
+const appVersionEl = document.getElementById("appVersion")
+const updateBtn = document.getElementById("updateBtn")
+const updateStatus = document.getElementById("updateStatus")
+let updateInfo = null // 最近一次检查结果（含 downloadUrl）
+let updateChecked = false // 本窗口会话是否已自动检查过
+let updateBusy = false // 检查/下载进行中（按钮禁用）
+let updateDest = null // 下载完成后的本地路径
+
+function setUpdateStatus(text, isError = false) {
+  updateStatus.textContent = text
+  updateStatus.classList.toggle("error", isError)
+}
+
+async function checkForUpdates() {
+  if (updateBusy) return
+  updateBusy = true
+  updateBtn.disabled = true
+  setUpdateStatus(t("about.checking"))
+  const res = await zlogApi.checkForUpdates().catch(() => null)
+  updateBusy = false
+  if (!res || !res.ok) {
+    setUpdateStatus(t("about.checkFailed"), true)
+    updateBtn.disabled = false
+    return
+  }
+  updateInfo = res
+  updateChecked = true
+  if (!res.hasUpdate) {
+    setUpdateStatus(`${t("about.upToDate")} ${res.current}`)
+    updateBtn.textContent = t("about.checkUpdate")
+    updateBtn.disabled = false
+    return
+  }
+  if (!res.downloadUrl) {
+    setUpdateStatus(`${t("about.found")} v${res.latest} — ${t("about.noAsset")}`, true)
+    updateBtn.textContent = t("about.checkUpdate")
+    updateBtn.disabled = false
+    return
+  }
+  setUpdateStatus(`${t("about.found")} v${res.latest}`)
+  updateBtn.textContent = `${t("about.download")} v${res.latest}`
+  updateBtn.disabled = false
+}
+
+async function downloadUpdatePackage() {
+  if (updateBusy || !updateInfo?.downloadUrl) return
+  updateBusy = true
+  updateBtn.disabled = true
+  setUpdateStatus(`${t("about.downloading")} 0%`)
+  const res = await zlogApi.downloadUpdate(updateInfo.downloadUrl).catch(() => null)
+  updateBusy = false
+  if (!res || !res.ok) {
+    setUpdateStatus(t("about.downloadFailed"), true)
+    updateBtn.textContent = `${t("about.download")} v${updateInfo.latest}`
+    updateBtn.disabled = false
+    return
+  }
+  updateDest = res.dest
+  setUpdateStatus(`${t("about.downloaded")} v${updateInfo.latest}`)
+  updateBtn.textContent = t("about.openPackage")
+  updateBtn.disabled = false
+}
+
+// 主进程流式下载进度（百分比文本）
+zlogApi.onUpdateProgress(({ percent }) => {
+  if (updateBusy) setUpdateStatus(`${t("about.downloading")} ${percent}%`)
+})
+
+updateBtn.addEventListener("click", () => {
+  if (updateBtn.disabled) return
+  if (updateDest) {
+    void zlogApi.openUpdate(updateDest)
+  } else if (updateInfo?.hasUpdate && updateInfo.downloadUrl) {
+    void downloadUpdatePackage()
+  } else {
+    void checkForUpdates()
+  }
+})
+
+// 版本号常驻显示（无需网络）
+zlogApi.getVersion().then((v) => {
+  if (v) appVersionEl.textContent = v
+})
 
 // ── 其他操作 ──────────────────────────────────────────────────────────
 document.getElementById("syncBtn").addEventListener("click", async () => {
