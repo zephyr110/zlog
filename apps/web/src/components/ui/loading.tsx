@@ -60,22 +60,9 @@ export function PostFeedSkeleton({ count = 6 }: { count?: number }) {
   )
 }
 
-export function CardSkeleton({ count = 4 }: { count?: number }) {
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-xl border bg-card p-6 space-y-3">
-          <Skeleton className="h-3 w-1/2" />
-          <Skeleton className="h-8 w-1/3" />
-        </div>
-      ))}
-    </div>
-  )
-}
-
 /** Admin posts table skeleton — mirrors title / status / pin / date /
  *  tags / actions columns and the sticky header chrome. */
-export function TableSkeleton({ rows = 5 }: { rows?: number }) {
+function TableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div className="min-h-0 flex-1 overflow-hidden rounded-xl border bg-card">
       {/* Header row — title ~32%, status/date wider, tags take the rest */}

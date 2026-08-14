@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, createContext } from "react"
+import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { AdminSidebar, AdminSidebarTrigger } from "@/components/admin/admin-sidebar"
 import { CommentUnreadProvider } from "@/components/admin/comment-unread"
@@ -10,8 +10,6 @@ import { useT } from "@/components/layout/trans"
 import { cn } from "@/lib/utils"
 import { type AuthUser } from "@zlog/auth"
 import type { TranslationPath } from "@/lib/i18n"
-
-export const SidebarCollapsedContext = createContext(false)
 
 /** Page title/subtitle shown in the top header, keyed by exact pathname.
  *  descKey is optional — editor pages use title only (+ optional

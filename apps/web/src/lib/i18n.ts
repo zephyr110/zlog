@@ -21,7 +21,7 @@ export const localeLabels: Record<Locale, string> = {
   en: "English",
 }
 
-export const translations = {
+const translations = {
   zh: {
     site: site.zh,
     post: post.zh,
@@ -46,7 +46,7 @@ export const translations = {
   },
 } as const
 
-export type TranslationDict = typeof translations.zh
+type TranslationDict = typeof translations.zh
 
 /** Dot-path to a leaf string or formatter in the dictionary. */
 type Leaves<T, P extends string = ""> = T extends (

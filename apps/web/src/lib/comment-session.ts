@@ -20,9 +20,9 @@
 
 import { COMMENT_MIN_SUBMIT_DELAY_MS } from "@/lib/comment-shared"
 
-export const SESSION_TTL_MS = 5 * 60 * 1000
+const SESSION_TTL_MS = 5 * 60 * 1000
 
-export interface CommentSessionPayload {
+interface CommentSessionPayload {
   postSlug: string
   ipHash: string
   issuedAt: number // epoch ms

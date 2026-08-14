@@ -9,7 +9,6 @@ export {
   setPostPinned,
   getHomepageLatestPosts,
   getAllTags,
-  getAllCategories,
   getPostsByCategory,
   getPostsByTag,
 } from "./content"
@@ -57,7 +56,7 @@ export type {
   AdminCommentPage,
 } from "./comments"
 // Re-export domain logic from core for backwards compatibility.
-export { safeSlug, slugify, computeReadingStats, toPostSummary } from "@zlog/core"
-export type { Post, PostSummary, AuthUser } from "@zlog/core"
+export { slugify, computeReadingStats } from "@zlog/core"
+export type { Post, PostSummary } from "@zlog/core"
 export type { UserRecord } from "./users"
 export { runSync, scheduleSync, getSyncStatus, isSyncConfigured } from "./sync"

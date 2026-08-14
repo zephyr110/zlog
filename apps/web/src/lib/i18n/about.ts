@@ -24,7 +24,6 @@ styling: "实用优先的响应式样式",
 content: "通过 Markdown + JSX 编写丰富内容",
 database: "边缘分布式 SQLite 数据库",
 hosting: "全球边缘网络部署",
-cicd: "Git 推送自动构建部署",
     
 } as const
 
@@ -52,7 +51,6 @@ styling: "Utility-first responsive styling",
 content: "Rich content with Markdown + JSX",
 database: "Edge-distributed SQLite database",
 hosting: "Global edge network deployment",
-cicd: "Automated build and deploy on push",
     
 } as const satisfies LocaleMessages<typeof zh>
 

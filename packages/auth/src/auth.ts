@@ -241,7 +241,7 @@ export function generateRecoveryKey(): string {
  * not exist, has no key set, or the key doesn't match — callers surface a
  * single generic error to avoid user enumeration.
  */
-export async function verifyRecoveryKey(
+async function verifyRecoveryKey(
   username: string,
   key: string
 ): Promise<boolean> {

@@ -23,7 +23,7 @@ import { useT } from "@/components/layout/trans"
 import { cn } from "@/lib/utils"
 import type { Locale } from "@/lib/i18n"
 
-export interface CountryDatum {
+interface CountryDatum {
   /** ISO 3166-1 alpha-2 (GA countryId), used to locate the pin. */
   code: string
   name: string

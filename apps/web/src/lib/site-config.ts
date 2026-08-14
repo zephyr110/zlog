@@ -74,9 +74,6 @@ export const defaultSiteConfig: SiteConfig = {
   commentEnabled: true,
 }
 
-/** @deprecated Prefer getSiteConfig() / useSiteConfig() — kept for sync env fields. */
-export const siteConfig = defaultSiteConfig
-
 export const DEFAULT_SITE_LOGO = "/logo.svg"
 /** White-glyph variant of the built-in mark, used in dark mode so the
  *  logo never needs a CSS invert filter (filter forces bitmap

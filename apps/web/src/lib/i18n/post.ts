@@ -5,7 +5,6 @@ import type { LocaleMessages } from "./locale-messages"
 const zh = {
 
 minRead: (n: number) => `${n} 分钟`,
-comments: "评论",
 commentsCount: (n: number) => `评论 (${n})`,
 commentAuthorPlaceholder: "昵称（可选）",
 commentEmailPlaceholder: "邮箱（可选）",
@@ -30,7 +29,6 @@ commentErrorFailed: "提交失败，请重试",
 commentMirrorUnavailable: "评论功能仅在主站可用，请访问 zephyr110.vercel.app",
 commentRetry: "重试",
 relatedPosts: "相关文章",
-shareOnX: "分享到 X",
 copyLink: "复制链接",
 linkCopied: "链接已复制！",
 copyFailed: "复制失败",
@@ -56,7 +54,6 @@ shortDate: (d: Date) =>
 const en = {
 
 minRead: (n: number) => `${n} min`,
-comments: "Comments",
 commentsCount: (n: number) => `Comments (${n})`,
 commentAuthorPlaceholder: "Name (optional)",
 commentEmailPlaceholder: "Email (optional)",
@@ -81,7 +78,6 @@ commentErrorFailed: "Failed to post, please retry",
 commentMirrorUnavailable: "Comments are only available on the main site — visit zephyr110.vercel.app",
 commentRetry: "Retry",
 relatedPosts: "Related posts",
-shareOnX: "Share on X",
 copyLink: "Copy link",
 linkCopied: "Link copied!",
 copyFailed: "Copy failed",

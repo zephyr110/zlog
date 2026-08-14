@@ -1,6 +1,6 @@
 import sharp from "sharp"
 
-export interface CompressedImage {
+interface CompressedImage {
   buffer: Buffer
   mime: string
   ext: string
@@ -11,7 +11,7 @@ export interface CompressedImage {
 const MAX_EDGE = 4096
 
 /** Quality from BLOG_IMG_QUALITY (default 80), clamped to [1, 100]. */
-export function imageCompressQuality(): number {
+function imageCompressQuality(): number {
   const parsed = parseInt(process.env.BLOG_IMG_QUALITY ?? "", 10)
   return Number.isFinite(parsed) && parsed >= 1 && parsed <= 100 ? parsed : 80
 }

@@ -12,7 +12,7 @@ const sizeClass = {
   lg: "size-7 border-2",
 } as const
 
-export type SpinnerSize = keyof typeof sizeClass
+type SpinnerSize = keyof typeof sizeClass
 
 /**
  * Loading spinner. Pass `fill` for page/block loaders so it expands and
