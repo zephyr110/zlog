@@ -20,14 +20,14 @@ if (isFirstRun) {
   document.getElementById("saveBtn").textContent = "保存"
   document.getElementById("title2").textContent = "同步设置"
   document.getElementById("subtitle2").textContent =
-    "配置 Turso 双向同步；未配置则纯本地运行。"
+    "配置 Turso 双向同步；未配置则纯本地运行"
 }
 
 // ── 侧栏面板切换（设置模式） ────────────────────────────────────────
 const PANEL_META = {
-  sync: { title: "同步设置", subtitle: "配置 Turso 双向同步；未配置则纯本地运行。" },
-  analytics: { title: "流量分析", subtitle: "线上站点流量的只读报表；桌面端不发送埋点数据。" },
-  data: { title: "数据目录", subtitle: "博客数据与备份位置。" },
+  sync: { title: "同步设置", subtitle: "配置 Turso 双向同步；未配置则纯本地运行" },
+  analytics: { title: "流量分析", subtitle: "线上站点流量的只读报表；桌面端不发送埋点数据" },
+  data: { title: "数据目录", subtitle: "博客数据与备份位置" },
 }
 if (!isFirstRun) {
   for (const btn of document.querySelectorAll(".nav-item")) {

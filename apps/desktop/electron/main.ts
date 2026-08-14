@@ -259,7 +259,7 @@ async function main() {
   if (!config) {
     firstRunWindow = new BrowserWindow({
       width: 560,
-      height: 900,
+      height: 920,
       title: "Zlog 首次设置",
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },
