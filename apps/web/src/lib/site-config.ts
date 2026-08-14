@@ -74,9 +74,9 @@ export const defaultSiteConfig: SiteConfig = {
   commentEnabled: true,
 }
 
-export const DEFAULT_SITE_LOGO = "/logo.svg"
-/** White-glyph variant of the built-in mark, used in dark mode so the
- *  logo never needs a CSS invert filter (filter forces bitmap
+export const DEFAULT_SITE_LOGO = "/zlog-logo.png"
+/** White-glyph variant of the legacy vector marks, used in dark mode so
+ *  the logo never needs a CSS invert filter (filter forces bitmap
  *  rasterization, which renders jagged on some engines/HiDPI setups). */
 export const DEFAULT_SITE_LOGO_DARK = "/logo-dark.svg"
 /** Built-in favicon mark — also the fallback the /icon route serves. */
@@ -86,9 +86,14 @@ export function siteLogoSrc(config: Pick<SiteConfig, "logoUrl">): string {
   return config.logoUrl || DEFAULT_SITE_LOGO
 }
 
-/** True when src is a known built-in mark (not a custom upload). */
+/** True when src is a vector mark that HAS a dedicated dark variant file
+ *  (logo.svg ↔ logo-dark.svg swap, no CSS filter). Bitmap marks like
+ *  /zlog-logo.png and custom uploads are excluded on purpose — they use
+ *  the CSS invert fallback in dark mode instead. */
 export function isBuiltInLogoSrc(src: string): boolean {
-  return src === DEFAULT_SITE_LOGO || src === DEFAULT_SITE_LOGO_DARK ||
-    src === "/spooky.svg" || src === DEFAULT_FAVICON ||
-    src.endsWith("/logo.svg")
+  return (
+    src === "/logo.svg" ||
+    src === "/logo-dark.svg" ||
+    src === "/spooky.svg"
+  )
 }

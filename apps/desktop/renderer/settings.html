@@ -5,54 +5,195 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Zlog</title>
   <style>
-    :root { color-scheme: light dark; }
+    /* ── shadcn tokens（与 apps/web/src/app/globals.css 同源）───────
+       跟随系统主题：浅色为 :root，深色由 prefers-color-scheme 覆盖。 */
+    :root {
+      color-scheme: light;
+      --background: oklch(1 0 0);
+      --foreground: oklch(0.145 0 0);
+      --muted: oklch(0.97 0 0);
+      --muted-foreground: oklch(0.556 0 0);
+      --accent: oklch(0.97 0 0);
+      --accent-foreground: oklch(0.205 0 0);
+      --destructive: oklch(0.577 0.245 27.325);
+      --border: oklch(0.922 0 0);
+      --input: oklch(0.922 0 0);
+      --ring: oklch(0.708 0 0);
+      --primary: oklch(0.205 0 0);
+      --primary-foreground: oklch(0.985 0 0);
+      --radius: 0.625rem;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --background: oklch(0.145 0 0);
+        --foreground: oklch(0.985 0 0);
+        --muted: oklch(0.269 0 0);
+        --muted-foreground: oklch(0.708 0 0);
+        --accent: oklch(0.269 0 0);
+        --accent-foreground: oklch(0.985 0 0);
+        --destructive: oklch(0.704 0.191 22.216);
+        --border: oklch(1 0 0 / 10%);
+        --input: oklch(1 0 0 / 15%);
+        --ring: oklch(0.556 0 0);
+        --primary: oklch(0.922 0 0);
+        --primary-foreground: oklch(0.205 0 0);
+      }
+    }
+
+    /* ── 基础 ─────────────────────────────────────────────────────── */
+    * { box-sizing: border-box; }
     body {
-      font: 14px/1.6 -apple-system, "Segoe UI", Roboto, sans-serif;
-      margin: 0; padding: 24px; max-width: 480px;
-      background: Canvas; color: CanvasText;
+      margin: 0;
+      padding: 24px;
+      background: var(--background);
+      color: var(--foreground);
+      /* 与应用同源的系统 UI 字体栈（globals.css --font-sans） */
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
     }
-    h1 { font-size: 18px; margin: 0 0 16px; }
-    label { display: block; margin: 12px 0 4px; font-weight: 600; }
+
+    /* ── 头部 ─────────────────────────────────────────────────────── */
+    header { margin-bottom: 24px; }
+    h1 {
+      margin: 0 0 4px;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .subtitle {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted-foreground);
+    }
+
+    /* ── 表单 ─────────────────────────────────────────────────────── */
+    .section { display: flex; flex-direction: column; gap: 16px; }
+    .field { display: flex; flex-direction: column; }
+    label {
+      margin-bottom: 6px;
+      font-size: 13px;
+      font-weight: 500;
+    }
     input {
-      width: 100%; box-sizing: border-box; padding: 8px 10px;
-      border: 1px solid GrayText; border-radius: 6px;
-      background: Canvas; color: CanvasText; font: inherit;
+      width: 100%;
+      height: 36px; /* shadcn input h-9 */
+      padding: 0 12px;
+      font: inherit;
+      color: var(--foreground);
+      background: var(--background);
+      border: 1px solid var(--input);
+      border-radius: calc(var(--radius) - 2px); /* rounded-md */
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
-    .hint { color: GrayText; font-size: 12px; margin-top: 2px; }
+    input::placeholder { color: var(--muted-foreground); opacity: 0.6; }
+    input:hover { border-color: oklch(0.708 0 0); }
+    input:focus-visible {
+      border-color: var(--ring);
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+    }
+    .hint {
+      margin: 6px 0 0;
+      font-size: 12px;
+      color: var(--muted-foreground);
+    }
+
+    /* 分区分隔：与应用 hairline 语言一致 */
+    .divider {
+      margin: 20px 0;
+      border: 0;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── 状态区（min-height 防布局跳动） ─────────────────────────── */
+    .status {
+      min-height: 40px;
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--muted-foreground);
+      white-space: pre-line;
+    }
+    .status.error { color: var(--destructive); }
+
+    /* ── 按钮 ─────────────────────────────────────────────────────── */
+    .row { display: flex; gap: 8px; margin-top: 4px; }
     button {
-      margin-top: 18px; padding: 9px 18px; border: none; border-radius: 6px;
-      background: -apple-system-controlAccent; background: AccentColor;
-      color: Canvas; font: inherit; font-weight: 600; cursor: pointer;
+      height: 36px; /* shadcn h-9 */
+      padding: 0 16px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: calc(var(--radius) - 2px);
+      cursor: pointer;
+      outline: none;
+      transition: background-color 0.15s ease, opacity 0.15s ease;
     }
-    button.secondary { background: transparent; border: 1px solid GrayText; color: CanvasText; }
-    .status { margin-top: 16px; font-size: 12px; color: GrayText; white-space: pre-line; }
-    .row { display: flex; gap: 8px; }
-    .row button { flex: 1; }
-    #passwordFields { border-top: 1px dashed GrayText; margin-top: 16px; padding-top: 8px; }
+    button:focus-visible {
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+    }
+    /* primary（shadcn default variant） */
+    #saveBtn {
+      background: var(--primary);
+      color: var(--primary-foreground);
+      border: 1px solid transparent;
+    }
+    #saveBtn:hover:not(:disabled) { background: color-mix(in oklch, var(--primary) 90%, var(--background)); }
+    /* secondary（shadcn secondary variant） */
+    .secondary {
+      background: var(--accent);
+      color: var(--accent-foreground);
+      border: 1px solid transparent;
+    }
+    .secondary:hover:not(:disabled) { background: color-mix(in oklch, var(--accent) 80%, var(--background)); }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
-  <h1 id="title">Zlog 首次设置</h1>
-  <p class="hint" id="subtitle">
-    创建管理员账号；同步可稍后在"设置"中补充（可选）。
-  </p>
+  <header>
+    <h1 id="title">Zlog 首次设置</h1>
+    <p class="subtitle" id="subtitle">
+      创建管理员账号；同步可稍后在设置中补充（可选）。
+    </p>
+  </header>
 
-  <div id="passwordFields">
-    <label for="username">管理员用户名</label>
-    <input id="username" autocomplete="username" placeholder="admin" />
-    <label for="password">密码</label>
-    <input id="password" type="password" autocomplete="new-password" />
-    <label for="password2">确认密码</label>
-    <input id="password2" type="password" autocomplete="new-password" />
+  <div class="section" id="passwordFields">
+    <div class="field">
+      <label for="username">管理员用户名</label>
+      <input id="username" autocomplete="username" placeholder="admin" />
+    </div>
+    <div class="field">
+      <label for="password">密码</label>
+      <input id="password" type="password" autocomplete="new-password" />
+    </div>
+    <div class="field">
+      <label for="password2">确认密码</label>
+      <input id="password2" type="password" autocomplete="new-password" />
+    </div>
   </div>
 
-  <label for="syncUrl">同步数据库 URL（可选）</label>
-  <input id="syncUrl" placeholder="libsql://your-db.turso.io" />
-  <p class="hint">从 Turso 控制台复制。不填则纯本地运行，之后可补。</p>
-  <label for="syncToken">同步 Token（可选）</label>
-  <input id="syncToken" type="password" placeholder="eyJ..." />
+  <hr class="divider" />
 
-  <div class="status" id="status"></div>
+  <div class="section">
+    <div class="field">
+      <label for="syncUrl">同步数据库 URL（可选）</label>
+      <input id="syncUrl" placeholder="libsql://your-db.turso.io" />
+      <p class="hint">从 Turso 控制台复制。不填则纯本地运行，之后可补。</p>
+    </div>
+    <div class="field">
+      <label for="syncToken">同步 Token（可选）</label>
+      <input id="syncToken" type="password" placeholder="eyJ..." />
+    </div>
+  </div>
+
+  <div class="status" id="status" aria-live="polite"></div>
 
   <div class="row">
     <button id="saveBtn">保存</button>

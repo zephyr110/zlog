@@ -10,6 +10,10 @@ document.getElementById("subtitle").textContent = isFirstRun
 if (!isFirstRun) document.getElementById("passwordFields").style.display = "none"
 
 const statusEl = document.getElementById("status")
+function showStatus(text, isError = false) {
+  statusEl.textContent = text
+  statusEl.classList.toggle("error", isError)
+}
 function renderStatus(s) {
   if (!s) return
   const lines = [
@@ -17,21 +21,15 @@ function renderStatus(s) {
     s.lastSyncAt ? `上次同步：${new Date(s.lastSyncAt).toLocaleString()}` : "尚未同步",
     s.lastSyncError ? `最近错误：${s.lastSyncError}` : "",
   ]
-  statusEl.textContent = lines.filter(Boolean).join("\n")
+  showStatus(lines.filter(Boolean).join("\n"))
 }
 
 async function refreshStatus() {
   renderStatus(await zlog.getSyncStatus())
 }
 
-// 首启向导里服务器尚未启动，「立即同步」会静默失败——禁用并给出原因提示
-if (isFirstRun) {
-  const syncBtn = document.getElementById("syncBtn")
-  syncBtn.disabled = true
-  syncBtn.title = "保存并启动博客后，可在设置中同步"
-}
-
-document.getElementById("saveBtn").addEventListener("click", async () => {
+const saveBtn = document.getElementById("saveBtn")
+saveBtn.addEventListener("click", async () => {
   const cfg = {
     username: document.getElementById("username").value.trim(),
     password: document.getElementById("password").value,
@@ -40,18 +38,33 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
     syncToken: document.getElementById("syncToken").value.trim(),
   }
   if (isFirstRun && (!cfg.username || cfg.password !== cfg.password2 || cfg.password.length < 6)) {
-    statusEl.textContent = "请填写用户名，且两次密码一致并至少 6 位。"
+    showStatus("请填写用户名，且两次密码一致并至少 6 位。", true)
     return
   }
-  statusEl.textContent = "保存中…"
-  const res = await zlog.saveConfig(cfg)
-  if (res && res.ok) {
-    statusEl.textContent = "已保存，博客即将打开。"
-    if (!isFirstRun) refreshStatus()
-  } else {
-    statusEl.textContent = "保存失败，请重试。"
+  // 保存期间禁用按钮，防止双击触发两次「停止→启动」竞态
+  saveBtn.disabled = true
+  showStatus("保存中…")
+  try {
+    const res = await zlog.saveConfig(cfg)
+    if (res && res.ok) {
+      showStatus("已保存，博客即将打开。")
+      if (!isFirstRun) refreshStatus()
+    } else {
+      showStatus("保存失败，请重试。", true)
+      saveBtn.disabled = false
+    }
+  } catch {
+    showStatus("保存失败，请重试。", true)
+    saveBtn.disabled = false
   }
 })
+
+// 首启向导里服务器尚未启动，「立即同步」会静默失败——禁用并给出原因提示
+if (isFirstRun) {
+  const syncBtn = document.getElementById("syncBtn")
+  syncBtn.disabled = true
+  syncBtn.title = "保存并启动博客后，可在设置中同步"
+}
 
 document.getElementById("syncBtn").addEventListener("click", async () => {
   await zlog.runSyncNow()

@@ -1,12 +1,33 @@
 import { deflateSync } from "node:zlib"
-import { mkdirSync, writeFileSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, "..")
 
-let crcTable = null
+// ── 真实 logo 优先 ──────────────────────────────────────────────────────
+// 默认站点标志（web 包 public/，1024×1024 PNG）：同时作为桌面应用图标
+// （electron-builder 从 build/icon.png 生成 icns/ico）与托盘图标
+// （tray.ts 运行时 resize 到 16×16）。源文件缺失时退回下方占位生成器。
+const LOGO_SOURCE = join(root, "..", "..", "apps", "web", "public", "zlog-logo.png")
+const ICON_TARGET = join(root, "build", "icon.png")
+const TRAY_TARGET = join(root, "assets", "tray.png")
+
+if (existsSync(LOGO_SOURCE)) {
+  mkdirSync(join(root, "assets"), { recursive: true })
+  mkdirSync(join(root, "build"), { recursive: true })
+  copyFileSync(LOGO_SOURCE, ICON_TARGET)
+  copyFileSync(LOGO_SOURCE, TRAY_TARGET)
+  console.log("icons copied from", LOGO_SOURCE)
+} else {
+  console.warn(`zlog-logo.png not found at ${LOGO_SOURCE} — generating placeholder icons`)
+  generatePlaceholderIcons()
+}
+
+/** 占位图标生成器：纯色深灰方块（零依赖 PNG 编码）。 */
+function generatePlaceholderIcons() {
+  let crcTable = null
 function crc32(buf) {
   if (!crcTable) {
     crcTable = new Int32Array(256)
@@ -57,10 +78,11 @@ function png(size, rgba) {
   ])
 }
 
-// 占位图标：深灰方块（后续设计正式图标时替换）。
-const COLOR = [38, 38, 38, 255]
-mkdirSync(join(root, "assets"), { recursive: true })
-mkdirSync(join(root, "build"), { recursive: true })
-writeFileSync(join(root, "assets/tray.png"), png(32, COLOR))
-writeFileSync(join(root, "build/icon.png"), png(512, COLOR))
-console.log("generated assets/tray.png + build/icon.png")
+  // 占位图标：深灰方块（真实 logo 缺失时的兜底）。
+  const COLOR = [38, 38, 38, 255]
+  mkdirSync(join(root, "assets"), { recursive: true })
+  mkdirSync(join(root, "build"), { recursive: true })
+  writeFileSync(join(root, "assets/tray.png"), png(32, COLOR))
+  writeFileSync(join(root, "build/icon.png"), png(512, COLOR))
+  console.log("generated assets/tray.png + build/icon.png")
+}
