@@ -190,7 +190,9 @@
     body.mode-settings .panel { display: none; }
     body.mode-settings .panel.active { display: block; }
     .section { display: flex; flex-direction: column; gap: 16px; }
-    .section + .section { margin-top: 22px; }
+    /* 区块间距仅首启模式需要（账号区与同步区间）；设置模式下账号区隐藏，
+       兄弟选择器仍按 DOM 匹配会给同步区加 22px，破坏三个面板的 20px 一致 */
+    body.mode-firstrun .section + .section { margin-top: 22px; }
     .section-title {
       display: flex;
       align-items: baseline;
@@ -412,7 +414,7 @@
       <img class="brand-logo" src="../assets/tray.png" alt="" />
       <h1 id="title">Zlog 首次设置</h1>
       <p class="subtitle" id="subtitle">
-        创建管理员账号；同步可稍后在设置中补充（可选）
+        创建管理员账号；同步可稍后在设置中补充
       </p>
     </header>
 
@@ -442,8 +444,10 @@
         </div>
       </div>
 
-      <div class="section" style="margin-top: 22px">
-        <!-- 面板标题由内容区头部承载；此标题仅首启模式（无头部）需要 -->
+      <div class="section">
+        <!-- 面板标题由内容区头部承载；此标题仅首启模式（无头部）需要。
+             区块间距交给 .section + .section（首启两区块间 22px）；
+             设置模式下账号区隐藏后本区块紧跟头部 20px，与其余面板一致 -->
         <h2 class="section-title panel-title">同步设置<span class="tag">可选</span></h2>
         <div class="field">
           <label for="syncUrl">数据库 URL</label>
