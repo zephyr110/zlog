@@ -14,6 +14,8 @@ document.getElementById("saveBtn").textContent = isFirstRun ? "保存并启动" 
 if (isFirstRun) {
   // 首启向导里服务器尚未启动，「立即同步」无意义——隐藏
   document.getElementById("syncBtn").style.display = "none"
+  // 流量分析属高级配置，首启保持最小化——整个区块隐藏
+  document.getElementById("analyticsSection").style.display = "none"
   // 首字段自动聚焦，回车直接提交
   document.getElementById("username").focus()
 } else {
@@ -65,6 +67,13 @@ async function doSave() {
     password2: document.getElementById("password2").value,
     syncUrl: document.getElementById("syncUrl").value.trim(),
     syncToken: document.getElementById("syncToken").value.trim(),
+    // 流量分析（设置模式可见；首启模式下区块隐藏，值恒为空）
+    vercelApiToken: document.getElementById("vercelApiToken").value.trim(),
+    vercelProjectId: document.getElementById("vercelProjectId").value.trim(),
+    vercelTeamId: document.getElementById("vercelTeamId").value.trim(),
+    gaPropertyId: document.getElementById("gaPropertyId").value.trim(),
+    gaClientEmail: document.getElementById("gaClientEmail").value.trim(),
+    gaPrivateKey: document.getElementById("gaPrivateKey").value.trim(),
   }
   // 校验失败：定位到出问题的字段并给出 aria-invalid
   const username = document.getElementById("username")

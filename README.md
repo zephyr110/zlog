@@ -91,6 +91,12 @@ Turso database (offline writes sync back when you are online).
 > Unsigned builds: macOS Gatekeeper and Windows SmartScreen will warn —
 > right-click → Open on macOS, "More info → Run anyway" on Windows.
 
+> Analytics note: the desktop app's traffic reports are a read-only
+> dashboard for the **online** site (configured in app Settings, or via
+> the usual env vars on Vercel). The desktop never sets
+> `NEXT_PUBLIC_GA_MEASUREMENT_ID` — local visits must not pollute your
+> GA4 data.
+
 ## Running web + desktop together (account model)
 
 The web deploy (Vercel), the desktop app and Turso are one system. Three

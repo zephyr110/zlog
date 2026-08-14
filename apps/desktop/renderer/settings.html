@@ -157,6 +157,31 @@
       font-size: 12px;
       color: var(--muted-foreground);
     }
+
+    /* ── 流量分析折叠区块 ────────────────────────────────────────── */
+    .analytics {
+      margin-top: 22px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+    .analytics summary {
+      list-style: none;
+      cursor: pointer;
+      user-select: none;
+      border-radius: 4px;
+    }
+    .analytics summary::-webkit-details-marker { display: none; }
+    .analytics summary:hover h2 { color: var(--foreground); }
+    .analytics summary h2 { transition: color 0.15s ease; }
+    .analytics summary::after {
+      content: "▾";
+      float: right;
+      font-size: 11px;
+      color: var(--muted-foreground);
+      transition: transform 0.15s ease;
+    }
+    .analytics[open] summary::after { transform: rotate(180deg); }
+    .analytics-body { margin-top: 14px; }
     a {
       color: var(--primary);
       text-decoration: none;
@@ -272,6 +297,42 @@
       <a href="https://docs.turso.tech/cli/db/tokens/create" target="_blank" rel="noopener">Token 文档</a>
     </p>
   </div>
+
+  <details class="analytics" id="analyticsSection">
+    <summary>
+      <h2 class="section-title">流量分析<span class="tag">可选</span></h2>
+    </summary>
+    <div class="section analytics-body">
+      <p class="hint" style="margin: 0 0 2px">
+        用于查看<strong>线上站点</strong>的流量报表（只读仪表盘）；桌面端本身不发送任何埋点数据。
+      </p>
+      <div class="field">
+        <label for="vercelApiToken">Vercel API Token</label>
+        <input id="vercelApiToken" type="password" placeholder="Vercel 控制台 → Settings → Tokens" />
+      </div>
+      <div class="field">
+        <label for="vercelProjectId">Vercel Project ID</label>
+        <input id="vercelProjectId" placeholder="项目 Settings → General 页面底部" />
+      </div>
+      <div class="field">
+        <label for="vercelTeamId">Vercel Team ID（团队项目才需要）</label>
+        <input id="vercelTeamId" placeholder="留空表示个人项目" />
+      </div>
+      <div class="field">
+        <label for="gaPropertyId">GA4 媒体资源 ID</label>
+        <input id="gaPropertyId" placeholder="123456789" />
+      </div>
+      <div class="field">
+        <label for="gaClientEmail">GA4 服务账号邮箱</label>
+        <input id="gaClientEmail" placeholder="xxx@project.iam.gserviceaccount.com" />
+      </div>
+      <div class="field">
+        <label for="gaPrivateKey">GA4 服务账号私钥</label>
+        <input id="gaPrivateKey" type="password" placeholder="-----BEGIN PRIVATE KEY-----" />
+      </div>
+      <p class="hint">服务账号需在 GA4 媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节。</p>
+    </div>
+  </details>
 
   <div class="status" id="status" aria-live="polite"></div>
 

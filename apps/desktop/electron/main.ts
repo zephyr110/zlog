@@ -100,9 +100,24 @@ async function main() {
         // sessionSecret / adminPasswordHash / desktopKey / syncToken，
         // 博客侧任何 XSS 都可能把这些密钥送出（settings / 首启向导窗口才需要）。
       })
+      // 站内跳转策略：admin 的「查看线上」等链接是相对路径（target=_blank，
+      // 解析后指向本地 origin）——在应用内导航而非丢给浏览器；外部链接
+      // （GitHub/社交/远程站点）仍走系统浏览器。同窗口点击外部链接时
+      // 也不让窗口离开应用（拦截后转交浏览器）。
+      const localOrigin = serverManager.url
       mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        if (url.startsWith("http")) void shell.openExternal(url)
+        if (url.startsWith(localOrigin)) {
+          void mainWindow?.loadURL(url)
+        } else {
+          void shell.openExternal(url)
+        }
         return { action: "deny" }
+      })
+      mainWindow.webContents.on("will-navigate", (event, url) => {
+        if (!url.startsWith(localOrigin)) {
+          event.preventDefault()
+          void shell.openExternal(url)
+        }
       })
       mainWindow.on("closed", () => { mainWindow = null })
     }
@@ -162,7 +177,18 @@ async function main() {
 
   // ── IPC ──
   ipcMain.handle("config:load", () => configStore.load())
-  ipcMain.handle("config:save", async (_e, cfg: { username?: string; password?: string; syncUrl?: string; syncToken?: string }) => {
+  ipcMain.handle("config:save", async (_e, cfg: {
+    username?: string
+    password?: string
+    syncUrl?: string
+    syncToken?: string
+    vercelApiToken?: string
+    vercelProjectId?: string
+    vercelTeamId?: string
+    gaPropertyId?: string
+    gaClientEmail?: string
+    gaPrivateKey?: string
+  }) => {
     if (!config) {
       const passwordHash = bcrypt.hashSync(String(cfg.password ?? ""), 10)
       config = {
@@ -174,7 +200,18 @@ async function main() {
         syncToken: cfg.syncToken?.trim() || undefined,
       }
     } else {
-      config = { ...config, syncUrl: cfg.syncUrl?.trim() || undefined, syncToken: cfg.syncToken?.trim() || undefined }
+      config = {
+        ...config,
+        syncUrl: cfg.syncUrl?.trim() || undefined,
+        syncToken: cfg.syncToken?.trim() || undefined,
+        // 流量分析（可选，仅设置模式填写）
+        vercelApiToken: cfg.vercelApiToken?.trim() || undefined,
+        vercelProjectId: cfg.vercelProjectId?.trim() || undefined,
+        vercelTeamId: cfg.vercelTeamId?.trim() || undefined,
+        gaPropertyId: cfg.gaPropertyId?.trim() || undefined,
+        gaClientEmail: cfg.gaClientEmail?.trim() || undefined,
+        gaPrivateKey: cfg.gaPrivateKey?.trim() || undefined,
+      }
     }
     // 与渲染层同源的防御性校验：非法 syncUrl 会让 libsql 原生客户端
     // 在解析时 panic、整个服务器进程崩溃（真实事故：URL 字段误填用户名）
