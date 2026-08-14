@@ -139,9 +139,9 @@ function classifyGaError(err: unknown): AnalyticsFetchError {
       err !== null &&
       "proxyAttempted" in err &&
       Boolean((err as { proxyAttempted?: unknown }).proxyAttempted)
-    const timeoutHint: AnalyticsTimeoutHint = process.env.VERCEL
+    const timeoutHint: AnalyticsTimeoutHint = isHostedVercel()
       ? "hosted"
-      : proxyAttempted
+      : proxyAttempted || Date.now() < skipProxyUntil
         ? "proxy"
         : "direct"
     return new AnalyticsFetchError(
@@ -192,6 +192,10 @@ function envTrim(name: string): string | undefined {
 }
 
 function resolveProxyUrl(): string | undefined {
+  // Vercel production/preview can reach Google directly. A copied
+  // HTTPS_PROXY=http://127.0.0.1:… from .env.local would point at the
+  // serverless instance’s own loopback and only add timeouts.
+  if (isHostedVercel()) return undefined
   return (
     envTrim("HTTPS_PROXY") ||
     envTrim("https_proxy") ||
@@ -200,6 +204,11 @@ function resolveProxyUrl(): string | undefined {
     envTrim("ALL_PROXY") ||
     envTrim("all_proxy")
   )
+}
+
+function isHostedVercel(): boolean {
+  const env = envTrim("VERCEL_ENV")
+  return env === "production" || env === "preview"
 }
 
 const NETWORK_ERROR_RE =
@@ -217,6 +226,12 @@ const directAgent = new Agent({
 
 let cachedProxyAgent: ProxyAgent | undefined
 let cachedProxyUrl: string | undefined
+
+/** After a proxy connect fails, skip it briefly so OAuth + batchRunReports
+ *  (and the next range switch) don’t each burn connectTimeout on a dead
+ *  proxy. Direct still runs immediately as the fallback. */
+let skipProxyUntil = 0
+const SKIP_PROXY_MS = 60_000
 
 function getProxyDispatcher(): ProxyAgent | undefined {
   const proxyUrl = resolveProxyUrl()
@@ -262,10 +277,10 @@ async function gaFetchOnce(
 }
 
 function markProxyAttempted(err: unknown): never {
-  if (typeof err === "object" && err !== null) {
-    ;(err as { proxyAttempted?: boolean }).proxyAttempted = true
-  }
-  throw err
+  const wrapped =
+    typeof err === "object" && err !== null ? err : new Error(String(err))
+  ;(wrapped as { proxyAttempted?: boolean }).proxyAttempted = true
+  throw wrapped
 }
 
 /**
@@ -281,19 +296,21 @@ async function gaFetch(
     body?: string
   }
 ): Promise<Response> {
-  const proxy = getProxyDispatcher()
+  const proxy =
+    Date.now() < skipProxyUntil ? undefined : getProxyDispatcher()
   if (proxy) {
     try {
       return await gaFetchOnce(input, init, proxy)
     } catch (proxyErr) {
+      skipProxyUntil = Date.now() + SKIP_PROXY_MS
+      cachedProxyAgent = undefined
+      cachedProxyUrl = undefined
       console.warn(
         "[analytics] HTTPS_PROXY failed; retrying Google request directly"
       )
       try {
         return await gaFetchOnce(input, init, directAgent)
       } catch {
-        cachedProxyAgent = undefined
-        cachedProxyUrl = undefined
         markProxyAttempted(proxyErr)
       }
     }
