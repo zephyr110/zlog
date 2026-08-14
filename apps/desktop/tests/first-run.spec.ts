@@ -22,8 +22,9 @@ test("first-run wizard saves config and boots the blog server", async () => {
     await wizard.waitForLoadState("domcontentloaded")
     expect(wizard.url()).toContain("settings.html?mode=firstrun")
 
-    // 2) 向导脚本必须正常运行：同步按钮在保存前禁用（服务器未启动）
-    await expect(wizard.locator("#syncBtn")).toBeDisabled()
+    // 2) 向导脚本必须正常运行：首启模式隐藏同步按钮（服务器未启动，
+    //    保存前「立即同步」无意义）
+    await expect(wizard.locator("#syncBtn")).toBeHidden()
 
     // 3) 填表并保存
     await wizard.fill("#username", "admin")

@@ -10,7 +10,15 @@ document.getElementById("title").textContent = isFirstRun ? "Zlog 首次设置" 
 document.getElementById("subtitle").textContent = isFirstRun
   ? "创建管理员账号；同步可稍后在设置中补充（可选）。"
   : "同步数据库 URL 与 Token 为空时不启用同步。"
-if (!isFirstRun) document.getElementById("passwordFields").style.display = "none"
+document.getElementById("saveBtn").textContent = isFirstRun ? "保存并启动" : "保存"
+if (isFirstRun) {
+  // 首启向导里服务器尚未启动，「立即同步」无意义——隐藏
+  document.getElementById("syncBtn").style.display = "none"
+  // 首字段自动聚焦，回车直接提交
+  document.getElementById("username").focus()
+} else {
+  document.getElementById("passwordFields").style.display = "none"
+}
 
 const statusEl = document.getElementById("status")
 function showStatus(text, isError = false) {
@@ -32,7 +40,7 @@ async function refreshStatus() {
 }
 
 const saveBtn = document.getElementById("saveBtn")
-saveBtn.addEventListener("click", async () => {
+async function doSave() {
   const cfg = {
     username: document.getElementById("username").value.trim(),
     password: document.getElementById("password").value,
@@ -40,9 +48,25 @@ saveBtn.addEventListener("click", async () => {
     syncUrl: document.getElementById("syncUrl").value.trim(),
     syncToken: document.getElementById("syncToken").value.trim(),
   }
-  if (isFirstRun && (!cfg.username || cfg.password !== cfg.password2 || cfg.password.length < 6)) {
-    showStatus("请填写用户名，且两次密码一致并至少 6 位。", true)
-    return
+  // 校验失败：定位到出问题的字段并给出 aria-invalid
+  const username = document.getElementById("username")
+  const password = document.getElementById("password")
+  const password2 = document.getElementById("password2")
+  for (const el of [username, password, password2]) el.removeAttribute("aria-invalid")
+  if (isFirstRun) {
+    if (!cfg.username) {
+      username.setAttribute("aria-invalid", "true")
+      username.focus()
+      showStatus("请填写用户名。", true)
+      return
+    }
+    if (cfg.password.length < 6 || cfg.password !== cfg.password2) {
+      password.setAttribute("aria-invalid", "true")
+      password2.setAttribute("aria-invalid", "true")
+      password.focus()
+      showStatus("密码至少 6 位，且两次输入一致。", true)
+      return
+    }
   }
   // 保存期间禁用按钮，防止双击触发两次「停止→启动」竞态
   saveBtn.disabled = true
@@ -60,13 +84,13 @@ saveBtn.addEventListener("click", async () => {
     showStatus("保存失败，请重试。", true)
     saveBtn.disabled = false
   }
-})
-
-// 首启向导里服务器尚未启动，「立即同步」会静默失败——禁用并给出原因提示
-if (isFirstRun) {
-  const syncBtn = document.getElementById("syncBtn")
-  syncBtn.disabled = true
-  syncBtn.title = "保存并启动博客后，可在设置中同步"
+}
+saveBtn.addEventListener("click", doSave)
+// 回车即提交（首启主流程的键盘可达性）
+for (const id of ["username", "password", "password2", "syncUrl", "syncToken"]) {
+  document.getElementById(id).addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doSave()
+  })
 }
 
 document.getElementById("syncBtn").addEventListener("click", async () => {

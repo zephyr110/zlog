@@ -45,23 +45,43 @@
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      padding: 24px;
+      padding: 28px 24px 24px;
       background: var(--background);
       color: var(--foreground);
-      /* 与应用同源的系统 UI 字体栈（globals.css --font-sans） */
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
         "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC",
         "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
       font-size: 14px;
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
+      /* 轻量入场：140ms 上浮渐隐；尊重系统减弱动效设置 */
+      animation: rise-in 0.14s ease-out;
+    }
+    @keyframes rise-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body { animation: none; }
     }
 
-    /* ── 头部 ─────────────────────────────────────────────────────── */
-    header { margin-bottom: 24px; }
-    h1 {
-      margin: 0 0 4px;
-      font-size: 16px;
+    /* ── 品牌头部（居中） ─────────────────────────────────────────── */
+    .brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+    .brand-logo {
+      width: 44px;
+      height: 44px;
+      border-radius: calc(var(--radius) * 1.4); /* rounded-xl */
+      box-shadow: 0 1px 2px oklch(0 0 0 / 0.08);
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 17px;
       font-weight: 600;
       letter-spacing: -0.01em;
     }
@@ -69,10 +89,35 @@
       margin: 0;
       font-size: 13px;
       color: var(--muted-foreground);
+      text-align: center;
     }
 
-    /* ── 表单 ─────────────────────────────────────────────────────── */
+    /* ── 分区分隔 ─────────────────────────────────────────────────── */
+    .divider {
+      margin: 0 0 22px;
+      border: 0;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── 区块 ─────────────────────────────────────────────────────── */
     .section { display: flex; flex-direction: column; gap: 16px; }
+    .section + .section { margin-top: 22px; }
+    .section-title {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin: 0;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: -0.005em;
+    }
+    .section-title .tag {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted-foreground);
+    }
+    .section-title .tag.req { color: var(--destructive); }
+
     .field { display: flex; flex-direction: column; }
     label {
       margin-bottom: 6px;
@@ -97,12 +142,15 @@
       border-color: var(--ring);
       box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
     }
+    input[aria-invalid="true"] {
+      border-color: var(--destructive);
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px color-mix(in oklch, var(--destructive) 35%, transparent);
+    }
     .hint {
       margin: 6px 0 0;
       font-size: 12px;
       color: var(--muted-foreground);
     }
-    /* 外链：跟随主题的 primary 色，hover 下划线 */
     a {
       color: var(--primary);
       text-decoration: none;
@@ -114,70 +162,79 @@
       box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
     }
 
-    /* 分区分隔：与应用 hairline 语言一致 */
-    .divider {
-      margin: 20px 0;
-      border: 0;
-      border-top: 1px solid var(--border);
-    }
-
     /* ── 状态区（min-height 防布局跳动） ─────────────────────────── */
     .status {
       min-height: 40px;
-      margin-top: 16px;
+      margin-top: 18px;
       font-size: 12px;
       color: var(--muted-foreground);
       white-space: pre-line;
     }
     .status.error { color: var(--destructive); }
 
-    /* ── 按钮 ─────────────────────────────────────────────────────── */
-    .row { display: flex; gap: 8px; margin-top: 4px; }
-    button {
-      height: 36px; /* shadcn h-9 */
+    /* ── 操作区：全宽主 CTA + 次要链接 ───────────────────────────── */
+    #saveBtn {
+      width: 100%;
+      height: 40px; /* 主 CTA 略高，视觉主导 */
       padding: 0 16px;
       font: inherit;
       font-size: 14px;
       font-weight: 500;
+      color: var(--primary-foreground);
+      background: var(--primary);
+      border: 1px solid transparent;
       border-radius: calc(var(--radius) - 2px);
       cursor: pointer;
       outline: none;
       transition: background-color 0.15s ease, opacity 0.15s ease;
     }
-    button:focus-visible {
+    #saveBtn:hover:not(:disabled) { background: color-mix(in oklch, var(--primary) 90%, var(--background)); }
+    #saveBtn:focus-visible {
       box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
     }
-    /* primary（shadcn default variant） */
-    #saveBtn {
-      background: var(--primary);
-      color: var(--primary-foreground);
-      border: 1px solid transparent;
+    #saveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .secondary-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      margin-top: 12px;
     }
-    #saveBtn:hover:not(:disabled) { background: color-mix(in oklch, var(--primary) 90%, var(--background)); }
-    /* secondary（shadcn secondary variant） */
-    .secondary {
-      background: var(--accent);
-      color: var(--accent-foreground);
-      border: 1px solid transparent;
+    .secondary-row button {
+      padding: 0;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted-foreground);
+      background: none;
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      outline: none;
     }
-    .secondary:hover:not(:disabled) { background: color-mix(in oklch, var(--accent) 80%, var(--background)); }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    .secondary-row button:hover { color: var(--foreground); text-decoration: underline; }
+    .secondary-row button:focus-visible {
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
     }
+    .secondary-row button:disabled { opacity: 0.5; cursor: not-allowed; }
   </style>
 </head>
 <body>
-  <header>
+  <header class="brand">
+    <img class="brand-logo" src="../assets/tray.png" alt="" />
     <h1 id="title">Zlog 首次设置</h1>
     <p class="subtitle" id="subtitle">
       创建管理员账号；同步可稍后在设置中补充（可选）。
     </p>
   </header>
 
-  <div class="section" id="passwordFields">
+  <hr class="divider" />
+
+  <div class="section">
+    <h2 class="section-title">管理员账号<span class="tag req">必填</span></h2>
     <div class="field">
-      <label for="username">管理员用户名</label>
+      <label for="username">用户名</label>
       <input id="username" autocomplete="username" placeholder="admin" />
     </div>
     <div class="field">
@@ -190,11 +247,10 @@
     </div>
   </div>
 
-  <hr class="divider" />
-
   <div class="section">
+    <h2 class="section-title">同步设置<span class="tag">可选</span></h2>
     <div class="field">
-      <label for="syncUrl">同步数据库 URL（可选）</label>
+      <label for="syncUrl">数据库 URL</label>
       <input id="syncUrl" placeholder="libsql://your-db.turso.io" />
       <p class="hint">
         从 Turso 控制台复制数据库 URL；不填则纯本地运行，之后可补。
@@ -202,7 +258,7 @@
       </p>
     </div>
     <div class="field">
-      <label for="syncToken">同步 Token（可选）</label>
+      <label for="syncToken">同步 Token</label>
       <input id="syncToken" type="password" placeholder="eyJ..." />
       <p class="hint">
         在 Turso 控制台创建 API Token。
@@ -217,10 +273,10 @@
 
   <div class="status" id="status" aria-live="polite"></div>
 
-  <div class="row">
-    <button id="saveBtn">保存</button>
-    <button id="syncBtn" class="secondary">立即同步</button>
-    <button id="openBtn" class="secondary">打开数据目录</button>
+  <button id="saveBtn">保存并启动</button>
+  <div class="secondary-row">
+    <button id="syncBtn">立即同步</button>
+    <button id="openBtn">打开数据目录</button>
   </div>
 
   <script src="./settings.js"></script>

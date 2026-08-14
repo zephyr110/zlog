@@ -113,7 +113,7 @@ async function main() {
   function openSettingsWindow() {
     const win = new BrowserWindow({
       width: 560,
-      height: 640,
+      height: 700,
       title: "Zlog 设置",
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },
@@ -215,7 +215,7 @@ async function main() {
   if (!config) {
     firstRunWindow = new BrowserWindow({
       width: 560,
-      height: 680,
+      height: 900,
       title: "Zlog 首次设置",
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },
