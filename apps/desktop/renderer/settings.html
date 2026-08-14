@@ -390,7 +390,8 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 4px;
+      /* 品牌区与信息区分组：加大下方间距（.section gap 16px 之上再补 8px） */
+      margin-bottom: 8px;
     }
     .about-logo {
       width: 40px;
@@ -406,15 +407,19 @@
     .about-row {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 10px;
+      min-height: 28px; /* 与按钮同高，值垂直居中 */
     }
     .about-label {
       font-size: 13px;
       color: var(--muted-foreground);
     }
     .about-version {
-      font-size: 13px;
+      font-size: 14px;
+      font-weight: 600;
       font-variant-numeric: tabular-nums;
+      letter-spacing: -0.01em;
       color: var(--foreground);
     }
     button.small {
@@ -426,11 +431,14 @@
       font-size: 13px;
       color: var(--primary);
       text-decoration: none;
+      overflow-wrap: break-word;
+      transition: text-decoration-color 0.12s ease;
     }
-    .about-link:hover { text-decoration: underline; }
+    .about-link:hover { text-decoration: underline; text-underline-offset: 2px; }
     .about-license {
       font-size: 13px;
-      color: var(--foreground);
+      /* 次级元信息：muted，不与主内容同级 */
+      color: var(--muted-foreground);
     }
     #updateStatus.error { color: var(--destructive); }
 
@@ -612,8 +620,8 @@
         </div>
 
         <div class="field">
+          <span class="about-label" data-i18n="about.version">版本</span>
           <div class="about-row">
-            <span class="about-label" data-i18n="about.version">版本</span>
             <span id="appVersion" class="about-version">…</span>
             <button class="secondary small" id="updateBtn" data-i18n="about.checkUpdate">检查更新</button>
           </div>
