@@ -164,6 +164,12 @@ async function main() {
   }
 
   function openSettingsWindow() {
+    // 单实例：托盘/重复点击只聚焦已有窗口，不叠开多个设置窗口
+    // （多窗口会让 settingsWindow ref 互相覆盖，语言切换广播丢目标）
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.focus()
+      return
+    }
     // 640 宽容纳左侧栏（176px）+ 内容区；面板切换后内容高度变化，
     // 窗口内滚动即可（body 无固定高度）
     const win = new BrowserWindow({
