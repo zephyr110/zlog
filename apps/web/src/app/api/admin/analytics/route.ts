@@ -52,8 +52,18 @@ export async function GET(request: NextRequest) {
     const message =
       err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300)
     console.error("[analytics]", source, kind, message)
+    const timeoutHint =
+      kind === "timeout" && err instanceof AnalyticsFetchError
+        ? err.timeoutHint
+        : undefined
     return NextResponse.json(
-      { configured: true, source, error: kind, message },
+      {
+        configured: true,
+        source,
+        error: kind,
+        message,
+        ...(timeoutHint ? { timeoutHint } : {}),
+      },
       { status: 502 }
     )
   }

@@ -42,6 +42,7 @@ import type {
   AnalyticsRange,
   AnalyticsReport,
   AnalyticsSource,
+  AnalyticsTimeoutHint,
 } from "@/lib/ga-analytics"
 
 const RANGES: AnalyticsRange[] = ["today", "7d", "30d"]
@@ -52,7 +53,7 @@ type ErrorKind = "timeout" | "permission" | "unavailable"
 type FetchState =
   | { status: "loading" }
   | { status: "unconfigured" }
-  | { status: "error"; kind: ErrorKind }
+  | { status: "error"; kind: ErrorKind; timeoutHint?: AnalyticsTimeoutHint }
   | { status: "ok"; data: AnalyticsReport }
 
 function parseErrorKind(raw: unknown): ErrorKind {
@@ -60,6 +61,11 @@ function parseErrorKind(raw: unknown): ErrorKind {
     return raw
   }
   return "unavailable"
+}
+
+function parseTimeoutHint(raw: unknown): AnalyticsTimeoutHint | undefined {
+  if (raw === "direct" || raw === "proxy" || raw === "hosted") return raw
+  return undefined
 }
 
 /** Shared chrome for the four breakdown panels (title + content column). */
@@ -569,10 +575,10 @@ export function TrafficAnalytics() {
 
     async function load() {
       try {
-        // The server-side GA chain (OAuth + batch, with direct→proxy
-        // failover) can legitimately take 15-40s — far beyond the default
-        // 15s apiFetch timeout, which would abort slow-but-successful
-        // reports and misreport them as a network timeout.
+        // The server-side GA chain (OAuth + batch, proxy then direct)
+        // can take 15-40s — far beyond the default 15s apiFetch timeout,
+        // which would abort slow-but-successful reports and misreport
+        // them as a network timeout.
         const res = await apiFetch(
           `/api/admin/analytics?source=${source}&range=${range}`,
           { timeout: 60_000 }
@@ -616,13 +622,18 @@ export function TrafficAnalytics() {
         }
         if (!res.ok) {
           let kind: ErrorKind = "unavailable"
+          let timeoutHint: AnalyticsTimeoutHint | undefined
           try {
-            const body = (await res.json()) as { error?: unknown }
+            const body = (await res.json()) as {
+              error?: unknown
+              timeoutHint?: unknown
+            }
             kind = parseErrorKind(body.error)
+            timeoutHint = parseTimeoutHint(body.timeoutHint)
           } catch {
             /* ignore */
           }
-          if (!cancelled) setState({ status: "error", kind })
+          if (!cancelled) setState({ status: "error", kind, timeoutHint })
           return
         }
         const data = (await res.json()) as AnalyticsReport
@@ -688,9 +699,15 @@ export function TrafficAnalytics() {
         }
       }
       if (state.kind === "timeout") {
+        const descKey =
+          state.timeoutHint === "proxy"
+            ? "admin.analyticsTimeoutProxyDesc"
+            : state.timeoutHint === "hosted"
+              ? "admin.analyticsTimeoutHostedDesc"
+              : "admin.analyticsTimeoutDesc"
         return {
           title: t("admin.analyticsTimeout"),
-          description: t("admin.analyticsTimeoutDesc"),
+          description: t(descKey),
         }
       }
       if (state.kind === "permission") {

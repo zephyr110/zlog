@@ -66,4 +66,21 @@ describe("buildServerEnv analytics", () => {
     const env = buildServerEnv(base, "/data/zlog.db", "/data/userData/lang.json")
     expect(env.DESKTOP_LANG_FILE).toBe("/data/userData/lang.json")
   })
+
+  it("透传进程 HTTPS_PROXY 给服务器", () => {
+    const prevHttps = process.env.HTTPS_PROXY
+    const prevHttp = process.env.HTTP_PROXY
+    process.env.HTTPS_PROXY = "http://127.0.0.1:7892"
+    delete process.env.HTTP_PROXY
+    try {
+      const env = buildServerEnv(base, "/data/zlog.db")
+      expect(env.HTTPS_PROXY).toBe("http://127.0.0.1:7892")
+      expect(env.HTTP_PROXY).toBe("http://127.0.0.1:7892")
+    } finally {
+      if (prevHttps === undefined) delete process.env.HTTPS_PROXY
+      else process.env.HTTPS_PROXY = prevHttps
+      if (prevHttp === undefined) delete process.env.HTTP_PROXY
+      else process.env.HTTP_PROXY = prevHttp
+    }
+  })
 })

@@ -27,5 +27,16 @@ export function buildServerEnv(
   if (cfg.gaPropertyId) env.GA_PROPERTY_ID = cfg.gaPropertyId
   if (cfg.gaClientEmail) env.GA_CLIENT_EMAIL = cfg.gaClientEmail
   if (cfg.gaPrivateKey) env.GA_PRIVATE_KEY = cfg.gaPrivateKey
+  // Dock/Finder launches have no shell proxy; copy from Electron's env so
+  // the Next child can reach Google Analytics 4 via Clash/V2Ray.
+  const proxy =
+    process.env.HTTPS_PROXY?.trim() ||
+    process.env.https_proxy?.trim() ||
+    process.env.HTTP_PROXY?.trim() ||
+    process.env.http_proxy?.trim()
+  if (proxy) {
+    env.HTTPS_PROXY = proxy
+    env.HTTP_PROXY = proxy
+  }
   return env
 }

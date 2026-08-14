@@ -28,11 +28,20 @@ export type AnalyticsReport = {
 
 type AnalyticsFetchErrorKind = "timeout" | "permission" | "unavailable"
 
+/** How to hint the admin empty-state when kind is timeout. */
+export type AnalyticsTimeoutHint = "direct" | "proxy" | "hosted"
+
 export class AnalyticsFetchError extends Error {
   kind: AnalyticsFetchErrorKind
-  constructor(kind: AnalyticsFetchErrorKind, message: string) {
+  timeoutHint?: AnalyticsTimeoutHint
+  constructor(
+    kind: AnalyticsFetchErrorKind,
+    message: string,
+    timeoutHint?: AnalyticsTimeoutHint
+  ) {
     super(message)
     this.kind = kind
+    this.timeoutHint = timeoutHint
     this.name = "AnalyticsFetchError"
   }
 }
@@ -124,12 +133,21 @@ function classifyGaError(err: unknown): AnalyticsFetchError {
       : ""
   const blob = `${code} ${status} ${message} ${cause}`
 
-  // Shared with isNetworkFailure below — one matcher drives both the
-  // direct→proxy failover decision and the user-facing error kind.
   if (NETWORK_ERROR_RE.test(blob)) {
+    const proxyAttempted =
+      typeof err === "object" &&
+      err !== null &&
+      "proxyAttempted" in err &&
+      Boolean((err as { proxyAttempted?: unknown }).proxyAttempted)
+    const timeoutHint: AnalyticsTimeoutHint = process.env.VERCEL
+      ? "hosted"
+      : proxyAttempted
+        ? "proxy"
+        : "direct"
     return new AnalyticsFetchError(
       "timeout",
-      "Cannot reach Google Analytics Data API (network timeout)"
+      "Cannot reach Google Analytics Data API (network timeout)",
+      timeoutHint
     )
   }
   // OAuth token-exchange failures (rotated private key, wrong client
@@ -165,53 +183,40 @@ function classifyGaError(err: unknown): AnalyticsFetchError {
   return new AnalyticsFetchError("unavailable", message.slice(0, 200))
 }
 
-/** Optional fallback proxy (Clash/V2Ray). Used only after a direct
- *  Google request fails — never forced on the first attempt. */
-function resolveProxyUrl(): string | undefined {
-  const raw =
-    process.env.HTTPS_PROXY ||
-    process.env.https_proxy ||
-    process.env.HTTP_PROXY ||
-    process.env.http_proxy ||
-    process.env.ALL_PROXY ||
-    process.env.all_proxy
-  const url = raw?.trim()
+/** Bracket access so Next/webpack cannot compile `process.env.HTTPS_PROXY`
+ *  to `undefined` when the var was missing at bundling time. */
+function envTrim(name: string): string | undefined {
+  const raw = process.env[name]
+  const url = typeof raw === "string" ? raw.trim() : ""
   return url || undefined
 }
 
-const NETWORK_ERROR_RE =
-  /DEADLINE_EXCEEDED|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|network|fetch failed|ConnectTimeout|UND_ERR/i
-
-function isNetworkFailure(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err)
-  const code =
-    typeof err === "object" && err && "code" in err
-      ? String((err as { code: unknown }).code)
-      : ""
-  const cause =
-    typeof err === "object" && err && "cause" in err
-      ? String((err as { cause: unknown }).cause)
-      : ""
-  return NETWORK_ERROR_RE.test(`${code} ${message} ${cause}`)
+function resolveProxyUrl(): string | undefined {
+  return (
+    envTrim("HTTPS_PROXY") ||
+    envTrim("https_proxy") ||
+    envTrim("HTTP_PROXY") ||
+    envTrim("http_proxy") ||
+    envTrim("ALL_PROXY") ||
+    envTrim("all_proxy")
+  )
 }
 
-/** Short connect budget so a blocked direct path fails over to the proxy
- *  quickly instead of hanging the admin dashboard. Body budget matches the
- *  proxy agent — GA batch reports can legitimately take >20s on busy days. */
+const NETWORK_ERROR_RE =
+  /DEADLINE_EXCEEDED|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|fetch failed|ConnectTimeout|UND_ERR/i
+
+/** Direct path: short connect so a blocked Google IP fails over quickly.
+ *  autoSelectFamily prefers IPv4 when IPv6 is advertised but black-holed. */
 const directAgent = new Agent({
   connectTimeout: 4_000,
   headersTimeout: 20_000,
   bodyTimeout: 30_000,
+  autoSelectFamily: true,
+  autoSelectFamilyAttemptTimeout: 300,
 })
 
 let cachedProxyAgent: ProxyAgent | undefined
 let cachedProxyUrl: string | undefined
-
-/** After a direct→proxy failover, prefer the proxy briefly so OAuth +
- *  batchRunReports (and rapid range switches) don’t each burn another
- *  connectTimeout on a blocked direct path. */
-let preferProxyUntil = 0
-const PREFER_PROXY_MS = 60_000
 
 function getProxyDispatcher(): ProxyAgent | undefined {
   const proxyUrl = resolveProxyUrl()
@@ -256,11 +261,16 @@ async function gaFetchOnce(
   }) as unknown as Response
 }
 
+function markProxyAttempted(err: unknown): never {
+  if (typeof err === "object" && err !== null) {
+    ;(err as { proxyAttempted?: boolean }).proxyAttempted = true
+  }
+  throw err
+}
+
 /**
- * Prefer a direct path to Google. If that fails with a network error and
- * HTTPS_PROXY (etc.) is set, retry once through the proxy — typical local
- * VPN setup without forcing every request through Clash. After failover,
- * stick to the proxy briefly so token + report don’t double the wait.
+ * If HTTPS_PROXY is set, try the proxy first (local Clash in CN), then
+ * fall back to direct. Direct-only when no proxy is configured.
  */
 async function gaFetch(
   input: string,
@@ -271,43 +281,24 @@ async function gaFetch(
   }
 ): Promise<Response> {
   const proxy = getProxyDispatcher()
-  const preferProxy = Boolean(proxy && Date.now() < preferProxyUntil)
-
-  if (preferProxy && proxy) {
+  if (proxy) {
     try {
       return await gaFetchOnce(input, init, proxy)
     } catch (proxyErr) {
+      console.warn(
+        "[analytics] HTTPS_PROXY failed; retrying Google request directly"
+      )
       try {
         return await gaFetchOnce(input, init, directAgent)
       } catch {
-        throw proxyErr
+        cachedProxyAgent = undefined
+        cachedProxyUrl = undefined
+        markProxyAttempted(proxyErr)
       }
     }
   }
 
-  try {
-    return await gaFetchOnce(input, init, directAgent)
-  } catch (err) {
-    if (!proxy || !isNetworkFailure(err)) throw err
-    console.warn(
-      "[analytics] direct Google request failed; retrying via HTTPS_PROXY"
-    )
-    try {
-      const res = await gaFetchOnce(input, init, proxy)
-      // Prefer the proxy briefly only after it PROVED reachable — arming
-      // before the attempt would make the next 60s go proxy-first through
-      // a dead proxy (8s burn) before falling back.
-      preferProxyUntil = Date.now() + PREFER_PROXY_MS
-      return res
-    } catch {
-      // Drop the cached proxy agent so the next build re-tests a restarted
-      // proxy instead of reusing the dead one forever.
-      cachedProxyAgent = undefined
-      cachedProxyUrl = undefined
-      // Surface the original direct failure (timeout) for admin copy.
-      throw err
-    }
-  }
+  return gaFetchOnce(input, init, directAgent)
 }
 
 function base64UrlJson(value: object): string {
@@ -374,7 +365,7 @@ async function getAccessToken(): Promise<string> {
 
 /**
  * Call GA4 Data API over plain HTTPS JSON.
- * Direct first; falls back to HTTPS_PROXY on network failure (local VPN).
+ * Uses HTTPS_PROXY first when set (local VPN), then direct.
  * Avoids `@google-analytics/data` REST fallback, which throws
  * `toProto3JSON: don't know how to convert value 10` for int64 `limit`
  * on Vercel’s Node runtime.
