@@ -743,7 +743,7 @@ export function TrafficAnalytics() {
             <SelectTrigger
               size="sm"
               aria-label={t("admin.analyticsSource") as string}
-              className="w-40"
+              className="w-56"
             >
               <SelectValue>{sourceLabel(source)}</SelectValue>
             </SelectTrigger>
