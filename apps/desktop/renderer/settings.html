@@ -253,9 +253,17 @@
       box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
     }
     .section-footer {
+      display: flex;
+      align-items: center; /* 图标与文字基线垂直居中对齐 */
+      gap: 6px;
       margin: 10px 0 0; /* 与上方字段提示（hint）拉开节奏 */
       font-size: 12px;
       color: var(--muted-foreground);
+    }
+    .section-footer .help-icon {
+      width: 14px; /* 与 12px 正文等高的视觉比例 */
+      height: 14px;
+      flex: none;
     }
 
     /* 面板内标题：设置模式由内容区头部承载，此处隐藏（仅首启模式显示） */
@@ -460,10 +468,13 @@
           <p class="hint">在 Turso 控制台创建</p>
         </div>
         <p class="section-footer">
-          首次使用 Turso？
-          <a href="https://app.turso.tech" target="_blank" rel="noopener">注册 / 登录</a> ·
-          <a href="https://docs.turso.tech/tursodb/quickstart" target="_blank" rel="noopener">创建数据库指南</a> ·
-          <a href="https://docs.turso.tech/cli/db/tokens/create" target="_blank" rel="noopener">Token 文档</a>
+          <svg class="icon help-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+          <span>
+            首次使用 Turso？
+            <a href="https://app.turso.tech" target="_blank" rel="noopener">注册 / 登录</a> ·
+            <a href="https://docs.turso.tech/tursodb/quickstart" target="_blank" rel="noopener">创建数据库指南</a> ·
+            <a href="https://docs.turso.tech/cli/db/tokens/create" target="_blank" rel="noopener">Token 文档</a>
+          </span>
         </p>
       </div>
     </section>
