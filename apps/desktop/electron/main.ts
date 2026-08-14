@@ -176,13 +176,18 @@ async function main() {
     // 单实例：托盘/重复点击只聚焦已有窗口，不叠开多个设置窗口
     // （多窗口会让 settingsWindow ref 互相覆盖，语言切换广播丢目标）
     if (settingsWindow && !settingsWindow.isDestroyed()) {
+      // macOS 上 app 未激活（托盘常驻菜单栏）时仅 focus() 不生效：
+      // 需 show + restore + app.focus({steal:true}) 才能置前
+      if (settingsWindow.isMinimized()) settingsWindow.restore()
+      settingsWindow.show()
       settingsWindow.focus()
+      app.focus({ steal: true })
       return
     }
-    // 640 宽容纳左侧栏（176px）+ 内容区；面板切换后内容高度变化，
-    // 窗口内滚动即可（body 无固定高度）
+    // 720 宽：左侧栏 176px + 更充裕的内容区（面板卡片化后需要呼吸空间）；
+    // 面板切换后内容高度变化，窗口内滚动即可（body 无固定高度）
     const win = new BrowserWindow({
-      width: 640,
+      width: 720,
       height: 720,
       title: WINDOW_TITLES[currentLang].settings,
       autoHideMenuBar: true,

@@ -14,7 +14,7 @@ const I18N = {
     "nav.sync": "同步设置",
     "nav.analytics": "流量分析",
     "nav.data": "数据目录",
-    "nav.lang": "语言",
+    "nav.lang": "系统语言",
     "nav.about": "关于",
     "firstrun.title": "Zlog 首次设置",
     "firstrun.subtitle": "创建管理员账号；同步可稍后在设置中补充",
@@ -103,7 +103,7 @@ const I18N = {
     "nav.sync": "Sync",
     "nav.analytics": "Analytics",
     "nav.data": "Data Folder",
-    "nav.lang": "Language",
+    "nav.lang": "System Language",
     "nav.about": "About",
     "firstrun.title": "Zlog First-Time Setup",
     "firstrun.subtitle": "Create an admin account; sync can be added later in Settings",
@@ -216,10 +216,20 @@ function applyLang() {
   // 直接调用：renderUpdateState 内部自行 getElementById，不能引用
   // 文件后段声明的 updateBtn（TDZ——applyLang 先于 about 区块执行）
   renderUpdateState()
+  // 语言 select 的显示值跟随字典（内部取元素，避免 TDZ）
+  const langValue = document.getElementById("langSelectValue")
+  if (langValue) langValue.textContent = t(`lang.${currentPref}`)
+  const popup = document.getElementById("langPopup")
+  if (popup) {
+    for (const item of popup.querySelectorAll(".select-item")) {
+      item.classList.toggle("selected", item.dataset.value === currentPref)
+    }
+  }
 }
 
-// ── 关于面板状态（声明先于 applyLang：语言初始化会在本文件后段
-// 的 about 逻辑执行前调用 applyLang，const 声明若在后面会触发 TDZ）──
+// ── 语言 select 与关于面板状态（声明先于 applyLang：语言初始化会在
+// 本文件后段逻辑执行前调用 applyLang，const 声明若在后面会触发 TDZ）──
+let currentPref = "system" // 语言偏好（select 显示值；applyLang 渲染用）
 let updateInfo = null // 最近一次检查结果（含 downloadUrl）
 let updateChecked = false // 本窗口会话是否已自动检查过（失败也算一次）
 let updateBusy = false // 检查/下载进行中（按钮禁用）
@@ -347,17 +357,47 @@ if (!isFirstRun) {
   }
 }
 
-// ── 语言（三态：跟随系统/中文/English） ─────────────────────────────
-// langSelect 在两种模式都存在（首启模式下面板被隐藏但元素在 DOM）：
-// 首启跟随系统语言渲染，设置模式同步下拉。先同步渲染一次 zh 默认，
-// 避免 IPC 往返期间窗口停留在 HTML 初值（标题 "Zlog"/"保存并启动"）。
+// ── 语言（三态：跟随系统/中文/English，shadcn 风格自定义 select） ──
+// 首启模式下语言面板被隐藏但元素在 DOM：首启跟随系统语言渲染。
+// 先同步渲染一次 zh 默认，避免 IPC 往返期间窗口停留在 HTML 初值。
 applyLang()
-const langSelect = document.getElementById("langSelect")
+const langSelectBtn = document.getElementById("langSelectBtn")
+const langPopup = document.getElementById("langPopup")
+
+function setLangPopupOpen(open) {
+  langSelectBtn.setAttribute("aria-expanded", String(open))
+  langPopup.hidden = !open
+}
+
+langSelectBtn.addEventListener("click", (e) => {
+  e.stopPropagation()
+  setLangPopupOpen(langPopup.hidden)
+})
+// 点击外部关闭（popup 挂在 body 事件上：trigger 的 stopPropagation
+// 保证点 trigger 自身时不会立即关闭）
+document.addEventListener("click", () => setLangPopupOpen(false))
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") setLangPopupOpen(false)
+})
+for (const item of langPopup.querySelectorAll(".select-item")) {
+  item.addEventListener("click", async (e) => {
+    e.stopPropagation()
+    const pref = item.dataset.value
+    const res = await zlogApi.setLang(pref)
+    if (res && res.ok && res.state) {
+      currentPref = pref
+      lang = res.state.resolved
+      applyLang()
+    }
+    setLangPopupOpen(false)
+  })
+}
+
 zlogApi
   .getLang()
   .then((state) => {
     if (!state) return
-    if (langSelect) langSelect.value = state.pref
+    currentPref = state.pref
     lang = state.resolved
     applyLang()
   })
@@ -365,15 +405,6 @@ zlogApi
     // IPC 失败（如语言文件目录不可写）：保持 zh 默认，静态渲染已由
     // 上方的同步 applyLang() 完成
   })
-if (langSelect) {
-  langSelect.addEventListener("change", async () => {
-    const res = await zlogApi.setLang(langSelect.value)
-    if (res && res.ok && res.state) {
-      lang = res.state.resolved
-      applyLang()
-    }
-  })
-}
 
 // ── 按钮级 spinner ────────────────────────────────────────────────────
 function setButtonSpinner(btn, on) {

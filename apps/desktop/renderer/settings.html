@@ -93,7 +93,9 @@
       width: 176px;
       flex: none;
       padding: 16px 10px;
-      background: var(--muted);
+      /* shadcn 侧栏：background 底（非 muted——本主题 --accent 与 --muted
+         同值，侧栏用 muted 会让 hover/选中块失去对比），靠 border 分隔 */
+      background: var(--background);
       border-right: 1px solid var(--border);
     }
     .sidebar-brand {
@@ -192,7 +194,14 @@
 
     /* ── 面板 ─────────────────────────────────────────────────────── */
     .panel { display: block; }
-    body.mode-settings .panel { display: none; }
+    body.mode-settings .panel {
+      display: none;
+      /* shadcn 卡片式内容块：muted 表面 + 边框 + 圆角 */
+      background: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) - 2px);
+      padding: 20px;
+    }
     body.mode-settings .panel.active { display: block; }
     .section { display: flex; flex-direction: column; gap: 16px; }
     /* 区块间距仅首启模式需要（账号区与同步区间）；设置模式下账号区隐藏，
@@ -234,6 +243,64 @@
     }
     input::placeholder { color: var(--muted-foreground); opacity: 0.6; }
     input:hover { border-color: var(--ring); }
+
+    /* ── shadcn Select（自定义下拉，原生 select 不可样式化） ──────── */
+    .select { position: relative; width: 100%; }
+    .select-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+      height: 36px; /* 与 input 同高 */
+      padding: 0 12px;
+      font: inherit;
+      font-size: 13px;
+      color: var(--foreground);
+      background: var(--background);
+      border: 1px solid var(--input);
+      border-radius: calc(var(--radius) - 2px);
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .select-trigger:hover { border-color: var(--ring); }
+    .select-trigger:focus-visible {
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+    }
+    .select-chevron {
+      width: 16px;
+      height: 16px;
+      flex: none;
+      color: var(--muted-foreground);
+      transition: transform 0.15s ease;
+    }
+    .select-trigger[aria-expanded="true"] .select-chevron { transform: rotate(180deg); }
+    .select-popup {
+      position: absolute;
+      top: calc(100% + 4px);
+      /* alignItemWithTrigger=false：popup 左缘对齐 trigger 左缘 */
+      left: 0;
+      min-width: 100%;
+      z-index: 50;
+      padding: 4px;
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) - 2px);
+      box-shadow: 0 8px 24px oklch(0 0 0 / 0.12), 0 2px 8px oklch(0 0 0 / 0.08);
+    }
+    .select-item {
+      display: flex;
+      align-items: center;
+      height: 32px;
+      padding: 0 10px;
+      font-size: 13px;
+      border-radius: calc(var(--radius) - 4px);
+      cursor: pointer;
+      transition: background-color 0.1s ease, color 0.1s ease;
+    }
+    .select-item:hover { background: var(--accent); color: var(--accent-foreground); }
+    .select-item.selected { font-weight: 500; }
     input:focus-visible {
       border-color: var(--ring);
       box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
@@ -305,10 +372,11 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      height: 40px;
-      padding: 0 18px;
+      /* 高度与紧凑操作（检查更新等 button.small）一致 */
+      height: 28px;
+      padding: 0 14px;
       font: inherit;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
       color: var(--primary-foreground);
       background: var(--primary);
@@ -331,10 +399,11 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      height: 40px;
-      padding: 0 18px;
+      /* 高度与紧凑操作（检查更新等 button.small）一致 */
+      height: 28px;
+      padding: 0 14px;
       font: inherit;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
       color: var(--accent-foreground);
       background: var(--accent);
@@ -385,25 +454,8 @@
       .spinner { animation-duration: 1.4s; }
     }
 
-    /* 关于面板 */
-    .about-brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      /* 品牌区与信息区分组：加大下方间距（.section gap 16px 之上再补 8px） */
-      margin-bottom: 8px;
-    }
-    .about-logo {
-      width: 40px;
-      height: 40px;
-      border-radius: calc(var(--radius) * 1.2);
-      box-shadow: 0 1px 2px oklch(0 0 0 / 0.08);
-    }
-    .about-name {
-      font-size: 17px;
-      font-weight: 600;
-      letter-spacing: -0.01em;
-    }
+    /* 关于面板（无品牌块：标题块与内容间距与其他面板一致，由
+       .content header 的 20px margin 承担） */
     .about-row {
       display: flex;
       align-items: center;
@@ -596,29 +648,30 @@
       </div>
     </section>
 
-    <!-- 面板：语言 -->
+    <!-- 面板：语言（自定义 shadcn 风格 select） -->
     <section class="panel" id="panel-lang">
       <div class="section">
         <div class="field">
-          <label for="langSelect" data-i18n="lang.label">界面语言</label>
-          <select id="langSelect">
-            <option value="system" data-i18n="lang.system">跟随系统</option>
-            <option value="zh" data-i18n="lang.zh">中文</option>
-            <option value="en" data-i18n="lang.en">English</option>
-          </select>
+          <label for="langSelectBtn" data-i18n="lang.label">界面语言</label>
+          <div class="select">
+            <button type="button" class="select-trigger" id="langSelectBtn" aria-haspopup="listbox" aria-expanded="false">
+              <span id="langSelectValue">跟随系统</span>
+              <svg class="icon select-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div class="select-popup" id="langPopup" role="listbox" hidden>
+              <div class="select-item" data-value="system" role="option">跟随系统</div>
+              <div class="select-item" data-value="zh" role="option">中文</div>
+              <div class="select-item" data-value="en" role="option">English</div>
+            </div>
+          </div>
           <p class="hint" data-i18n="lang.hint">跟随系统时，系统语言为中文则显示中文；其他语言一律显示英文</p>
         </div>
       </div>
     </section>
 
-    <!-- 面板：关于 -->
+    <!-- 面板：关于（无品牌块；标题块与内容间距由 .content header 承担） -->
     <section class="panel" id="panel-about">
       <div class="section">
-        <div class="about-brand">
-          <img class="about-logo" src="../assets/tray.png" alt="" />
-          <span class="about-name">Zlog</span>
-        </div>
-
         <div class="field">
           <span class="about-label" data-i18n="about.version">版本</span>
           <div class="about-row">
