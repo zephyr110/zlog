@@ -26,7 +26,7 @@ export type AnalyticsReport = {
   countries: { country: string; countryId: string; users: number }[]
 }
 
-export type AnalyticsFetchErrorKind = "timeout" | "permission" | "unavailable"
+type AnalyticsFetchErrorKind = "timeout" | "permission" | "unavailable"
 
 export class AnalyticsFetchError extends Error {
   kind: AnalyticsFetchErrorKind

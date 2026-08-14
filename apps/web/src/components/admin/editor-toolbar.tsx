@@ -35,7 +35,7 @@ export interface ToolbarItem {
   inline?: boolean
 }
 
-export const TOOLBAR: ToolbarItem[] = [
+const TOOLBAR: ToolbarItem[] = [
   { key: "bold", i18nKey: "admin.bold", icon: Bold, prefix: "**", suffix: "**" },
   { key: "italic", i18nKey: "admin.italic", icon: Italic, prefix: "*", suffix: "*" },
   { key: "heading", i18nKey: "admin.heading", icon: Heading2, prefix: "## " },

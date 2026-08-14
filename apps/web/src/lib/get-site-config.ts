@@ -8,7 +8,7 @@ import { defaultSiteConfig, type SiteConfig } from "@/lib/site-config"
 
 export const SITE_CONFIG_TAG = "site-config"
 
-export type SiteSettingsDto = {
+type SiteSettingsDto = {
   name: string
   title: string
   description: string

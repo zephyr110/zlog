@@ -33,7 +33,7 @@ function apiHeaders() {
   }
 }
 
-export function cdnBase(): string {
+function cdnBase(): string {
   return (
     process.env.BLOG_IMG_CDN_BASE ??
     "https://cdn.jsdelivr.net/gh/zephyr110/blog-img"

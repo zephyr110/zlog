@@ -1,6 +1,6 @@
 /** Parse post-markdown video URLs into provider embeds (no network). */
 
-export type VideoProvider = "bilibili" | "youtube"
+type VideoProvider = "bilibili" | "youtube"
 
 export type VideoEmbed = {
   provider: VideoProvider

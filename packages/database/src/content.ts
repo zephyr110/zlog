@@ -1,5 +1,5 @@
 import { type Client } from "@libsql/client"
-import { getDb } from "./db"
+import { requireDb } from "./db"
 import { scheduleSync } from "./sync"
 import { type Post, type PostSummary } from "@zlog/core"
 import { toPostSummary } from "@zlog/core"
@@ -31,17 +31,6 @@ CREATE INDEX IF NOT EXISTS idx_posts_draft ON posts(draft);
 `
 
 // ── Helpers ─────────────────────────────────────────────────────────────
-
-function requireDb(): Client {
-  const db = getDb()
-  if (!db) {
-    throw new Error(
-      "TURSO_DATABASE_URL environment variable is required. " +
-        "Set it to a libsql:// or file: URL (and TURSO_AUTH_TOKEN for remote databases)."
-    )
-  }
-  return db
-}
 
 let tableReady: Promise<void> | null = null
 
@@ -336,32 +325,6 @@ export async function getAllTags(): Promise<string[]> {
   }
 
   return Array.from(tagSet).sort()
-}
-
-export async function getAllCategories(): Promise<string[]> {
-  const db = requireDb()
-  await ensureTable(db)
-
-  const result = await db.execute("SELECT tags FROM posts")
-  const catSet = new Set<string>()
-
-  for (const row of result.rows) {
-    let tags: string[]
-    try {
-      tags = JSON.parse((row.tags as string) || "[]")
-    } catch {
-      continue
-    }
-    for (const tag of tags) {
-      if (!tag) continue
-      const dash = tag.indexOf("-")
-      if (dash > 0) {
-        catSet.add(tag.slice(0, dash).toLowerCase())
-      }
-    }
-  }
-
-  return Array.from(catSet).sort()
 }
 
 export async function getPostsByCategory(category: string): Promise<PostSummary[]> {
