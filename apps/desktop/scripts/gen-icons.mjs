@@ -13,11 +13,13 @@ const root = join(here, "..")
 const LOGO_SOURCE = join(root, "..", "..", "apps", "web", "public", "zlog-logo.png")
 const ICON_TARGET = join(root, "build", "icon.png")
 const TRAY_TARGET = join(root, "assets", "tray.png")
-// 菜单栏模板图标（macOS）：16pt @1x 与 @2x；文件名以 Template 结尾 →
-// Electron 自动标记模板图，@2x 相邻文件自动作为 Retina 尺寸。
+// 菜单栏模板图标（macOS）：18pt @1x 与 @2x（用户反馈 16pt 偏小，且原图
+// 四周留白等比缩到 16pt 后图形极小——见 boxDownsampleTemplate 的裁剪放大）；
+// 文件名以 Template 结尾 → Electron 自动标记模板图，@2x 相邻文件自动作为
+// Retina 尺寸。
 const TRAY_TEMPLATES = [
-  { size: 16, file: "trayTemplate.png" },
-  { size: 32, file: "trayTemplate@2x.png" },
+  { size: 18, file: "trayTemplate.png" },
+  { size: 36, file: "trayTemplate@2x.png" },
 ]
 
 if (existsSync(LOGO_SOURCE)) {
@@ -125,28 +127,41 @@ function toTemplateAlpha(src) {
   return out
 }
 
-/** 盒式降采样：对 alpha 覆盖度平均，16px 下边缘平滑。 */
+/** 菜单栏模板图标：裁剪图形包围盒 → 放大填充画布（四周各留 2px）。
+ *  原图是 1024 方块、图形居中且四周留白大，若直接降采样到 18px，
+ *  图形在菜单栏里会小到看不清；裁剪后图形占满画布，视觉权重正常。 */
 function boxDownsampleTemplate(src, size) {
   const alpha = toTemplateAlpha(src)
   const { width, height } = src
-  const out = Buffer.alloc(size * size * 4)
-  const stepX = width / size, stepY = height / size
-  for (let y = 0; y < size; y++) {
-    const y0 = Math.floor(y * stepY)
-    const y1 = Math.max(y0 + 1, Math.floor((y + 1) * stepY))
-    for (let x = 0; x < size; x++) {
-      const x0 = Math.floor(x * stepX)
-      const x1 = Math.max(x0 + 1, Math.floor((x + 1) * stepX))
-      let sum = 0, n = 0
-      for (let sy = y0; sy < y1; sy++) {
-        for (let sx = x0; sx < x1; sx++) {
-          sum += alpha[(sy * width + sx) * 4 + 3]
-          n++
-        }
+  const PAD = 2
+  // 图形包围盒（alpha 覆盖度 > 32 的像素）
+  let minX = width, minY = height, maxX = -1, maxY = -1
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (alpha[(y * width + x) * 4 + 3] > 32) {
+        if (x < minX) minX = x
+        if (x > maxX) maxX = x
+        if (y < minY) minY = y
+        if (y > maxY) maxY = y
       }
-      const o = (y * size + x) * 4
-      out[o] = 0; out[o + 1] = 0; out[o + 2] = 0
-      out[o + 3] = Math.round(sum / n)
+    }
+  }
+  if (maxX < 0) return Buffer.alloc(size * size * 4) // 全透明兜底
+  const bw = maxX - minX + 1, bh = maxY - minY + 1
+  // 目标尺寸（画布减两侧留白），等比缩放
+  const target = size - PAD * 2
+  const scale = Math.min(target / bw, target / bh)
+  const sw = Math.max(1, Math.round(bw * scale))
+  const sh = Math.max(1, Math.round(bh * scale))
+  const offX = Math.floor((size - sw) / 2)
+  const offY = Math.floor((size - sh) / 2)
+  const out = Buffer.alloc(size * size * 4)
+  for (let y = 0; y < sh; y++) {
+    const sy = Math.min(bh - 1, Math.floor(y / scale))
+    for (let x = 0; x < sw; x++) {
+      const sx = Math.min(bw - 1, Math.floor(x / scale))
+      out[((offY + y) * size + offX + x) * 4 + 3] =
+        alpha[((minY + sy) * width + (minX + sx)) * 4 + 3]
     }
   }
   return out

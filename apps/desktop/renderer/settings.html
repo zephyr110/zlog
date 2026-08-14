@@ -151,6 +151,12 @@
       font-size: 12px;
       color: var(--muted-foreground);
     }
+    /* 区块底部引导行：与字段提示区分开，节奏更清晰 */
+    .section-footer {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: var(--muted-foreground);
+    }
     a {
       color: var(--primary);
       text-decoration: none;
@@ -231,7 +237,7 @@
 
   <hr class="divider" />
 
-  <div class="section">
+  <div class="section" id="passwordFields">
     <h2 class="section-title">管理员账号<span class="tag req">必填</span></h2>
     <div class="field">
       <label for="username">用户名</label>
@@ -252,22 +258,18 @@
     <div class="field">
       <label for="syncUrl">数据库 URL</label>
       <input id="syncUrl" placeholder="libsql://your-db.turso.io" />
-      <p class="hint">
-        从 Turso 控制台复制数据库 URL；不填则纯本地运行，之后可补。
-        <a href="https://docs.turso.tech/tursodb/quickstart" target="_blank" rel="noopener">创建数据库指南 →</a>
-      </p>
+      <p class="hint">留空则纯本地运行，之后可在设置中补充。</p>
     </div>
     <div class="field">
-      <label for="syncToken">同步 Token</label>
+      <label for="syncToken">数据库 Token</label>
       <input id="syncToken" type="password" placeholder="eyJ..." />
-      <p class="hint">
-        在 Turso 控制台创建 API Token。
-        <a href="https://docs.turso.tech/cli/db/tokens/create" target="_blank" rel="noopener">Token 文档 →</a>
-      </p>
+      <p class="hint">在 Turso 控制台创建。</p>
     </div>
-    <p class="hint" style="margin-top: 0">
-      没有 Turso 账号？
-      <a href="https://app.turso.tech" target="_blank" rel="noopener">注册 / 登录 Turso 控制台 →</a>
+    <p class="section-footer">
+      首次使用 Turso？
+      <a href="https://app.turso.tech" target="_blank" rel="noopener">注册 / 登录</a> ·
+      <a href="https://docs.turso.tech/tursodb/quickstart" target="_blank" rel="noopener">创建数据库指南</a> ·
+      <a href="https://docs.turso.tech/cli/db/tokens/create" target="_blank" rel="noopener">Token 文档</a>
     </p>
   </div>
 

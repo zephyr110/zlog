@@ -35,7 +35,7 @@ export function createTray(actions: TrayActions): Tray {
   tray.setToolTip("Zlog")
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: "打开博客", click: actions.onOpen },
+      { label: "打开", click: actions.onOpen },
       { label: "设置", click: actions.onSettings },
       { label: "立即同步", click: actions.onSyncNow },
       { type: "separator" },
