@@ -184,8 +184,7 @@ async function main() {
       app.focus({ steal: true })
       return
     }
-    // 720 宽：左侧栏 176px + 更充裕的内容区（面板卡片化后需要呼吸空间）；
-    // 面板切换后内容高度变化，窗口内滚动即可（body 无固定高度）
+    // 720 宽：左侧栏 208px + 内容区；侧栏固定，内容区内部滚动
     const win = new BrowserWindow({
       width: 720,
       height: 720,
@@ -420,9 +419,12 @@ async function main() {
 
   // ── 首启向导 ──
   if (!config) {
+    // 800 + useContentSize：高度按网页内容算（不含标题栏）。760 含窗框时
+    // 品牌/CTA 间距加大后主按钮会被裁到折线以下。
     firstRunWindow = new BrowserWindow({
       width: 560,
-      height: 920,
+      height: 800,
+      useContentSize: true,
       title: WINDOW_TITLES[currentLang].firstRun,
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },

@@ -11,8 +11,14 @@
       color-scheme: light;
       --background: oklch(1 0 0);
       --foreground: oklch(0.145 0 0);
+      --card: oklch(1 0 0);
+      --card-foreground: oklch(0.145 0 0);
+      --popover: oklch(1 0 0);
+      --popover-foreground: oklch(0.145 0 0);
       --muted: oklch(0.97 0 0);
       --muted-foreground: oklch(0.556 0 0);
+      --secondary: oklch(0.97 0 0);
+      --secondary-foreground: oklch(0.205 0 0);
       --accent: oklch(0.97 0 0);
       --accent-foreground: oklch(0.205 0 0);
       --destructive: oklch(0.577 0.245 27.325);
@@ -21,15 +27,30 @@
       --ring: oklch(0.708 0 0);
       --primary: oklch(0.205 0 0);
       --primary-foreground: oklch(0.985 0 0);
+      --sidebar: oklch(0.985 0 0);
+      --sidebar-foreground: oklch(0.145 0 0);
+      --sidebar-accent: oklch(0.97 0 0);
+      --sidebar-accent-foreground: oklch(0.205 0 0);
+      --sidebar-border: oklch(0.922 0 0);
+      --sidebar-ring: oklch(0.708 0 0);
       --radius: 0.625rem;
+      --radius-sm: calc(var(--radius) * 0.6);
+      --radius-md: calc(var(--radius) * 0.8);
+      --radius-lg: var(--radius);
     }
     @media (prefers-color-scheme: dark) {
       :root {
         color-scheme: dark;
         --background: oklch(0.145 0 0);
         --foreground: oklch(0.985 0 0);
+        --card: oklch(0.205 0 0);
+        --card-foreground: oklch(0.985 0 0);
+        --popover: oklch(0.205 0 0);
+        --popover-foreground: oklch(0.985 0 0);
         --muted: oklch(0.269 0 0);
         --muted-foreground: oklch(0.708 0 0);
+        --secondary: oklch(0.269 0 0);
+        --secondary-foreground: oklch(0.985 0 0);
         --accent: oklch(0.269 0 0);
         --accent-foreground: oklch(0.985 0 0);
         --destructive: oklch(0.704 0.191 22.216);
@@ -38,6 +59,12 @@
         --ring: oklch(0.556 0 0);
         --primary: oklch(0.922 0 0);
         --primary-foreground: oklch(0.205 0 0);
+        --sidebar: oklch(0.205 0 0);
+        --sidebar-foreground: oklch(0.985 0 0);
+        --sidebar-accent: oklch(0.269 0 0);
+        --sidebar-accent-foreground: oklch(0.985 0 0);
+        --sidebar-border: oklch(1 0 0 / 10%);
+        --sidebar-ring: oklch(0.556 0 0);
       }
     }
 
@@ -63,11 +90,12 @@
     @media (prefers-reduced-motion: reduce) {
       body { animation: none; }
     }
-    /* 设置模式：左侧栏布局，去掉内容区外边距 */
+    /* 设置模式：侧栏 + 内容分栏，窗口内滚动（侧栏不跟着跑） */
     body.mode-settings {
       padding: 0;
       display: flex;
-      min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
     }
 
     /* ── lucide 图标（内联 SVG，stroke 继承 currentColor） ───────── */
@@ -89,66 +117,98 @@
     body.mode-settings .sidebar {
       display: flex;
       flex-direction: column;
-      /* shadcn Sidebar 间距：py-5 px-3 容器、gap-1 项距、h-9 项高 */
-      gap: 4px;
-      width: 176px;
+      width: 208px;
       flex: none;
-      padding: 20px 12px;
-      /* shadcn 侧栏：background 底（非 muted——本主题 --accent 与 --muted
-         同值，侧栏用 muted 会让 hover/选中块失去对比），靠 border 分隔 */
-      background: var(--background);
-      border-right: 1px solid var(--border);
+      padding: 16px 12px;
+      background: var(--sidebar);
+      color: var(--sidebar-foreground);
+      border-right: 1px solid var(--sidebar-border);
     }
     .sidebar-brand {
       display: flex;
       align-items: center;
-      gap: 8px;
-      /* shadcn SidebarHeader：与导航区之间留出更多垂直呼吸（16px） */
-      padding: 4px 10px 16px;
+      gap: 10px;
+      padding: 4px 8px 16px;
       font-size: 14px;
       font-weight: 600;
-      letter-spacing: -0.01em;
+      letter-spacing: -0.02em;
+      color: var(--sidebar-foreground);
     }
     .sidebar-brand img {
       width: 22px;
       height: 22px;
-      border-radius: calc(var(--radius) - 2px);
+      border-radius: var(--radius-sm);
+    }
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      gap: 2px;
+      min-height: 0;
     }
     .nav-item {
       display: flex;
       align-items: center;
       gap: 8px;
       width: 100%;
-      /* shadcn SidebarMenuButton：h-9（36px）项高，垂直呼吸感 */
-      height: 36px;
+      height: 32px;
       padding: 0 10px;
       font: inherit;
       font-size: 13px;
-      color: var(--muted-foreground);
+      font-weight: 400;
+      text-align: left;
+      color: color-mix(in oklch, var(--sidebar-foreground) 72%, transparent);
       background: none;
       border: none;
-      border-radius: calc(var(--radius) - 2px);
+      border-radius: var(--radius-md);
       cursor: pointer;
       outline: none;
+      user-select: none;
+      overflow: hidden;
+      white-space: nowrap;
       transition: background-color 0.12s ease, color 0.12s ease;
     }
-    /* shadcn 侧栏交互：hover 与选中均为实色 accent 块（color-mix 半透明
-       在深色主题下会发灰且深浅不一）；active 不加粗（与 shadcn Sidebar
-       一致，层次靠背景色而非字重） */
-    .nav-item:hover { background: var(--accent); color: var(--accent-foreground); }
-    .nav-item.active { background: var(--accent); color: var(--accent-foreground); }
+    .nav-item .icon { flex: none; }
+    .nav-item span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .nav-item:hover {
+      background: var(--sidebar-accent);
+      color: var(--sidebar-accent-foreground);
+    }
+    .nav-item.active {
+      background: var(--sidebar-accent);
+      color: var(--sidebar-accent-foreground);
+      font-weight: 500;
+    }
     .nav-item:focus-visible {
-      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+      box-shadow: 0 0 0 2px var(--sidebar), 0 0 0 4px var(--sidebar-ring);
     }
     /* ── 内容区 ───────────────────────────────────────────────────── */
     .content {
       flex: 1;
       min-width: 0;
+      min-height: 0;
       display: flex;
       flex-direction: column;
-      padding: 24px;
-      /* 显式声明（shadcn 内容区 = background）：不依赖 body 继承 */
       background: var(--background);
+    }
+    body.mode-settings .content {
+      overflow: hidden;
+    }
+    .content-header {
+      flex: none;
+      padding: 28px 32px 20px;
+    }
+    .content-header h1 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      line-height: 1.3;
     }
     .content header { margin-bottom: 20px; }
     .content h1 {
@@ -157,39 +217,54 @@
       font-weight: 600;
       letter-spacing: -0.01em;
     }
+    body.mode-settings .content header.content-header { margin-bottom: 0; }
     .subtitle {
       margin: 0;
       font-size: 13px;
+      line-height: 1.5;
       color: var(--muted-foreground);
     }
+    .content-scroll {
+      flex: 1;
+      min-height: 0;
+    }
+    body.mode-settings .content-scroll {
+      overflow-y: auto;
+      padding: 0 32px 8px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    body.mode-firstrun .content-header { display: none; }
+    body.mode-firstrun .content-scroll { overflow: visible; }
+    body.mode-firstrun { overflow-y: auto; }
 
     /* ── 首启模式的品牌头部（设置模式隐藏） ─────────────────────── */
     .brand {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
     }
-    /* 特异性盖过 .content header 的 20px：首启间距由 divider 承担 */
-    .content header.brand { margin-bottom: 0; }
+    .content header.brand { margin-bottom: 24px; }
     .brand-logo {
       width: 44px;
       height: 44px;
+      margin-bottom: 14px;
       border-radius: calc(var(--radius) * 1.4);
       box-shadow: 0 1px 2px oklch(0 0 0 / 0.08);
     }
     .brand h1 {
-      margin: 0;
-      font-size: 17px;
+      margin: 0 0 6px;
+      font-size: 18px;
       font-weight: 600;
-      letter-spacing: -0.01em;
+      letter-spacing: -0.025em;
+      line-height: 1.3;
     }
     .brand .subtitle { text-align: center; }
     body.mode-settings .brand { display: none; }
 
     /* ── 分区分隔（首启模式） ────────────────────────────────────── */
     .divider {
-      margin: 0 0 20px;
+      margin: 0 0 24px;
       border: 0;
       border-top: 1px solid var(--border);
     }
@@ -199,14 +274,10 @@
     .panel { display: block; }
     body.mode-settings .panel {
       display: none;
-      /* shadcn 卡片式内容块：muted 表面 + 边框 + 圆角 */
-      background: var(--muted);
-      border: 1px solid var(--border);
-      border-radius: calc(var(--radius) - 2px);
-      padding: 20px;
+      max-width: 36rem;
     }
     body.mode-settings .panel.active { display: block; }
-    .section { display: flex; flex-direction: column; gap: 16px; }
+    .section { display: flex; flex-direction: column; gap: 18px; }
     /* 区块间距仅首启模式需要（账号区与同步区间）；设置模式下账号区隐藏，
        兄弟选择器仍按 DOM 匹配会给同步区加 22px，破坏三个面板的 20px 一致 */
     body.mode-firstrun .section + .section { margin-top: 22px; }
@@ -217,7 +288,7 @@
       margin: 0;
       font-size: 13px;
       font-weight: 500;
-      letter-spacing: -0.005em;
+      letter-spacing: -0.01em;
     }
     .section-title .tag {
       font-size: 11px;
@@ -228,48 +299,86 @@
 
     .field { display: flex; flex-direction: column; }
     label {
-      margin-bottom: 6px;
+      margin-bottom: 8px;
       font-size: 13px;
       font-weight: 500;
+      letter-spacing: -0.005em;
     }
     input {
       width: 100%;
-      height: 36px;
+      height: 32px;
       padding: 0 12px;
       font: inherit;
+      font-size: 13px;
       color: var(--foreground);
       background: var(--background);
       border: 1px solid var(--input);
-      border-radius: calc(var(--radius) - 2px);
+      border-radius: var(--radius-md);
       outline: none;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
     }
-    input::placeholder { color: var(--muted-foreground); opacity: 0.6; }
+    @media (prefers-color-scheme: dark) {
+      input, .select-trigger {
+        background: color-mix(in oklch, var(--input) 30%, transparent);
+      }
+    }
+    input::placeholder { color: var(--muted-foreground); opacity: 0.7; }
     input:hover { border-color: var(--ring); }
 
+    /* 密钥输入：右侧 eye 叠在框内，不改变字段高度 */
+    .secret { position: relative; }
+    .secret input { padding-right: 36px; }
+    .secret-toggle {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      color: var(--muted-foreground);
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      outline: none;
+    }
+    .secret-toggle:hover { color: var(--foreground); background: var(--muted); }
+    .secret-toggle:focus-visible {
+      box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
+    }
+    /* SVG 的 hidden 属性在 Electron 里经常不生效；用 aria-pressed 切图标 */
+    .secret-toggle .secret-eye-off { display: none; }
+    .secret-toggle[aria-pressed="true"] .secret-eye { display: none; }
+    .secret-toggle[aria-pressed="true"] .secret-eye-off { display: block; }
+
     /* ── shadcn Select（自定义下拉，原生 select 不可样式化） ──────── */
-    .select { position: relative; width: 100%; }
+    .select { position: relative; width: 100%; max-width: 20rem; }
     .select-trigger {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
       width: 100%;
-      height: 36px; /* 与 input 同高 */
+      max-width: 20rem;
+      height: 32px;
       padding: 0 12px;
       font: inherit;
       font-size: 13px;
       color: var(--foreground);
       background: var(--background);
       border: 1px solid var(--input);
-      border-radius: calc(var(--radius) - 2px);
+      border-radius: var(--radius-md);
       cursor: pointer;
       outline: none;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
     }
     .select-trigger:hover { border-color: var(--ring); }
     .select-trigger:focus-visible {
-      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+      border-color: var(--ring);
+      box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
     }
     .select-chevron {
       width: 16px;
@@ -282,23 +391,23 @@
     .select-popup {
       position: absolute;
       top: calc(100% + 4px);
-      /* alignItemWithTrigger=false：popup 左缘对齐 trigger 左缘 */
       left: 0;
-      min-width: 100%;
+      min-width: min(100%, 20rem);
       z-index: 50;
       padding: 4px;
-      background: var(--background);
+      color: var(--popover-foreground);
+      background: var(--popover);
       border: 1px solid var(--border);
-      border-radius: calc(var(--radius) - 2px);
-      box-shadow: 0 8px 24px oklch(0 0 0 / 0.12), 0 2px 8px oklch(0 0 0 / 0.08);
+      border-radius: var(--radius-md);
+      box-shadow: 0 10px 15px -3px oklch(0 0 0 / 0.1), 0 4px 6px -4px oklch(0 0 0 / 0.1);
     }
     .select-item {
       display: flex;
       align-items: center;
       height: 32px;
-      padding: 0 10px;
+      padding: 0 8px;
       font-size: 13px;
-      border-radius: calc(var(--radius) - 4px);
+      border-radius: var(--radius-sm);
       cursor: pointer;
       transition: background-color 0.1s ease, color 0.1s ease;
     }
@@ -306,15 +415,16 @@
     .select-item.selected { font-weight: 500; }
     input:focus-visible {
       border-color: var(--ring);
-      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+      box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
     }
     input[aria-invalid="true"] {
       border-color: var(--destructive);
-      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px color-mix(in oklch, var(--destructive) 35%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in oklch, var(--destructive) 20%, transparent);
     }
     .hint {
-      margin: 8px 0 0; /* 输入框下方留出呼吸空间（含聚焦环） */
+      margin: 8px 0 0;
       font-size: 12px;
+      line-height: 1.5;
       color: var(--muted-foreground);
     }
     a {
@@ -322,23 +432,25 @@
       text-decoration: none;
       border-radius: 2px;
     }
-    a:hover { text-decoration: underline; }
+    a:hover { text-decoration: underline; text-underline-offset: 2px; }
     a:focus-visible {
       outline: none;
-      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+      box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
     }
     .section-footer {
       display: flex;
-      align-items: center; /* 图标与文字基线垂直居中对齐 */
-      gap: 6px;
-      margin: 10px 0 0; /* 与上方字段提示（hint）拉开节奏 */
+      align-items: flex-start;
+      gap: 8px;
+      margin: 4px 0 0;
       font-size: 12px;
+      line-height: 1.5;
       color: var(--muted-foreground);
     }
     .section-footer .help-icon {
-      width: 14px; /* 与 12px 正文等高的视觉比例 */
+      width: 14px;
       height: 14px;
       flex: none;
+      margin-top: 1px;
     }
 
     /* 面板内标题：设置模式由内容区头部承载，此处隐藏（仅首启模式显示） */
@@ -346,27 +458,49 @@
 
     /* ── 状态区与操作栏间距（hairline 分隔） ─────────────────────── */
     .status {
-      min-height: 40px;
-      margin-top: 18px;
+      min-height: 0;
+      margin-top: 16px;
       font-size: 12px;
+      line-height: 1.5;
       color: var(--muted-foreground);
       white-space: pre-line;
     }
     .status.error { color: var(--destructive); }
     .actions-bar {
-      margin-top: 14px;
+      margin-top: 16px;
       border-top: 1px solid var(--border);
       padding-top: 16px;
       display: flex;
       align-items: center;
       gap: 8px;
     }
+    .status:empty { display: none; }
+    body.mode-settings .content-footer {
+      flex: none;
+      padding: 16px 32px 20px;
+      background: var(--background);
+      border-top: 1px solid var(--border);
+    }
+    body.mode-settings .content-footer .status {
+      margin-top: 0;
+    }
+    body.mode-settings .content-footer .status:not(:empty) {
+      margin-bottom: 12px;
+    }
+    body.mode-settings .content-footer .actions-bar {
+      margin-top: 0;
+      border-top: none;
+      padding-top: 0;
+    }
     body.mode-firstrun .actions-bar {
       border-top: none;
-      margin-top: 4px;
+      margin-top: 20px;
       padding-top: 0;
       flex-direction: column;
       align-items: stretch;
+    }
+    body.mode-firstrun .status:not(:empty) + .actions-bar {
+      margin-top: 12px;
     }
 
     /* ── 按钮 ─────────────────────────────────────────────────────── */
@@ -374,72 +508,76 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      /* 高度与紧凑操作（检查更新等 button.small）一致 */
-      height: 28px;
-      padding: 0 14px;
+      gap: 6px;
+      height: 32px;
+      padding: 0 12px;
       font: inherit;
       font-size: 13px;
       font-weight: 500;
       color: var(--primary-foreground);
       background: var(--primary);
       border: 1px solid transparent;
-      border-radius: calc(var(--radius) - 2px);
+      border-radius: var(--radius-md);
       cursor: pointer;
       outline: none;
+      white-space: nowrap;
       transition: background-color 0.15s ease, opacity 0.15s ease;
     }
-    button.primary:hover:not(:disabled) { background: color-mix(in oklch, var(--primary) 90%, var(--background)); }
+    button.primary:hover:not(:disabled) { background: color-mix(in oklch, var(--primary) 90%, transparent); }
     button.primary:focus-visible {
-      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+      box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
     }
     button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
     /* 首启模式：主按钮全宽 */
     body.mode-firstrun button.primary { width: 100%; }
 
-    button.secondary {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      /* 高度与紧凑操作（检查更新等 button.small）一致 */
-      height: 28px;
-      padding: 0 14px;
-      font: inherit;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--accent-foreground);
-      background: var(--accent);
-      border: 1px solid transparent;
-      border-radius: calc(var(--radius) - 2px);
-      cursor: pointer;
-      outline: none;
-      transition: background-color 0.15s ease, opacity 0.15s ease;
-    }
-    button.secondary:hover:not(:disabled) { background: color-mix(in oklch, var(--accent) 80%, var(--background)); }
-    button.secondary:focus-visible {
-      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
-    }
-    button.secondary:disabled { opacity: 0.5; cursor: not-allowed; }
-
+    /* 次按钮 = shadcn outline：实心底 + 边框。不用 --secondary 实心——
+       浅色 secondary(0.97) 贴在 background/card(1) 上几乎看不见；
+       深色 secondary(0.269) 贴在 card(0.205) 上同样糊成一块。 */
+    button.secondary,
     button.link {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
-      padding: 0;
+      height: 32px;
+      padding: 0 12px;
       font: inherit;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 500;
-      color: var(--muted-foreground);
-      background: none;
-      border: none;
-      border-radius: 2px;
+      color: var(--foreground);
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: 0 1px 2px oklch(0 0 0 / 0.04);
       cursor: pointer;
       outline: none;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
     }
-    button.link:hover { color: var(--foreground); text-decoration: underline; }
+    button.secondary:hover:not(:disabled),
+    button.link:hover:not(:disabled) {
+      background: var(--muted);
+      color: var(--foreground);
+    }
+    button.secondary:focus-visible,
     button.link:focus-visible {
-      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+      box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
+    }
+    button.secondary:disabled,
+    button.link:disabled { opacity: 0.5; cursor: not-allowed; }
+    @media (prefers-color-scheme: dark) {
+      button.secondary,
+      button.link {
+        /* 不透明：input 30% 混入 background，避免透明底叠在 card 上又糊回去 */
+        border-color: var(--input);
+        background: color-mix(in oklch, var(--input) 30%, var(--background));
+        box-shadow: none;
+      }
+      button.secondary:hover:not(:disabled),
+      button.link:hover:not(:disabled) {
+        background: color-mix(in oklch, var(--input) 50%, var(--background));
+      }
     }
 
     /* ── 按钮级 spinner ───────────────────────────────────────────── */
@@ -459,40 +597,59 @@
 
     /* 关于面板（无品牌块：标题块与内容间距与其他面板一致，由
        .content header 的 20px margin 承担） */
+    .about-group {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--card);
+      color: var(--card-foreground);
+    }
+    .about-group .field {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .about-group .field:last-child { border-bottom: none; }
     .about-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
-      min-height: 28px; /* 与按钮同高，值垂直居中 */
+      gap: 12px;
+      min-height: 32px;
     }
+    .about-row button { flex: none; }
     .about-label {
-      font-size: 13px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 500;
       color: var(--muted-foreground);
     }
     .about-version {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       font-size: 14px;
       font-weight: 600;
       font-variant-numeric: tabular-nums;
-      letter-spacing: -0.01em;
+      letter-spacing: -0.02em;
       color: var(--foreground);
     }
     button.small {
-      height: 28px;
+      height: 32px;
       padding: 0 12px;
-      font-size: 12px;
+      font-size: 13px;
     }
     .about-link {
       font-size: 13px;
       color: var(--primary);
       text-decoration: none;
       overflow-wrap: break-word;
-      transition: text-decoration-color 0.12s ease;
     }
     .about-link:hover { text-decoration: underline; text-underline-offset: 2px; }
     .about-license {
       font-size: 13px;
-      /* 次级元信息：muted，不与主内容同级 */
       color: var(--muted-foreground);
     }
     #updateStatus.error { color: var(--destructive); }
@@ -501,13 +658,23 @@
     .data-card {
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      padding: 12px 14px;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 16px;
       border: 1px solid var(--border);
-      border-radius: calc(var(--radius) - 2px);
-      background: var(--muted);
+      border-radius: var(--radius-lg);
+      background: var(--card);
+      color: var(--card-foreground);
     }
     .data-card .hint { margin: 0; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      padding: 1px 6px;
+      border-radius: var(--radius-sm);
+      background: var(--muted);
+      border: 1px solid var(--border);
+    }
   </style>
 </head>
 <body>
@@ -517,14 +684,14 @@
       <img src="../assets/tray.png" alt="" />
       <span>Zlog</span>
     </div>
-    <nav>
+    <nav class="sidebar-nav">
       <button class="nav-item active" data-panel="sync">
         <svg class="icon" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
-        同步设置
+        <span data-i18n="nav.sync">同步设置</span>
       </button>
       <button class="nav-item" data-panel="analytics">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
-        流量分析
+        <span data-i18n="nav.analytics">流量分析</span>
       </button>
       <button class="nav-item" data-panel="data">
         <svg class="icon" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
@@ -559,6 +726,7 @@
 
     <hr class="divider" />
 
+    <div class="content-scroll">
     <!-- 面板：同步设置 -->
     <section class="panel active" id="panel-sync">
       <div class="section" id="passwordFields">
@@ -569,11 +737,23 @@
         </div>
         <div class="field">
           <label for="password" data-i18n="account.password">密码</label>
-          <input id="password" type="password" autocomplete="new-password" />
+          <div class="secret">
+            <input id="password" type="password" autocomplete="new-password" />
+            <button type="button" class="secret-toggle" aria-controls="password" aria-pressed="false" aria-label="显示">
+              <svg class="icon secret-eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="icon secret-eye-off" viewBox="0 0 24 24" hidden aria-hidden="true"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+            </button>
+          </div>
         </div>
         <div class="field">
           <label for="password2" data-i18n="account.confirmPassword">确认密码</label>
-          <input id="password2" type="password" autocomplete="new-password" />
+          <div class="secret">
+            <input id="password2" type="password" autocomplete="new-password" />
+            <button type="button" class="secret-toggle" aria-controls="password2" aria-pressed="false" aria-label="显示">
+              <svg class="icon secret-eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="icon secret-eye-off" viewBox="0 0 24 24" hidden aria-hidden="true"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -589,7 +769,13 @@
         </div>
         <div class="field">
           <label for="syncToken" data-i18n="sync.token">数据库 Token</label>
-          <input id="syncToken" type="password" placeholder="eyJ..." />
+          <div class="secret">
+            <input id="syncToken" type="password" placeholder="eyJ..." />
+            <button type="button" class="secret-toggle" aria-controls="syncToken" aria-pressed="false" aria-label="显示">
+              <svg class="icon secret-eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="icon secret-eye-off" viewBox="0 0 24 24" hidden aria-hidden="true"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+            </button>
+          </div>
           <p class="hint" data-i18n="sync.tokenHint">在 Turso 控制台创建</p>
         </div>
         <p class="section-footer">
@@ -609,7 +795,13 @@
       <div class="section">
         <div class="field">
           <label for="vercelApiToken" data-i18n="analytics.vercelToken">Vercel API Token</label>
-          <input id="vercelApiToken" type="password" data-i18n-placeholder="analytics.vercelTokenPh" placeholder="Vercel 控制台 → Settings → Tokens" />
+          <div class="secret">
+            <input id="vercelApiToken" type="password" data-i18n-placeholder="analytics.vercelTokenPh" placeholder="Vercel 控制台 → Settings → Tokens" />
+            <button type="button" class="secret-toggle" aria-controls="vercelApiToken" aria-pressed="false" aria-label="显示">
+              <svg class="icon secret-eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="icon secret-eye-off" viewBox="0 0 24 24" hidden aria-hidden="true"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+            </button>
+          </div>
         </div>
         <div class="field">
           <label for="vercelProjectId" data-i18n="analytics.vercelProjectId">Vercel Project ID</label>
@@ -620,18 +812,24 @@
           <input id="vercelTeamId" data-i18n-placeholder="analytics.vercelTeamIdPh" placeholder="留空表示个人项目" />
         </div>
         <div class="field">
-          <label for="gaPropertyId" data-i18n="analytics.gaId">GA4 媒体资源 ID</label>
+          <label for="gaPropertyId" data-i18n="analytics.gaId">Google Analytics 4 媒体资源 ID</label>
           <input id="gaPropertyId" placeholder="123456789" />
         </div>
         <div class="field">
-          <label for="gaClientEmail" data-i18n="analytics.gaEmail">GA4 服务账号邮箱</label>
+          <label for="gaClientEmail" data-i18n="analytics.gaEmail">Google Analytics 4 服务账号邮箱</label>
           <input id="gaClientEmail" placeholder="xxx@project.iam.gserviceaccount.com" />
         </div>
         <div class="field">
-          <label for="gaPrivateKey" data-i18n="analytics.gaKey">GA4 服务账号私钥</label>
-          <input id="gaPrivateKey" type="password" placeholder="-----BEGIN PRIVATE KEY-----" />
+          <label for="gaPrivateKey" data-i18n="analytics.gaKey">Google Analytics 4 服务账号私钥</label>
+          <div class="secret">
+            <input id="gaPrivateKey" type="password" placeholder="-----BEGIN PRIVATE KEY-----" />
+            <button type="button" class="secret-toggle" aria-controls="gaPrivateKey" aria-pressed="false" aria-label="显示">
+              <svg class="icon secret-eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="icon secret-eye-off" viewBox="0 0 24 24" hidden aria-hidden="true"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+            </button>
+          </div>
         </div>
-        <p class="hint" data-i18n="analytics.hint">服务账号需在 GA4 媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节</p>
+        <p class="hint" data-i18n="analytics.hint">服务账号需在 Google Analytics 4 媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节</p>
       </div>
     </section>
 
@@ -662,9 +860,9 @@
               <svg class="icon select-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
             </button>
             <div class="select-popup" id="langPopup" role="listbox" hidden>
-              <div class="select-item" data-value="system" role="option">跟随系统</div>
-              <div class="select-item" data-value="zh" role="option">中文</div>
-              <div class="select-item" data-value="en" role="option">English</div>
+              <div class="select-item" data-value="system" role="option" data-i18n="lang.system">跟随系统</div>
+              <div class="select-item" data-value="zh" role="option" data-i18n="lang.zh">中文</div>
+              <div class="select-item" data-value="en" role="option" data-i18n="lang.en">English</div>
             </div>
           </div>
           <p class="hint" data-i18n="lang.hint">跟随系统时，系统语言为中文则显示中文；其他语言一律显示英文</p>
@@ -674,7 +872,7 @@
 
     <!-- 面板：关于（无品牌块；标题块与内容间距由 .content header 承担） -->
     <section class="panel" id="panel-about">
-      <div class="section">
+      <div class="about-group">
         <div class="field">
           <span class="about-label" data-i18n="about.version">版本</span>
           <div class="about-row">
@@ -697,7 +895,9 @@
         </div>
       </div>
     </section>
+    </div>
 
+    <div class="content-footer">
     <div class="status" id="status" aria-live="polite"></div>
 
     <div class="actions-bar">
@@ -705,6 +905,7 @@
         <span id="saveBtnLabel" data-i18n="save.firstRun">保存并启动</span>
       </button>
       <button class="secondary" id="syncBtn" data-i18n="sync.now">立即同步</button>
+    </div>
     </div>
   </main>
 

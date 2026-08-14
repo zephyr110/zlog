@@ -14,7 +14,7 @@ const I18N = {
     "nav.sync": "同步设置",
     "nav.analytics": "流量分析",
     "nav.data": "数据目录",
-    "nav.lang": "系统语言",
+    "nav.lang": "语言",
     "nav.about": "关于",
     "firstrun.title": "Zlog 首次设置",
     "firstrun.subtitle": "创建管理员账号；同步可稍后在设置中补充",
@@ -47,10 +47,10 @@ const I18N = {
     "analytics.vercelProjectIdPh": "项目 Settings → General 页面底部",
     "analytics.vercelTeamId": "Vercel Team ID（团队项目才需要）",
     "analytics.vercelTeamIdPh": "留空表示个人项目",
-    "analytics.gaId": "GA4 媒体资源 ID",
-    "analytics.gaEmail": "GA4 服务账号邮箱",
-    "analytics.gaKey": "GA4 服务账号私钥",
-    "analytics.hint": "服务账号需在 GA4 媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节",
+    "analytics.gaId": "Google Analytics 4 媒体资源 ID",
+    "analytics.gaEmail": "Google Analytics 4 服务账号邮箱",
+    "analytics.gaKey": "Google Analytics 4 服务账号私钥",
+    "analytics.hint": "服务账号需在 Google Analytics 4 媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节",
     "data.pathPre": "数据保存在用户数据目录：",
     "data.pathDb": "（本地数据库）、",
     "data.pathCfg": "（配置）、",
@@ -81,6 +81,8 @@ const I18N = {
     "save.firstRun": "保存并启动",
     "save.settings": "保存",
     "sync.now": "立即同步",
+    "secret.show": "显示",
+    "secret.hide": "隐藏",
     "status.saving": "保存中…",
     "status.saved": "已保存",
     "status.savedFirstRun": "已保存，博客即将打开。",
@@ -103,7 +105,7 @@ const I18N = {
     "nav.sync": "Sync",
     "nav.analytics": "Analytics",
     "nav.data": "Data Folder",
-    "nav.lang": "System Language",
+    "nav.lang": "Language",
     "nav.about": "About",
     "firstrun.title": "Zlog First-Time Setup",
     "firstrun.subtitle": "Create an admin account; sync can be added later in Settings",
@@ -136,10 +138,10 @@ const I18N = {
     "analytics.vercelProjectIdPh": "Bottom of project Settings → General",
     "analytics.vercelTeamId": "Vercel Team ID (teams only)",
     "analytics.vercelTeamIdPh": "Leave empty for personal projects",
-    "analytics.gaId": "GA4 Property ID",
-    "analytics.gaEmail": "GA4 service account email",
-    "analytics.gaKey": "GA4 service account private key",
-    "analytics.hint": "Grant the service account \"Viewer\" access on the GA4 property; see the README deployment section for steps",
+    "analytics.gaId": "Google Analytics 4 property ID",
+    "analytics.gaEmail": "Google Analytics 4 service account email",
+    "analytics.gaKey": "Google Analytics 4 service account private key",
+    "analytics.hint": "Grant the service account \"Viewer\" access on the Google Analytics 4 property; see the README deployment section for steps",
     "data.pathPre": "Data lives in the user data folder: ",
     "data.pathDb": " (local database), ",
     "data.pathCfg": " (config), ",
@@ -170,6 +172,8 @@ const I18N = {
     "save.firstRun": "Save & Start",
     "save.settings": "Save",
     "sync.now": "Sync Now",
+    "secret.show": "Show",
+    "secret.hide": "Hide",
     "status.saving": "Saving…",
     "status.saved": "Saved",
     "status.savedFirstRun": "Saved — your blog is about to open.",
@@ -225,6 +229,16 @@ function applyLang() {
       item.classList.toggle("selected", item.dataset.value === currentPref)
     }
   }
+  for (const btn of document.querySelectorAll(".secret-toggle")) syncSecretToggle(btn)
+}
+
+/** 密钥框 eye：按当前 type 同步图标与 aria-label（不走 data-i18n，以免清掉 SVG）。 */
+function syncSecretToggle(btn) {
+  const input = document.getElementById(btn.getAttribute("aria-controls"))
+  if (!input) return
+  const shown = input.type === "text"
+  btn.setAttribute("aria-pressed", String(shown))
+  btn.setAttribute("aria-label", t(shown ? "secret.hide" : "secret.show"))
 }
 
 // ── 语言 select 与关于面板状态（声明先于 applyLang：语言初始化会在
@@ -361,6 +375,16 @@ if (!isFirstRun) {
 // 首启模式下语言面板被隐藏但元素在 DOM：首启跟随系统语言渲染。
 // 先同步渲染一次 zh 默认，避免 IPC 往返期间窗口停留在 HTML 初值。
 applyLang()
+for (const btn of document.querySelectorAll(".secret-toggle")) {
+  btn.addEventListener("click", (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const input = document.getElementById(btn.getAttribute("aria-controls"))
+    if (!input) return
+    input.type = input.type === "password" ? "text" : "password"
+    syncSecretToggle(btn)
+  })
+}
 const langSelectBtn = document.getElementById("langSelectBtn")
 const langPopup = document.getElementById("langPopup")
 
