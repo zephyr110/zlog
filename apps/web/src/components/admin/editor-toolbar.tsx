@@ -101,39 +101,41 @@ export function EditorToolbar({
           {t("admin.insertImage")}
         </TooltipContent>
       </Tooltip>
-      <span className="w-px h-5 bg-border mx-1" />
-      {/* Collapse/expand preview (desktop split view) */}
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <IconButton
-              size="sm"
-              aria-label={
-                previewCollapsed
-                  ? (t("admin.expandPreview"))
-                  : (t("admin.collapsePreview"))
-              }
-              onClick={onTogglePreview}
-              className={
-                previewCollapsed
-                  ? "text-primary bg-primary/10 hover:bg-primary/15"
-                  : undefined
-              }
-            >
-              {previewCollapsed ? (
-                <Eye size={15} />
-              ) : (
-                <EyeOff size={15} />
-              )}
-            </IconButton>
-          }
-        />
-        <TooltipContent>
-          {previewCollapsed
-            ? (t("admin.expandPreview"))
-            : (t("admin.collapsePreview"))}
-        </TooltipContent>
-      </Tooltip>
+      {/* lg+ 分栏才用 eye；移动端已有 Edit/Preview 滑块，再放会重复且点了无效 */}
+      <div className="hidden lg:flex items-center gap-0.5">
+        <span className="w-px h-5 bg-border mx-1" />
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <IconButton
+                size="sm"
+                aria-label={
+                  previewCollapsed
+                    ? (t("admin.expandPreview"))
+                    : (t("admin.collapsePreview"))
+                }
+                onClick={onTogglePreview}
+                className={
+                  previewCollapsed
+                    ? "text-primary bg-primary/10 hover:bg-primary/15"
+                    : undefined
+                }
+              >
+                {previewCollapsed ? (
+                  <Eye size={15} />
+                ) : (
+                  <EyeOff size={15} />
+                )}
+              </IconButton>
+            }
+          />
+          <TooltipContent>
+            {previewCollapsed
+              ? (t("admin.expandPreview"))
+              : (t("admin.collapsePreview"))}
+          </TooltipContent>
+        </Tooltip>
+      </div>
     </div>
   )
 }

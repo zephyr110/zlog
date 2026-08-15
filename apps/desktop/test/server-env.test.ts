@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildServerEnv } from "../electron/server-env"
+import { buildServerEnv, mergeNoProxy } from "../electron/server-env"
 import type { DesktopConfig } from "../electron/config-store"
 
 const base: DesktopConfig = {
@@ -69,30 +69,63 @@ describe("buildServerEnv analytics", () => {
 
   it("显式传入的系统代理优先于进程 env", () => {
     const prevHttps = process.env.HTTPS_PROXY
+    const prevNo = process.env.NO_PROXY
+    const prevNoLower = process.env.no_proxy
     process.env.HTTPS_PROXY = "http://127.0.0.1:1"
+    delete process.env.NO_PROXY
+    delete process.env.no_proxy
     try {
       const env = buildServerEnv(base, "/data/zlog.db", undefined, "http://127.0.0.1:9")
       expect(env.HTTPS_PROXY).toBe("http://127.0.0.1:9")
+      expect(env.NO_PROXY).toBe("127.0.0.1,localhost,::1")
     } finally {
       if (prevHttps === undefined) delete process.env.HTTPS_PROXY
       else process.env.HTTPS_PROXY = prevHttps
+      if (prevNo === undefined) delete process.env.NO_PROXY
+      else process.env.NO_PROXY = prevNo
+      if (prevNoLower === undefined) delete process.env.no_proxy
+      else process.env.no_proxy = prevNoLower
     }
   })
 
-  it("透传进程 HTTPS_PROXY 给服务器", () => {
+  it("未传入 httpsProxy 时不回落进程 env，避免 IDE 死代理灌进 Next", () => {
     const prevHttps = process.env.HTTPS_PROXY
     const prevHttp = process.env.HTTP_PROXY
-    process.env.HTTPS_PROXY = "http://127.0.0.1:65534"
+    process.env.HTTPS_PROXY = "http://127.0.0.1:1"
     delete process.env.HTTP_PROXY
     try {
       const env = buildServerEnv(base, "/data/zlog.db")
-      expect(env.HTTPS_PROXY).toBe("http://127.0.0.1:65534")
-      expect(env.HTTP_PROXY).toBe("http://127.0.0.1:65534")
+      expect(env.HTTPS_PROXY).toBeUndefined()
+      expect(env.HTTP_PROXY).toBeUndefined()
+      expect(env.NO_PROXY).toBeUndefined()
     } finally {
       if (prevHttps === undefined) delete process.env.HTTPS_PROXY
       else process.env.HTTPS_PROXY = prevHttps
       if (prevHttp === undefined) delete process.env.HTTP_PROXY
       else process.env.HTTP_PROXY = prevHttp
+    }
+  })
+
+  it("注入代理时合并已有 NO_PROXY，不覆盖", () => {
+    const prevNo = process.env.NO_PROXY
+    const prevNoLower = process.env.no_proxy
+    process.env.NO_PROXY = ".example.com,localhost"
+    delete process.env.no_proxy
+    try {
+      const env = buildServerEnv(
+        base,
+        "/data/zlog.db",
+        undefined,
+        "http://127.0.0.1:65534"
+      )
+      expect(env.HTTPS_PROXY).toBe("http://127.0.0.1:65534")
+      expect(env.NO_PROXY).toBe(".example.com,localhost,127.0.0.1,::1")
+      expect(env.no_proxy).toBe(env.NO_PROXY)
+    } finally {
+      if (prevNo === undefined) delete process.env.NO_PROXY
+      else process.env.NO_PROXY = prevNo
+      if (prevNoLower === undefined) delete process.env.no_proxy
+      else process.env.no_proxy = prevNoLower
     }
   })
 
@@ -107,11 +140,31 @@ describe("buildServerEnv analytics", () => {
       const env = buildServerEnv(base, "/data/zlog.db")
       expect(env.HTTPS_PROXY).toBeUndefined()
       expect(env.HTTP_PROXY).toBeUndefined()
+      expect(env.NO_PROXY).toBeUndefined()
     } finally {
       for (const k of keys) {
         if (prev[k] === undefined) delete process.env[k]
         else process.env[k] = prev[k]
       }
     }
+  })
+
+  it("SOCKS 代理写入 ALL_PROXY，不伪装成 HTTP", () => {
+    const env = buildServerEnv(base, "/data/zlog.db", undefined, "socks5://127.0.0.1:1080")
+    expect(env.ALL_PROXY).toBe("socks5://127.0.0.1:1080")
+    expect(env.HTTPS_PROXY).toBeUndefined()
+  })
+})
+
+describe("mergeNoProxy", () => {
+  it("空名单只保留本机项", () => {
+    expect(mergeNoProxy(undefined)).toBe("127.0.0.1,localhost,::1")
+    expect(mergeNoProxy("")).toBe("127.0.0.1,localhost,::1")
+  })
+
+  it("保留已有项并去重", () => {
+    expect(mergeNoProxy(".corp,localhost, 127.0.0.1")).toBe(
+      ".corp,localhost,127.0.0.1,::1"
+    )
   })
 })

@@ -43,19 +43,26 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   // 挂载期 GET /api/lang 未返回时用户已切换：该响应是陈旧快照，须跳过。
   // （默认 false：无切换时桌面源仍优先；setLocale 置位）
   const userPickedRef = useRef(false)
+  const desktopLangRef = useRef<boolean | null>(null)
 
   useEffect(() => {
     // 桌面端：语言单一事实源在主进程（lang.json，经 /api/lang）——
-    // 设置窗口的语言切换优先，web 界面跟随。纯 web（GitHub Pages，
-    // /api/lang 404）回落 localStorage。两者都让 SSR 首帧保持 defaultLocale，
+    // 设置窗口的语言切换优先，web 界面跟随。纯 web（desktop: false）
+    // 回落 localStorage。两者都让 SSR 首帧保持 defaultLocale，
     // 与现有注释的 hydration 约束一致。
     let cancelled = false
     async function syncFromDesktopOrStorage() {
       try {
         const res = await fetch("/api/lang")
         if (res.ok) {
-          const state = (await res.json()) as { resolved?: unknown }
+          const state = (await res.json()) as {
+            resolved?: unknown
+            desktop?: unknown
+          }
+          if (state.desktop === false) desktopLangRef.current = false
+          else if (state.desktop === true) desktopLangRef.current = true
           if (state.resolved === "zh" || state.resolved === "en") {
+            desktopLangRef.current = true
             // fetch 期间用户已手动切换过：陈旧响应不得覆盖（setLocale 置位）
             if (!cancelled && !userPickedRef.current) setLocaleState(state.resolved)
             return
@@ -89,12 +96,14 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(STORAGE_KEY, l)
     } catch {}
-    // 桌面端：写回统一语言源，设置窗口/托盘跟随（纯 web 下 404 静默忽略）
-    void fetch("/api/lang", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pref: l }),
-    }).catch(() => {})
+    // 桌面端：写回统一语言源。纯 web 不 POST，避免控制台 404。
+    if (desktopLangRef.current !== false) {
+      void fetch("/api/lang", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pref: l }),
+      }).catch(() => {})
+    }
   }, [])
 
   return (

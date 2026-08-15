@@ -54,9 +54,9 @@ const I18N = {
     "analytics.gaEmail": "服务账号邮箱",
     "analytics.gaKey": "服务账号私钥",
     "analytics.hint": "服务账号需在该媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节",
-    "analytics.proxyTitle": "HTTP 代理",
-    "analytics.proxyPh": "http://127.0.0.1:端口",
-    "analytics.proxyHint": "用于拉取 Vercel Analytics 与 Google Analytics 4。留空则自动读取系统/VPN 的 HTTP 代理；读不到或超时时再填写。",
+    "analytics.proxyTitle": "网络代理",
+    "analytics.proxyPh": "http:// 或 socks5://主机:端口",
+    "analytics.proxyHint": "用于拉取 Vercel Analytics 与 Google Analytics 4。留空则自动读取系统/VPN 的 HTTP 或 SOCKS 代理。SOCKS 端口请填 socks5://，不要写成 http://。",
     "data.location": "位置",
     "data.backupHint": "本地数据库、配置与日志。备份该目录即备份整个博客",
     "data.open": "打开",
@@ -94,7 +94,7 @@ const I18N = {
     "status.fillUsername": "请填写用户名。",
     "status.passwordRule": "密码至少 6 位，且两次输入一致。",
     "status.syncUrlInvalid": "数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io",
-    "status.httpsProxyInvalid": "HTTP 代理格式应为 http://主机:端口",
+    "status.httpsProxyInvalid": "代理格式应为 http://主机:端口 或 socks5://主机:端口",
     "status.sync": "同步",
     "status.configured": "已配置",
     "status.notConfigured": "未配置",
@@ -150,9 +150,9 @@ const I18N = {
     "analytics.gaEmail": "Service account email",
     "analytics.gaKey": "Service account private key",
     "analytics.hint": "Grant the service account Viewer access on this property; see the README deployment section for steps",
-    "analytics.proxyTitle": "HTTP Proxy",
-    "analytics.proxyPh": "http://127.0.0.1:port",
-    "analytics.proxyHint": "Used to fetch Vercel Analytics and Google Analytics 4. Leave empty to read the system/VPN HTTP proxy; fill this in if detection fails or requests time out.",
+    "analytics.proxyTitle": "Proxy",
+    "analytics.proxyPh": "http:// or socks5://host:port",
+    "analytics.proxyHint": "Used to fetch Vercel Analytics and Google Analytics 4. Leave empty to read the system/VPN HTTP or SOCKS proxy. Use socks5:// for a SOCKS port; do not write it as http://.",
     "data.location": "Location",
     "data.backupHint": "Local database, config, and logs. Back up this folder to back up the whole blog",
     "data.open": "Open",
@@ -190,7 +190,7 @@ const I18N = {
     "status.fillUsername": "Please enter a username.",
     "status.passwordRule": "Password must be at least 6 characters and match the confirmation.",
     "status.syncUrlInvalid": "Database URL must start with libsql://, e.g. libsql://your-db.turso.io",
-    "status.httpsProxyInvalid": "HTTP proxy must look like http://host:port",
+    "status.httpsProxyInvalid": "Proxy must look like http://host:port or socks5://host:port",
     "status.sync": "Sync",
     "status.configured": "Configured",
     "status.notConfigured": "Not configured",
@@ -496,17 +496,25 @@ async function refreshStatus() {
 }
 
 function isValidHttpProxy(raw) {
-  if (!raw || /^socks/i.test(raw)) return false
+  if (!raw) return false
   try {
-    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `http://${raw}`)
-    const hostPart = raw.replace(/^https?:\/\//i, "").split("/")[0] || ""
+    const prefixed = /^(https?|socks5h?|socks4a?|socks):\/\//i.test(raw) ? raw : `http://${raw}`
+    const url = new URL(prefixed)
+    const hostPart = raw.replace(/^(https?|socks5h?|socks4a?|socks):\/\//i, "").split("/")[0] || ""
     const host = hostPart.startsWith("[")
       ? hostPart
       : hostPart.includes("@")
         ? hostPart.slice(hostPart.lastIndexOf("@") + 1)
         : hostPart
     const hasPort = host.startsWith("[") ? /\]:\d+$/.test(host) : /:\d+$/.test(host)
-    return (url.protocol === "http:" || url.protocol === "https:") && !!url.hostname && hasPort
+    const proto = url.protocol
+    const okProto =
+      proto === "http:" ||
+      proto === "https:" ||
+      proto === "socks:" ||
+      proto === "socks5:" ||
+      proto === "socks5h:"
+    return okProto && !!url.hostname && hasPort
   } catch {
     return false
   }

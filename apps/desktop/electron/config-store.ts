@@ -17,7 +17,7 @@ export interface DesktopConfig {
   gaPropertyId?: string
   gaClientEmail?: string
   gaPrivateKey?: string
-  /** 选填 HTTP 代理。有值则覆盖自动检测，供 Vercel / GA4 拉取。 */
+  /** 选填 HTTP / SOCKS5 代理。有值则覆盖自动检测，供 Vercel / GA4 拉取。 */
   httpsProxy?: string
 }
 

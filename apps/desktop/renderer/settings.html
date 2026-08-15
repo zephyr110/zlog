@@ -850,11 +850,11 @@
         </div>
       </div>
       <div class="group">
-        <h2 class="block-title" id="proxyHeading"><span data-i18n="analytics.proxyTitle">HTTP 代理</span><span class="opt" data-i18n="tag.optional">（可选）</span></h2>
+        <h2 class="block-title" id="proxyHeading"><span data-i18n="analytics.proxyTitle">网络代理</span><span class="opt" data-i18n="tag.optional">（可选）</span></h2>
         <div class="block">
         <div class="field">
-          <input id="httpsProxy" aria-labelledby="proxyHeading" data-i18n-placeholder="analytics.proxyPh" placeholder="http://127.0.0.1:端口" />
-          <p class="hint" data-i18n="analytics.proxyHint">用于拉取 Vercel Analytics 与 Google Analytics 4。留空则自动读取系统/VPN 的 HTTP 代理；读不到或超时时再填写。</p>
+          <input id="httpsProxy" aria-labelledby="proxyHeading" data-i18n-placeholder="analytics.proxyPh" placeholder="http:// 或 socks5://主机:端口" />
+          <p class="hint" data-i18n="analytics.proxyHint">用于拉取 Vercel Analytics 与 Google Analytics 4。留空则自动读取系统/VPN 的 HTTP 或 SOCKS 代理。SOCKS 端口请填 socks5://，不要写成 http://。</p>
         </div>
         </div>
       </div>

@@ -407,15 +407,26 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
             onTogglePreview={() => setPreviewCollapsed(!previewCollapsed)}
           />
 
-          {/* Split view (lg+) — preview on the left, editor on the right.
-              The preview pane can be collapsed to give the editor full width. */}
+          {/* Split view (lg+) — preview left, editor right. Keep the preview
+              mounted and shrink its track to 0fr so collapse/expand animates. */}
           <div
             className={cn(
-              "hidden lg:grid gap-4",
-              previewCollapsed ? "grid-cols-1" : "grid-cols-2"
+              "hidden lg:grid transition-[grid-template-columns,gap] duration-300 ease-in-out",
+              previewCollapsed
+                ? "grid-cols-[0fr_minmax(0,1fr)] gap-0"
+                : "grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4"
             )}
           >
-            {!previewCollapsed && previewPanel}
+            <div
+              className={cn(
+                "min-w-0 overflow-hidden transition-opacity duration-300 ease-in-out",
+                previewCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
+              )}
+              aria-hidden={previewCollapsed}
+              inert={previewCollapsed}
+            >
+              {previewPanel}
+            </div>
             <Textarea
               ref={desktopContentRef}
               value={content}

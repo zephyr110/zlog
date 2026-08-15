@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
+import { isDesktopLangSource } from "@/lib/desktop-lang-source"
 
 /**
  * 桌面端语言单一事实源（userData/lang.json，格式见 desktop/electron/lang.ts）。
@@ -11,8 +12,8 @@ import { dirname } from "node:path"
  * - POST：写入显式语言（zh|en）——web 界面的语言切换是两态，写入即覆盖
  *   "跟随系统"（与设置窗口三态下拉互斥，属预期）
  *
- * 纯 web 构建（GitHub Pages / 无 env）下 404，i18n-provider 回落
- * localStorage 逻辑，行为与桌面端接入前一致。
+ * 纯 web 构建（无 DESKTOP_LANG_FILE）GET 返回 200 { desktop: false }，
+ * i18n-provider 回落 localStorage。不用 404，避免 next dev 控制台红字。
  */
 const ALLOWED = new Set(["zh", "en"])
 
@@ -23,8 +24,11 @@ function langFilePath(): string | null {
 
 export async function GET() {
   const p = langFilePath()
-  if (!p || !existsSync(p)) {
-    return NextResponse.json({ desktop: false }, { status: 404 })
+  if (!p || !isDesktopLangSource(p)) {
+    return NextResponse.json({ desktop: false })
+  }
+  if (!existsSync(p)) {
+    return NextResponse.json({ desktop: true })
   }
   try {
     const raw = JSON.parse(readFileSync(p, "utf8")) as {
