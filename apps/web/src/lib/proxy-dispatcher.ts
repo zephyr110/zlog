@@ -29,7 +29,9 @@ export function createProxyDispatcher(proxyUrl: string): Dispatcher {
         settled = true
         cb(err, sock as never)
       }
-      const s = net.connect({ host: proxy.hostname, port: Number(proxy.port) || 7892, timeout: 8000 })
+      // 端口只来自用户配置（协议默认值由 proxyListenPort 决定：
+      // socks→1080、http→80、https→443）——禁止任何硬编码端口
+      const s = net.connect({ host: proxy.hostname, port: proxyListenPort(proxy), timeout: 8000 })
       const fail = (err: Error) => { s.destroy(); done(err) }
       s.on("timeout", () => fail(new Error("proxy connect timeout")))
       s.once("error", fail)
