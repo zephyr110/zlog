@@ -4,7 +4,9 @@ import type { DesktopConfig } from "./config-store"
 export function buildServerEnv(
   cfg: DesktopConfig,
   dbPath: string,
-  langFilePath?: string
+  langFilePath?: string,
+  /** 系统/VPN HTTP 代理（Electron resolveProxy 或进程 env）。有值才注入。 */
+  httpsProxy?: string
 ): Record<string, string> {
   const env: Record<string, string> = {
     TURSO_DATABASE_URL: `file:${dbPath}`,
@@ -27,10 +29,8 @@ export function buildServerEnv(
   if (cfg.gaPropertyId) env.GA_PROPERTY_ID = cfg.gaPropertyId
   if (cfg.gaClientEmail) env.GA_CLIENT_EMAIL = cfg.gaClientEmail
   if (cfg.gaPrivateKey) env.GA_PRIVATE_KEY = cfg.gaPrivateKey
-  // Copy a user-supplied proxy from Electron’s environment (none by
-  // default — never a baked-in localhost port). Dock/Finder launches
-  // have no shell env, so this only applies when the user set one.
   const proxy =
+    httpsProxy?.trim() ||
     process.env.HTTPS_PROXY?.trim() ||
     process.env.https_proxy?.trim() ||
     process.env.HTTP_PROXY?.trim() ||

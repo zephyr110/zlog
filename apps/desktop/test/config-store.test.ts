@@ -40,6 +40,12 @@ describe("ConfigStore", () => {
     expect(new ConfigStore(dir).load()).toBeNull()
   })
 
+  it("选填 httpsProxy 往返保留", () => {
+    const store = new ConfigStore(dir)
+    store.save({ ...validConfig(), httpsProxy: "http://127.0.0.1:65504" })
+    expect(store.load()?.httpsProxy).toBe("http://127.0.0.1:65504")
+  })
+
   it("save 在 POSIX 上写 0600 权限", () => {
     if (process.platform === "win32") return
     const store = new ConfigStore(dir)

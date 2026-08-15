@@ -41,21 +41,25 @@ const I18N = {
     "sync.helpSignup": "注册 / 登录",
     "sync.helpGuide": "创建数据库指南",
     "sync.helpTokenDoc": "Token 文档",
-    "analytics.vercelToken": "Vercel API Token",
+    "analytics.vercelTitle": "Vercel Analytics",
+    "analytics.vercelToken": "API Token",
     "analytics.vercelTokenPh": "Vercel 控制台 → Settings → Tokens",
-    "analytics.vercelProjectId": "Vercel Project ID",
+    "analytics.vercelProjectId": "Project ID",
     "analytics.vercelProjectIdPh": "项目 Settings → General 页面底部",
-    "analytics.vercelTeamId": "Vercel Team ID（团队项目才需要）",
+    "analytics.vercelTeamId": "Team ID（团队项目才需要）",
     "analytics.vercelTeamIdPh": "留空表示个人项目",
-    "analytics.gaId": "Google Analytics 4 媒体资源 ID",
-    "analytics.gaEmail": "Google Analytics 4 服务账号邮箱",
-    "analytics.gaKey": "Google Analytics 4 服务账号私钥",
-    "analytics.hint": "服务账号需在 Google Analytics 4 媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节",
-    "data.pathPre": "数据保存在用户数据目录：",
-    "data.pathDb": "（本地数据库）、",
-    "data.pathCfg": "（配置）、",
-    "data.pathLogs": "（日志）。备份该目录即备份整个博客",
-    "data.open": "打开数据目录",
+    "analytics.gaTitle": "Google Analytics 4",
+    "analytics.gaId": "媒体资源 ID",
+    "analytics.gaEmail": "服务账号邮箱",
+    "analytics.gaKey": "服务账号私钥",
+    "analytics.hint": "服务账号需在该媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节",
+    "analytics.proxyTitle": "HTTP 代理",
+    "analytics.proxyLabel": "代理 URL",
+    "analytics.proxyPh": "http://127.0.0.1:端口",
+    "analytics.proxyHint": "用于拉取 Vercel Analytics 与 Google Analytics 4。留空则自动读取系统/VPN 的 HTTP 代理；读不到或超时时再填写。",
+    "data.location": "位置",
+    "data.backupHint": "本地数据库、配置与日志。备份该目录即备份整个博客",
+    "data.open": "打开",
     "lang.label": "界面语言",
     "lang.system": "跟随系统",
     "lang.zh": "中文",
@@ -90,6 +94,7 @@ const I18N = {
     "status.fillUsername": "请填写用户名。",
     "status.passwordRule": "密码至少 6 位，且两次输入一致。",
     "status.syncUrlInvalid": "数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io",
+    "status.httpsProxyInvalid": "HTTP 代理格式应为 http://主机:端口",
     "status.sync": "同步",
     "status.configured": "已配置",
     "status.notConfigured": "未配置",
@@ -132,21 +137,25 @@ const I18N = {
     "sync.helpSignup": "Sign up / Log in",
     "sync.helpGuide": "Database quickstart",
     "sync.helpTokenDoc": "Token docs",
-    "analytics.vercelToken": "Vercel API Token",
+    "analytics.vercelTitle": "Vercel Analytics",
+    "analytics.vercelToken": "API Token",
     "analytics.vercelTokenPh": "Vercel console → Settings → Tokens",
-    "analytics.vercelProjectId": "Vercel Project ID",
+    "analytics.vercelProjectId": "Project ID",
     "analytics.vercelProjectIdPh": "Bottom of project Settings → General",
-    "analytics.vercelTeamId": "Vercel Team ID (teams only)",
+    "analytics.vercelTeamId": "Team ID (teams only)",
     "analytics.vercelTeamIdPh": "Leave empty for personal projects",
-    "analytics.gaId": "Google Analytics 4 property ID",
-    "analytics.gaEmail": "Google Analytics 4 service account email",
-    "analytics.gaKey": "Google Analytics 4 service account private key",
-    "analytics.hint": "Grant the service account \"Viewer\" access on the Google Analytics 4 property; see the README deployment section for steps",
-    "data.pathPre": "Data lives in the user data folder: ",
-    "data.pathDb": " (local database), ",
-    "data.pathCfg": " (config), ",
-    "data.pathLogs": " (logs). Back up that folder to back up the whole blog",
-    "data.open": "Open Data Folder",
+    "analytics.gaTitle": "Google Analytics 4",
+    "analytics.gaId": "Property ID",
+    "analytics.gaEmail": "Service account email",
+    "analytics.gaKey": "Service account private key",
+    "analytics.hint": "Grant the service account Viewer access on this property; see the README deployment section for steps",
+    "analytics.proxyTitle": "HTTP Proxy",
+    "analytics.proxyLabel": "Proxy URL",
+    "analytics.proxyPh": "http://127.0.0.1:port",
+    "analytics.proxyHint": "Used to fetch Vercel Analytics and Google Analytics 4. Leave empty to read the system/VPN HTTP proxy; fill this in if detection fails or requests time out.",
+    "data.location": "Location",
+    "data.backupHint": "Local database, config, and logs. Back up this folder to back up the whole blog",
+    "data.open": "Open",
     "lang.label": "Interface Language",
     "lang.system": "Follow System",
     "lang.zh": "中文",
@@ -181,6 +190,7 @@ const I18N = {
     "status.fillUsername": "Please enter a username.",
     "status.passwordRule": "Password must be at least 6 characters and match the confirmation.",
     "status.syncUrlInvalid": "Database URL must start with libsql://, e.g. libsql://your-db.turso.io",
+    "status.httpsProxyInvalid": "HTTP proxy must look like http://host:port",
     "status.sync": "Sync",
     "status.configured": "Configured",
     "status.notConfigured": "Not configured",
@@ -339,6 +349,7 @@ if (isFirstRun) {
     set("gaPropertyId", cfg.gaPropertyId)
     set("gaClientEmail", cfg.gaClientEmail)
     set("gaPrivateKey", cfg.gaPrivateKey)
+    set("httpsProxy", cfg.httpsProxy)
   })
 }
 
@@ -485,6 +496,23 @@ async function refreshStatus() {
   renderStatus(await zlogApi.getSyncStatus())
 }
 
+function isValidHttpProxy(raw) {
+  if (!raw || /^socks/i.test(raw)) return false
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `http://${raw}`)
+    const hostPart = raw.replace(/^https?:\/\//i, "").split("/")[0] || ""
+    const host = hostPart.startsWith("[")
+      ? hostPart
+      : hostPart.includes("@")
+        ? hostPart.slice(hostPart.lastIndexOf("@") + 1)
+        : hostPart
+    const hasPort = host.startsWith("[") ? /\]:\d+$/.test(host) : /:\d+$/.test(host)
+    return (url.protocol === "http:" || url.protocol === "https:") && !!url.hostname && hasPort
+  } catch {
+    return false
+  }
+}
+
 // ── 保存 ──────────────────────────────────────────────────────────────
 const saveBtn = document.getElementById("saveBtn")
 async function doSave() {
@@ -502,6 +530,7 @@ async function doSave() {
     gaPropertyId: document.getElementById("gaPropertyId").value.trim(),
     gaClientEmail: document.getElementById("gaClientEmail").value.trim(),
     gaPrivateKey: document.getElementById("gaPrivateKey").value.trim(),
+    httpsProxy: document.getElementById("httpsProxy").value.trim(),
   }
   const username = document.getElementById("username")
   const password = document.getElementById("password")
@@ -529,6 +558,14 @@ async function doSave() {
     syncUrl.setAttribute("aria-invalid", "true")
     syncUrl.focus()
     showStatus(t("status.syncUrlInvalid"), true)
+    return
+  }
+  const httpsProxyEl = document.getElementById("httpsProxy")
+  httpsProxyEl.removeAttribute("aria-invalid")
+  if (cfg.httpsProxy && !isValidHttpProxy(cfg.httpsProxy)) {
+    httpsProxyEl.setAttribute("aria-invalid", "true")
+    httpsProxyEl.focus()
+    showStatus(t("status.httpsProxyInvalid"), true)
     return
   }
   saveBtn.disabled = true
@@ -559,7 +596,7 @@ saveBtn.addEventListener("click", doSave)
 for (const id of [
   "username", "password", "password2", "syncUrl", "syncToken",
   "vercelApiToken", "vercelProjectId", "vercelTeamId",
-  "gaPropertyId", "gaClientEmail", "gaPrivateKey",
+  "gaPropertyId", "gaClientEmail", "gaPrivateKey", "httpsProxy",
 ]) {
   const el = document.getElementById(id)
   el.addEventListener("keydown", (e) => {
@@ -654,9 +691,8 @@ document.getElementById("syncBtn").addEventListener("click", async () => {
   await zlogApi.runSyncNow()
   refreshStatus()
 })
-for (const id of ["openBtn", "openBtn2"]) {
-  const btn = document.getElementById(id)
-  if (btn) btn.addEventListener("click", () => zlogApi.openDataDir())
-}
+document.getElementById("openBtn2")?.addEventListener("click", () => {
+  zlogApi.openDataDir()
+})
 
 refreshStatus()

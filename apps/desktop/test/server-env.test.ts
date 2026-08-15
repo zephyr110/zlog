@@ -67,6 +67,18 @@ describe("buildServerEnv analytics", () => {
     expect(env.DESKTOP_LANG_FILE).toBe("/data/userData/lang.json")
   })
 
+  it("显式传入的系统代理优先于进程 env", () => {
+    const prevHttps = process.env.HTTPS_PROXY
+    process.env.HTTPS_PROXY = "http://127.0.0.1:1"
+    try {
+      const env = buildServerEnv(base, "/data/zlog.db", undefined, "http://127.0.0.1:9")
+      expect(env.HTTPS_PROXY).toBe("http://127.0.0.1:9")
+    } finally {
+      if (prevHttps === undefined) delete process.env.HTTPS_PROXY
+      else process.env.HTTPS_PROXY = prevHttps
+    }
+  })
+
   it("透传进程 HTTPS_PROXY 给服务器", () => {
     const prevHttps = process.env.HTTPS_PROXY
     const prevHttp = process.env.HTTP_PROXY

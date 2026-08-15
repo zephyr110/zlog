@@ -1,5 +1,7 @@
 import {
   AnalyticsFetchError,
+  analyticsFetch,
+  analyticsTimeoutHint,
   type AnalyticsRange,
   type AnalyticsReport,
 } from "@/lib/ga-analytics"
@@ -70,7 +72,8 @@ function classifyVercelError(err: unknown): AnalyticsFetchError {
   ) {
     return new AnalyticsFetchError(
       "timeout",
-      "Cannot reach Vercel Analytics API (network timeout)"
+      "Cannot reach Vercel Analytics API (network timeout)",
+      analyticsTimeoutHint(err)
     )
   }
   if (code === "401" || code === "403" || /unauthorized|forbidden|permission/i.test(blob)) {
@@ -93,9 +96,8 @@ async function vercelGet(
   const qs = new URLSearchParams({ projectId, ...params })
   if (teamId) qs.set("teamId", teamId)
 
-  const res = await fetch(`${url}?${qs.toString()}`, {
+  const res = await analyticsFetch(`${url}?${qs.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(30_000),
   })
   if (!res.ok) {
     const text = await res.text().catch(() => "")

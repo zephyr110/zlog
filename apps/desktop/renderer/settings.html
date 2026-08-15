@@ -277,11 +277,30 @@
       max-width: 36rem;
     }
     body.mode-settings .panel.active { display: block; }
-    .section { display: flex; flex-direction: column; gap: 18px; }
-    /* 区块间距仅首启模式需要（账号区与同步区间）；设置模式下账号区隐藏，
-       兄弟选择器仍按 DOM 匹配会给同步区加 22px，破坏三个面板的 20px 一致 */
-    body.mode-firstrun .section + .section { margin-top: 22px; }
-    .section-title {
+    /* 子块 = shadcn Card：bg-card + border-border。
+       浅色 card 与 background 同为 1，靠 --border 勾出分组；
+       深色 card(0.205) 从 background(0.145) 托起，再加 10% 描边。
+       不用 --muted 铺底：浅色 0.97≈1 看不清；深色 0.269 会让
+       outline 按钮 hover（也是 muted）和输入框糊成一层。 */
+    .block {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--card);
+      color: var(--card-foreground);
+    }
+    .block + .block { margin-top: 12px; }
+    body.mode-firstrun .block + .block { margin-top: 16px; }
+    /* 输入落在 card 上：浅色与 card 同底、靠 --input 描边；
+       深色用更暗的 --background 做凹陷，避免和 card 糊在一起。 */
+    .block input,
+    .block .select-trigger {
+      background: var(--background);
+    }
+    .block-title {
       display: flex;
       align-items: baseline;
       gap: 8px;
@@ -290,12 +309,12 @@
       font-weight: 500;
       letter-spacing: -0.01em;
     }
-    .section-title .tag {
+    .block-title .tag {
       font-size: 11px;
       font-weight: 500;
       color: var(--muted-foreground);
     }
-    .section-title .tag.req { color: var(--destructive); }
+    .block-title .tag.req { color: var(--destructive); }
 
     .field { display: flex; flex-direction: column; }
     label {
@@ -319,7 +338,7 @@
     }
     @media (prefers-color-scheme: dark) {
       input, .select-trigger {
-        background: color-mix(in oklch, var(--input) 30%, transparent);
+        background: color-mix(in oklch, var(--input) 30%, var(--card));
       }
     }
     input::placeholder { color: var(--muted-foreground); opacity: 0.7; }
@@ -531,9 +550,8 @@
     /* 首启模式：主按钮全宽 */
     body.mode-firstrun button.primary { width: 100%; }
 
-    /* 次按钮 = shadcn outline：实心底 + 边框。不用 --secondary 实心——
-       浅色 secondary(0.97) 贴在 background/card(1) 上几乎看不见；
-       深色 secondary(0.269) 贴在 card(0.205) 上同样糊成一块。 */
+    /* 次按钮 = shadcn outline：bg-background + border，hover 为 accent。
+       不用 --secondary 实心——浅色 0.97、深色 0.269 贴在 card 上会糊。 */
     button.secondary,
     button.link {
       display: inline-flex;
@@ -557,8 +575,8 @@
     }
     button.secondary:hover:not(:disabled),
     button.link:hover:not(:disabled) {
-      background: var(--muted);
-      color: var(--foreground);
+      background: var(--accent);
+      color: var(--accent-foreground);
     }
     button.secondary:focus-visible,
     button.link:focus-visible {
@@ -569,14 +587,14 @@
     @media (prefers-color-scheme: dark) {
       button.secondary,
       button.link {
-        /* 不透明：input 30% 混入 background，避免透明底叠在 card 上又糊回去 */
         border-color: var(--input);
-        background: color-mix(in oklch, var(--input) 30%, var(--background));
+        background: var(--background);
         box-shadow: none;
       }
       button.secondary:hover:not(:disabled),
       button.link:hover:not(:disabled) {
-        background: color-mix(in oklch, var(--input) 50%, var(--background));
+        background: var(--accent);
+        color: var(--accent-foreground);
       }
     }
 
@@ -595,22 +613,14 @@
       .spinner { animation-duration: 1.4s; }
     }
 
-    /* 关于面板（无品牌块：标题块与内容间距与其他面板一致，由
-       .content header 的 20px margin 承担） */
-    .about-group {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      background: var(--card);
-      color: var(--card-foreground);
-    }
-    .about-group .field {
-      padding: 14px 16px;
+    /* 只读元数据：同一 Card 内用 --border 分行 */
+    .block-meta { gap: 0; }
+    .block-meta .field {
+      padding: 14px 0;
       border-bottom: 1px solid var(--border);
     }
-    .about-group .field:last-child { border-bottom: none; }
+    .block-meta .field:first-child { padding-top: 2px; }
+    .block-meta .field:last-child { border-bottom: none; padding-bottom: 2px; }
     .about-row {
       display: flex;
       align-items: center;
@@ -654,25 +664,20 @@
     }
     #updateStatus.error { color: var(--destructive); }
 
-    /* 数据目录面板 */
-    .data-card {
+    .about-files {
       display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 14px;
-      padding: 16px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      background: var(--card);
-      color: var(--card-foreground);
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
     }
-    .data-card .hint { margin: 0; }
     code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 12px;
       padding: 1px 6px;
       border-radius: var(--radius-sm);
       background: var(--muted);
+      color: var(--foreground);
       border: 1px solid var(--border);
     }
   </style>
@@ -729,8 +734,8 @@
     <div class="content-scroll">
     <!-- 面板：同步设置 -->
     <section class="panel active" id="panel-sync">
-      <div class="section" id="passwordFields">
-        <h2 class="section-title"><span data-i18n="account.title">管理员账号</span><span class="tag req" data-i18n="tag.required">必填</span></h2>
+      <div class="block" id="passwordFields">
+        <h2 class="block-title"><span data-i18n="account.title">管理员账号</span><span class="tag req" data-i18n="tag.required">必填</span></h2>
         <div class="field">
           <label for="username" data-i18n="account.username">用户名</label>
           <input id="username" autocomplete="username" placeholder="admin" />
@@ -757,11 +762,9 @@
         </div>
       </div>
 
-      <div class="section">
-        <!-- 面板标题由内容区头部承载；此标题仅首启模式（无头部）需要。
-             区块间距交给 .section + .section（首启两区块间 22px）；
-             设置模式下账号区隐藏后本区块紧跟头部 20px，与其余面板一致 -->
-        <h2 class="section-title panel-title"><span data-i18n="sync.title">同步设置</span><span class="tag" data-i18n="tag.optional">可选</span></h2>
+      <div class="block">
+        <!-- 块标题仅首启需要（设置模式页头已是「同步设置」）。 -->
+        <h2 class="block-title panel-title"><span data-i18n="sync.title">同步设置</span><span class="tag" data-i18n="tag.optional">可选</span></h2>
         <div class="field">
           <label for="syncUrl" data-i18n="sync.url">数据库 URL</label>
           <input id="syncUrl" placeholder="libsql://your-db.turso.io" />
@@ -790,11 +793,12 @@
       </div>
     </section>
 
-    <!-- 面板：流量分析（默认铺开；面板标题由内容区头部承载） -->
+    <!-- 面板：流量分析（Vercel / GA 各一块浅底） -->
     <section class="panel" id="panel-analytics">
-      <div class="section">
+      <div class="block">
+        <h2 class="block-title" data-i18n="analytics.vercelTitle">Vercel Analytics</h2>
         <div class="field">
-          <label for="vercelApiToken" data-i18n="analytics.vercelToken">Vercel API Token</label>
+          <label for="vercelApiToken" data-i18n="analytics.vercelToken">API Token</label>
           <div class="secret">
             <input id="vercelApiToken" type="password" data-i18n-placeholder="analytics.vercelTokenPh" placeholder="Vercel 控制台 → Settings → Tokens" />
             <button type="button" class="secret-toggle" aria-controls="vercelApiToken" aria-pressed="false" aria-label="显示">
@@ -804,23 +808,26 @@
           </div>
         </div>
         <div class="field">
-          <label for="vercelProjectId" data-i18n="analytics.vercelProjectId">Vercel Project ID</label>
+          <label for="vercelProjectId" data-i18n="analytics.vercelProjectId">Project ID</label>
           <input id="vercelProjectId" data-i18n-placeholder="analytics.vercelProjectIdPh" placeholder="项目 Settings → General 页面底部" />
         </div>
         <div class="field">
-          <label for="vercelTeamId" data-i18n="analytics.vercelTeamId">Vercel Team ID（团队项目才需要）</label>
+          <label for="vercelTeamId" data-i18n="analytics.vercelTeamId">Team ID（团队项目才需要）</label>
           <input id="vercelTeamId" data-i18n-placeholder="analytics.vercelTeamIdPh" placeholder="留空表示个人项目" />
         </div>
+      </div>
+      <div class="block">
+        <h2 class="block-title" data-i18n="analytics.gaTitle">Google Analytics 4</h2>
         <div class="field">
-          <label for="gaPropertyId" data-i18n="analytics.gaId">Google Analytics 4 媒体资源 ID</label>
+          <label for="gaPropertyId" data-i18n="analytics.gaId">媒体资源 ID</label>
           <input id="gaPropertyId" placeholder="123456789" />
         </div>
         <div class="field">
-          <label for="gaClientEmail" data-i18n="analytics.gaEmail">Google Analytics 4 服务账号邮箱</label>
+          <label for="gaClientEmail" data-i18n="analytics.gaEmail">服务账号邮箱</label>
           <input id="gaClientEmail" placeholder="xxx@project.iam.gserviceaccount.com" />
         </div>
         <div class="field">
-          <label for="gaPrivateKey" data-i18n="analytics.gaKey">Google Analytics 4 服务账号私钥</label>
+          <label for="gaPrivateKey" data-i18n="analytics.gaKey">服务账号私钥</label>
           <div class="secret">
             <input id="gaPrivateKey" type="password" placeholder="-----BEGIN PRIVATE KEY-----" />
             <button type="button" class="secret-toggle" aria-controls="gaPrivateKey" aria-pressed="false" aria-label="显示">
@@ -829,29 +836,42 @@
             </button>
           </div>
         </div>
-        <p class="hint" data-i18n="analytics.hint">服务账号需在 Google Analytics 4 媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节</p>
+        <p class="hint" data-i18n="analytics.hint">服务账号需在该媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节</p>
+      </div>
+      <div class="block">
+        <h2 class="block-title"><span data-i18n="analytics.proxyTitle">HTTP 代理</span><span class="tag" data-i18n="tag.optional">可选</span></h2>
+        <div class="field">
+          <label for="httpsProxy" data-i18n="analytics.proxyLabel">代理 URL</label>
+          <input id="httpsProxy" data-i18n-placeholder="analytics.proxyPh" placeholder="http://127.0.0.1:端口" />
+          <p class="hint" data-i18n="analytics.proxyHint">用于拉取 Vercel Analytics 与 Google Analytics 4。留空则自动读取系统/VPN 的 HTTP 代理；读不到或超时时再填写。</p>
+        </div>
       </div>
     </section>
 
     <!-- 面板：数据目录 -->
     <section class="panel" id="panel-data">
-      <div class="data-card">
-        <p class="hint">
-          <span data-i18n="data.pathPre">数据保存在用户数据目录：</span>
-          <code>zlog.db</code><span data-i18n="data.pathDb">（本地数据库）、</span>
-          <code>zlog-config.json</code><span data-i18n="data.pathCfg">（配置）、</span>
-          <code>logs/</code><span data-i18n="data.pathLogs">（日志）。备份该目录即备份整个博客</span>
-        </p>
-        <button class="link" id="openBtn2">
-          <svg class="icon" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
-          <span data-i18n="data.open">打开数据目录</span>
-        </button>
+      <div class="block block-meta">
+        <div class="field">
+          <span class="about-label" data-i18n="data.location">位置</span>
+          <div class="about-row">
+            <span class="about-files">
+              <code>zlog.db</code>
+              <code>zlog-config.json</code>
+              <code>logs/</code>
+            </span>
+            <button type="button" class="secondary small" id="openBtn2">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+              <span data-i18n="data.open">打开</span>
+            </button>
+          </div>
+          <p class="hint" data-i18n="data.backupHint">本地数据库、配置与日志。备份该目录即备份整个博客</p>
+        </div>
       </div>
     </section>
 
     <!-- 面板：语言（自定义 shadcn 风格 select） -->
     <section class="panel" id="panel-lang">
-      <div class="section">
+      <div class="block">
         <div class="field">
           <label for="langSelectBtn" data-i18n="lang.label">界面语言</label>
           <div class="select">
@@ -870,9 +890,9 @@
       </div>
     </section>
 
-    <!-- 面板：关于（无品牌块；标题块与内容间距由 .content header 承担） -->
+    <!-- 面板：关于 -->
     <section class="panel" id="panel-about">
-      <div class="about-group">
+      <div class="block block-meta">
         <div class="field">
           <span class="about-label" data-i18n="about.version">版本</span>
           <div class="about-row">

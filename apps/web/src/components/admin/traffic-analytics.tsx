@@ -38,11 +38,12 @@ import {
 import { useT } from "@/components/layout/trans"
 import { apiFetch } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
-import type {
-  AnalyticsRange,
-  AnalyticsReport,
-  AnalyticsSource,
-  AnalyticsTimeoutHint,
+import {
+  analyticsTimeoutI18nKeys,
+  type AnalyticsRange,
+  type AnalyticsReport,
+  type AnalyticsSource,
+  type AnalyticsTimeoutHint,
 } from "@/lib/ga-analytics"
 
 const RANGES: AnalyticsRange[] = ["today", "7d", "30d"]
@@ -682,9 +683,10 @@ export function TrafficAnalytics() {
     if (state.status === "error") {
       if (source === "vercel") {
         if (state.kind === "timeout") {
+          const keys = analyticsTimeoutI18nKeys("vercel", state.timeoutHint)
           return {
-            title: t("admin.analyticsVercelTimeout"),
-            description: t("admin.analyticsVercelTimeoutDesc"),
+            title: t(keys.titleKey),
+            description: t(keys.descKey),
           }
         }
         if (state.kind === "permission") {
@@ -699,15 +701,10 @@ export function TrafficAnalytics() {
         }
       }
       if (state.kind === "timeout") {
-        const descKey =
-          state.timeoutHint === "proxy"
-            ? "admin.analyticsTimeoutProxyDesc"
-            : state.timeoutHint === "hosted"
-              ? "admin.analyticsTimeoutHostedDesc"
-              : "admin.analyticsTimeoutDesc"
+        const keys = analyticsTimeoutI18nKeys("ga", state.timeoutHint)
         return {
-          title: t("admin.analyticsTimeout"),
-          description: t(descKey),
+          title: t(keys.titleKey),
+          description: t(keys.descKey),
         }
       }
       if (state.kind === "permission") {

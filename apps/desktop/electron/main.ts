@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron"
+import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron"
 import { randomBytes } from "node:crypto"
 import bcrypt from "bcryptjs"
 import { join, resolve, sep } from "node:path"
@@ -15,6 +15,7 @@ import {
 } from "./updater"
 import { ServerManager } from "./server-manager"
 import { buildServerEnv } from "./server-env"
+import { parseManualHttpProxy, resolveDesktopHttpProxy } from "./system-proxy"
 import { isValidSyncUrl } from "./validate"
 import { createTray, updateTrayLanguage, updateTraySyncStatus, type TrayActions } from "./tray"
 
@@ -115,7 +116,14 @@ async function main() {
   const serverManager = new ServerManager(serverJsPath, logDir, onServerExit)
 
   async function startServerAndShow(cfg: DesktopConfig) {
-    await serverManager.start(buildServerEnv(cfg, dbPath, langFile.filePath))
+    const httpsProxy = await resolveDesktopHttpProxy({
+      override: cfg.httpsProxy,
+      resolveChromium: () =>
+        session.defaultSession.resolveProxy("https://oauth2.googleapis.com/"),
+    })
+    await serverManager.start(
+      buildServerEnv(cfg, dbPath, langFile.filePath, httpsProxy)
+    )
     server = serverManager
     showMainWindow()
   }
@@ -255,7 +263,17 @@ async function main() {
     gaPropertyId?: string
     gaClientEmail?: string
     gaPrivateKey?: string
+    httpsProxy?: string
   }) => {
+    // 与渲染层同源的防御性校验（唯一权威实现见 validate.ts）：非法
+    // syncUrl 会让 libsql 原生客户端解析时 panic、拖垮整个服务器进程
+    // （真实事故：URL 字段误填用户名）。校验先于 config 合并执行。
+    if (cfg.syncUrl?.trim() && !isValidSyncUrl(cfg.syncUrl.trim())) {
+      return { ok: false, error: "数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io" }
+    }
+    if (cfg.httpsProxy?.trim() && !parseManualHttpProxy(cfg.httpsProxy)) {
+      return { ok: false, error: "HTTP 代理格式应为 http://主机:端口" }
+    }
     if (!config) {
       const passwordHash = bcrypt.hashSync(String(cfg.password ?? ""), 10)
       config = {
@@ -278,13 +296,8 @@ async function main() {
         gaPropertyId: cfg.gaPropertyId?.trim() || undefined,
         gaClientEmail: cfg.gaClientEmail?.trim() || undefined,
         gaPrivateKey: cfg.gaPrivateKey?.trim() || undefined,
+        httpsProxy: parseManualHttpProxy(cfg.httpsProxy),
       }
-    }
-    // 与渲染层同源的防御性校验（唯一权威实现见 validate.ts）：非法
-    // syncUrl 会让 libsql 原生客户端解析时 panic、拖垮整个服务器进程
-    // （真实事故：URL 字段误填用户名）。校验先于 config 合并执行。
-    if (cfg.syncUrl?.trim() && !isValidSyncUrl(cfg.syncUrl.trim())) {
-      return { ok: false, error: "数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io" }
     }
     configStore.save(config)
     // 配置变更（同步信息）后重启服务器使 env 生效

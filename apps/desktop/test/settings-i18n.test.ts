@@ -40,6 +40,23 @@ describe("settings i18n coverage", () => {
     }
   })
 
+  it("各面板内容区用浅底 .block 分组，流量拆成 Vercel / GA", () => {
+    for (const id of ["panel-sync", "panel-analytics", "panel-data", "panel-lang", "panel-about"]) {
+      expect(html).toMatch(new RegExp(`id="${id}"[\\s\\S]*?class="block`))
+    }
+    expect(html).toContain('data-i18n="analytics.vercelTitle"')
+    expect(html).toContain('data-i18n="analytics.gaTitle"')
+    expect(html.match(/id="panel-analytics"[\s\S]*?id="panel-data"/)![0].match(/class="block"/g)?.length).toBe(3)
+    expect(html).toContain('id="httpsProxy"')
+    expect(html).toContain('data-i18n="analytics.proxyTitle"')
+    expect(html).toContain('data-i18n="analytics.proxyHint"')
+    expect(html).not.toContain("about-group")
+    expect(html).not.toContain("data-card")
+    expect(html).toContain('id="openBtn2"')
+    expect(html).toContain('data-i18n="data.location"')
+    expect(html).toContain('data-i18n="data.backupHint"')
+  })
+
   it("英文侧栏文案不含汉字，且短到单行放得下", () => {
     const enBlock = js.match(/en: \{([\s\S]*?)\n  \},\n\}/)![1]
     const nav: Record<string, string> = {}
@@ -67,6 +84,7 @@ describe("settings secret fields", () => {
     "vercelTeamId",
     "gaPropertyId",
     "gaClientEmail",
+    "httpsProxy",
   ]
 
   it("密钥默认 password，并带 eye 切换（不挂 data-i18n，避免 applyLang 清掉图标）", () => {
