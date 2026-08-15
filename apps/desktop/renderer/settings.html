@@ -279,7 +279,7 @@
       flex-wrap: wrap;
       margin: 0 0 10px;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 500;
       letter-spacing: -0.015em;
       line-height: 1.3;
       color: var(--foreground);
@@ -333,12 +333,11 @@
       color: var(--foreground);
       background: var(--background);
       border: 1px solid var(--input);
-      border-radius: var(--radius-md);
+      border-radius: var(--radius);
       outline: none;
       transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
     }
-    input::placeholder { color: var(--muted-foreground); opacity: 0.7; }
-    input:hover { border-color: var(--ring); }
+    input::placeholder { color: var(--muted-foreground); }
 
     /* 密钥输入：右侧 eye 叠在框内，不改变字段高度 */
     .secret { position: relative; }
@@ -387,12 +386,11 @@
       color: var(--foreground);
       background: var(--background);
       border: 1px solid var(--input);
-      border-radius: var(--radius-md);
+      border-radius: var(--radius);
       cursor: pointer;
       outline: none;
       transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
     }
-    .select-trigger:hover { border-color: var(--ring); }
     .select-trigger:focus-visible {
       border-color: var(--ring);
       box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
@@ -415,21 +413,31 @@
       color: var(--popover-foreground);
       background: var(--popover);
       border: 1px solid var(--border);
-      border-radius: var(--radius-md);
+      border-radius: var(--radius);
       box-shadow: 0 10px 15px -3px oklch(0 0 0 / 0.1), 0 4px 6px -4px oklch(0 0 0 / 0.1);
     }
     .select-item {
       display: flex;
       align-items: center;
+      justify-content: space-between;
+      gap: 8px;
       height: 32px;
       padding: 0 8px;
       font-size: 13px;
-      border-radius: var(--radius-sm);
+      font-weight: 400;
+      border-radius: calc(var(--radius) * 0.6);
       cursor: pointer;
       transition: background-color 0.1s ease, color 0.1s ease;
     }
     .select-item:hover { background: var(--accent); color: var(--accent-foreground); }
-    .select-item.selected { font-weight: 500; }
+    .select-item .select-check {
+      width: 16px;
+      height: 16px;
+      flex: none;
+      opacity: 0;
+      color: var(--foreground);
+    }
+    .select-item.selected .select-check { opacity: 1; }
     input:focus-visible {
       border-color: var(--ring);
       box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
@@ -454,24 +462,6 @@
       outline: none;
       box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
     }
-    .section-footer {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      margin: 0;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-      font-size: 12px;
-      line-height: 1.5;
-      color: var(--muted-foreground);
-    }
-    .section-footer .help-icon {
-      width: 14px;
-      height: 14px;
-      flex: none;
-      margin-top: 1px;
-    }
-
     /* 面板内标题：设置模式由内容区头部承载，此处隐藏（仅首启模式显示） */
     body.mode-settings .panel-title { display: none; }
 
@@ -502,6 +492,7 @@
       gap: 12px;
       padding: 12px 32px 20px;
       background: var(--background);
+      border-top: 1px solid var(--border);
     }
     body.mode-settings .content-footer .status {
       margin: 0;
@@ -535,13 +526,13 @@
       color: var(--primary-foreground);
       background: var(--primary);
       border: 1px solid transparent;
-      border-radius: var(--radius-md);
+      border-radius: var(--radius);
       cursor: pointer;
       outline: none;
       white-space: nowrap;
       transition: background-color 0.15s ease, opacity 0.15s ease;
     }
-    button.primary:hover:not(:disabled) { background: color-mix(in oklch, var(--primary) 90%, transparent); }
+    button.primary:hover:not(:disabled) { background: color-mix(in oklch, var(--primary) 80%, transparent); }
     button.primary:focus-visible {
       box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
     }
@@ -563,8 +554,7 @@
       color: var(--foreground);
       background: var(--background);
       border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      box-shadow: 0 1px 2px oklch(0 0 0 / 0.04);
+      border-radius: var(--radius);
       cursor: pointer;
       outline: none;
       white-space: nowrap;
@@ -641,7 +631,7 @@
       text-overflow: ellipsis;
       white-space: nowrap;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 500;
       font-variant-numeric: tabular-nums;
       letter-spacing: -0.02em;
       color: var(--foreground);
@@ -659,36 +649,82 @@
       text-align: right;
     }
     .about-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+    .about-link-ext {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .about-link-ext .icon {
+      width: 12px;
+      height: 12px;
+    }
 
-    /* 发布到线上：步骤列表 */
-    .publish-steps {
-      margin: 4px 0 0;
-      padding-left: 20px;
+    /* 同步 / 线上部署：步骤列表（序号 / 标题+外链 / 说明） */
+    .block > .hint + .guide-steps { margin-top: 4px; }
+    .guide-steps {
+      list-style: none;
+      margin: 0;
+      padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 12px;
     }
-    .publish-steps li {
+    .guide-step {
       display: flex;
-      align-items: baseline;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px 0;
+      border-top: 1px solid var(--border);
+    }
+    .guide-step:last-child { padding-bottom: 0; }
+    .guide-step-num {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      line-height: 1.2;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted-foreground);
+    }
+    .guide-step-row {
+      display: flex;
+      align-items: center;
       justify-content: space-between;
       gap: 12px;
-      font-size: 13px;
-      line-height: 1.6;
-      color: var(--foreground);
-    }
-    .publish-steps li::marker {
-      color: var(--muted-foreground);
-      font-weight: 500;
-    }
-    .publish-step-text {
-      flex: 1;
       min-width: 0;
     }
+    .guide-step-title {
+      margin: 0;
+      flex: 1;
+      min-width: 0;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      line-height: 1.4;
+      color: var(--foreground);
+    }
+    .guide-step-row .about-link {
+      flex: none;
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--muted-foreground);
+      text-decoration: none;
+    }
+    .guide-step-row .about-link:hover {
+      color: var(--foreground);
+      text-decoration: none;
+    }
+    .guide-step > .hint { margin-top: 0; }
     .about-license {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
       font-size: 13px;
       color: var(--foreground);
-      text-align: right;
+      white-space: nowrap;
+    }
+    .about-license .icon {
+      width: 12px;
+      height: 12px;
     }
     .block-meta .field > .hint { margin-top: 6px; }
     #updateStatus.error { color: var(--destructive); }
@@ -720,27 +756,27 @@
     </div>
     <nav class="sidebar-nav">
       <button class="nav-item active" data-panel="sync">
-        <svg class="icon" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
         <span data-i18n="nav.sync">同步设置</span>
       </button>
+      <button class="nav-item" data-panel="publish">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+        <span data-i18n="nav.publish">线上部署</span>
+      </button>
       <button class="nav-item" data-panel="analytics">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
         <span data-i18n="nav.analytics">流量分析</span>
       </button>
       <button class="nav-item" data-panel="data">
-        <svg class="icon" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
         <span data-i18n="nav.data">数据目录</span>
       </button>
       <button class="nav-item" data-panel="lang">
-        <svg class="icon" viewBox="0 0 24 24"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
         <span data-i18n="nav.lang">语言</span>
       </button>
-      <button class="nav-item" data-panel="publish">
-        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-        <span data-i18n="nav.publish">发布到线上</span>
-      </button>
       <button class="nav-item" data-panel="about">
-        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
         <span data-i18n="nav.about">关于</span>
       </button>
     </nav>
@@ -759,7 +795,7 @@
     <!-- 设置模式标题（内容区顶部） -->
     <header class="content-header" id="contentHeader">
       <h1 id="title2" data-i18n="sync.title">同步设置</h1>
-      <p class="subtitle" id="subtitle2" data-i18n="sync.subtitle">配置 Turso 双向同步；未配置则纯本地运行</p>
+      <p class="subtitle" id="subtitle2" data-i18n="sync.subtitle">配置 Turso 双向同步，未配置则纯本地运行</p>
     </header>
 
     <hr class="divider" />
@@ -817,15 +853,87 @@
           </div>
           <p class="hint" data-i18n="sync.tokenHint">在 Turso 控制台创建</p>
         </div>
-        <p class="section-footer">
-          <svg class="icon help-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
-          <span>
-            <span data-i18n="sync.help">首次使用 Turso？</span>
-            <a href="https://app.turso.tech" target="_blank" rel="noopener" data-i18n="sync.helpSignup">注册 / 登录</a> ·
-            <a href="https://docs.turso.tech/tursodb/quickstart" target="_blank" rel="noopener" data-i18n="sync.helpGuide">创建数据库指南</a> ·
-            <a href="https://docs.turso.tech/cli/db/tokens/create" target="_blank" rel="noopener" data-i18n="sync.helpTokenDoc">Token 文档</a>
-          </span>
-        </p>
+        <p class="hint" data-i18n="sync.help">首次使用 Turso？按下面步骤获取数据库 URL 和 Token</p>
+        <ol class="guide-steps">
+          <li class="guide-step">
+            <span class="guide-step-num" data-i18n="publish.step1Label">Step 1</span>
+            <div class="guide-step-row">
+              <p class="guide-step-title" data-i18n="sync.helpSignup">注册 / 登录</p>
+              <a class="about-link about-link-ext" href="https://app.turso.tech" target="_blank" rel="noopener">
+                <span data-i18n="sync.helpSignupLink">打开控制台</span>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+              </a>
+            </div>
+          </li>
+          <li class="guide-step">
+            <span class="guide-step-num" data-i18n="publish.step2Label">Step 2</span>
+            <div class="guide-step-row">
+              <p class="guide-step-title" data-i18n="sync.helpStep2Title">创建数据库</p>
+              <a class="about-link about-link-ext" href="https://docs.turso.tech/tursodb/quickstart" target="_blank" rel="noopener">
+                <span data-i18n="sync.helpGuide">创建数据库指南</span>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+              </a>
+            </div>
+          </li>
+          <li class="guide-step">
+            <span class="guide-step-num" data-i18n="publish.step3Label">Step 3</span>
+            <div class="guide-step-row">
+              <p class="guide-step-title" data-i18n="sync.helpStep3Title">创建 Token</p>
+              <a class="about-link about-link-ext" href="https://docs.turso.tech/cli/db/tokens/create" target="_blank" rel="noopener">
+                <span data-i18n="sync.helpTokenDoc">Token 文档</span>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+              </a>
+            </div>
+          </li>
+        </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- 面板：线上部署（可选；外链走系统浏览器） -->
+    <section class="panel" id="panel-publish">
+      <div class="group">
+        <h2 class="block-title"><span data-i18n="publish.stepsTitle">部署步骤</span><span class="opt" data-i18n="tag.optional">（可选）</span></h2>
+        <div class="block">
+          <p class="hint" data-i18n="publish.intro">应用默认只在这台电脑使用。若希望别人通过网址阅读文章，再按下面步骤配置即可。不部署也不影响本地写作和预览</p>
+          <ol class="guide-steps">
+            <li class="guide-step">
+              <span class="guide-step-num" data-i18n="publish.step1Label">Step 1</span>
+              <div class="guide-step-row">
+                <p class="guide-step-title" data-i18n="publish.step1Title">创建 Turso 数据库</p>
+                <a class="about-link about-link-ext" href="https://docs.turso.tech/tursodb/quickstart" target="_blank" rel="noopener">
+                  <span data-i18n="publish.step1Link">创建数据库指南</span>
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                </a>
+              </div>
+              <p class="hint" data-i18n="publish.step1">用来存储文章、媒体资源数据，Turso 免费额度满足个人博客使用</p>
+            </li>
+            <li class="guide-step">
+              <span class="guide-step-num" data-i18n="publish.step2Label">Step 2</span>
+              <div class="guide-step-row">
+                <p class="guide-step-title" data-i18n="publish.step2Title">部署到 Vercel</p>
+                <a class="about-link about-link-ext" href="https://zephyr110.vercel.app/posts/zlog-deployment-guide" target="_blank" rel="noopener">
+                  <span data-i18n="publish.step2Link">打开指南</span>
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                </a>
+              </div>
+              <p class="hint" data-i18n="publish.step2">按照指南中部署到 Vercel 的步骤配置即可</p>
+            </li>
+            <li class="guide-step">
+              <span class="guide-step-num" data-i18n="publish.step3Label">Step 3</span>
+              <div class="guide-step-row">
+                <p class="guide-step-title" data-i18n="publish.step3Title">填入同步信息</p>
+              </div>
+              <p class="hint" data-i18n="publish.step3">打开「同步设置」，粘贴数据库 URL 和 Token，点击保存即可</p>
+            </li>
+            <li class="guide-step">
+              <span class="guide-step-num" data-i18n="publish.step4Label">Step 4</span>
+              <div class="guide-step-row">
+                <p class="guide-step-title" data-i18n="publish.step4Title">配置流量分析</p>
+              </div>
+              <p class="hint" data-i18n="publish.step4">「流量分析」中按需配置 Vercel Analytics 和 Google Analytics 4 统计访客数据</p>
+            </li>
+          </ol>
         </div>
       </div>
     </section>
@@ -884,7 +992,7 @@
         <div class="block">
         <div class="field">
           <input id="httpsProxy" aria-labelledby="proxyHeading" data-i18n-placeholder="analytics.proxyPh" placeholder="http:// 或 socks5://主机:端口" />
-          <p class="hint" data-i18n="analytics.proxyHint">用于拉取 Vercel Analytics 与 Google Analytics 4。留空则自动读取系统/VPN 的 HTTP 或 SOCKS 代理。SOCKS 端口请填 socks5://，不要写成 http://。</p>
+          <p class="hint" data-i18n="analytics.proxyHint">用于拉取 Vercel Analytics 与 Google Analytics 4。留空则自动读取系统/VPN 的 HTTP 或 SOCKS 代理。SOCKS 端口请填 socks5://，不要写成 http://</p>
         </div>
         </div>
       </div>
@@ -906,7 +1014,7 @@
               <span data-i18n="data.open">打开</span>
             </button>
           </div>
-          <p class="hint" data-i18n="data.backupHint">本地数据库、配置与日志。备份该目录即备份整个博客</p>
+          <p class="hint" data-i18n="data.backupHint">本地数据库、配置与日志，备份该目录即备份整个博客</p>
         </div>
       </div>
     </section>
@@ -922,34 +1030,22 @@
               <svg class="icon select-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
             </button>
             <div class="select-popup" id="langPopup" role="listbox" hidden>
-              <div class="select-item" data-value="system" role="option" data-i18n="lang.system">跟随系统</div>
-              <div class="select-item" data-value="zh" role="option" data-i18n="lang.zh">中文</div>
-              <div class="select-item" data-value="en" role="option" data-i18n="lang.en">English</div>
+              <div class="select-item" data-value="system" role="option">
+                <span data-i18n="lang.system">跟随系统</span>
+                <svg class="icon select-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+              </div>
+              <div class="select-item" data-value="zh" role="option">
+                <span data-i18n="lang.zh">中文</span>
+                <svg class="icon select-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+              </div>
+              <div class="select-item" data-value="en" role="option">
+                <span data-i18n="lang.en">English</span>
+                <svg class="icon select-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+              </div>
             </div>
           </div>
           <p class="hint" data-i18n="lang.hint">跟随系统时，系统语言为中文则显示中文；其他语言一律显示英文</p>
         </div>
-      </div>
-    </section>
-
-    <!-- 面板：发布到线上（首次上线的一次性引导；外链走系统浏览器） -->
-    <section class="panel" id="panel-publish">
-      <div class="section">
-        <p class="hint" data-i18n="publish.intro">完成下面三个步骤后，任何人通过网址就能访问你的文章</p>
-        <ol class="publish-steps">
-          <li>
-            <span class="publish-step-text" data-i18n="publish.step1">创建 Turso 数据库（文章数据存储）</span>
-            <a class="about-link" href="https://turso.tech" target="_blank" rel="noopener" data-i18n="publish.step1Link">打开 turso.tech</a>
-          </li>
-          <li>
-            <span class="publish-step-text" data-i18n="publish.step2">把博客部署到 Vercel（一次性；含环境变量清单）</span>
-            <a class="about-link" href="https://zephyr110.vercel.app/posts/zlog-deployment-guide" target="_blank" rel="noopener" data-i18n="publish.step2Link">部署指南</a>
-          </li>
-          <li>
-            <span class="publish-step-text" data-i18n="publish.step3">回到「同步设置」，填入数据库 URL 和 Token</span>
-          </li>
-        </ol>
-        <p class="hint" data-i18n="publish.done">之后发布文章会自动同步到线上，约 1 分钟内可见</p>
       </div>
     </section>
 
@@ -972,14 +1068,17 @@
         <div class="field">
           <div class="about-line">
             <span class="about-label" data-i18n="about.repository">代码仓库</span>
-            <a class="about-link" href="https://github.com/zephyr110/zlog" target="_blank" rel="noopener">github.com/zephyr110/zlog</a>
+            <a class="about-link about-link-ext" href="https://github.com/zephyr110/zlog" target="_blank" rel="noopener">
+              <span>github.com/zephyr110/zlog</span>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+            </a>
           </div>
         </div>
 
         <div class="field">
           <div class="about-line">
             <span class="about-label" data-i18n="about.license">开源协议</span>
-            <span class="about-license">MIT · © zephyr110</span>
+            <span class="about-license">MIT ·<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M14.83 14.83a4 4 0 1 1 0-5.66"/></svg>zephyr110</span>
           </div>
         </div>
       </div>

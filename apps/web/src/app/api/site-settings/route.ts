@@ -85,7 +85,7 @@ export async function PUT(request: NextRequest) {
         description: patch.description ?? defaultSiteConfig.description,
         authorName: patch.authorName ?? defaultSiteConfig.author.name,
         logoUrl: patch.logoUrl ?? "",
-        logoInvertDark: patch.logoInvertInDark ?? true,
+        logoInvertDark: patch.logoInvertInDark ?? defaultSiteConfig.logoInvertInDark,
         githubUrl: patch.githubUrl ?? defaultSiteConfig.social.github,
         twitterUrl: patch.twitterUrl ?? defaultSiteConfig.social.twitter,
         commentEnabled: patch.commentEnabled ?? defaultSiteConfig.commentEnabled,

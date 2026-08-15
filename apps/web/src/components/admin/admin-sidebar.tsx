@@ -170,7 +170,7 @@ export function AdminSidebar({ collapsed, onToggle, user, mobileOpen, onMobileCl
         >
           <SiteLogo
             src={logoSrc}
-            invertInDark={site.logoInvertInDark ?? true}
+            invertInDark={site.logoInvertInDark ?? false}
             className="size-9 shrink-0 rounded-md"
             chip
           />

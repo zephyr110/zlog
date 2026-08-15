@@ -55,7 +55,7 @@ export function Footer() {
             >
               <SiteLogo
                 src={logoSrc}
-                invertInDark={site.logoInvertInDark ?? true}
+                invertInDark={site.logoInvertInDark ?? false}
                 className="size-6 rounded-md"
                 chip
               />

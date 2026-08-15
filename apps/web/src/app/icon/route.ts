@@ -34,14 +34,21 @@ const FALLBACK_SVG =
  *  its own origin. Never redirects (a redirect can't be represented in
  *  the static export build) and never throws — worst case it serves the
  *  tiny inline mark above. */
+function defaultFaviconType(path: string): string {
+  if (path.endsWith(".svg")) return "image/svg+xml"
+  if (path.endsWith(".ico")) return "image/x-icon"
+  if (path.endsWith(".webp")) return "image/webp"
+  return "image/png"
+}
+
 async function defaultFavicon(request: NextRequest): Promise<Response> {
-  const svg = "image/svg+xml"
+  const file = DEFAULT_FAVICON.replace(/^\//, "")
   const headers = {
-    "Content-Type": svg,
+    "Content-Type": defaultFaviconType(file),
     "Cache-Control": "public, max-age=3600",
   }
   try {
-    const buf = readFileSync(join(process.cwd(), "public", "favicon.svg"))
+    const buf = readFileSync(join(process.cwd(), "public", file))
     return new Response(buf, { headers })
   } catch {
     try {
@@ -54,7 +61,12 @@ async function defaultFavicon(request: NextRequest): Promise<Response> {
       if (!res.ok) throw new Error(`default favicon fetch failed: ${res.status}`)
       return new Response(await res.arrayBuffer(), { headers })
     } catch {
-      return new Response(FALLBACK_SVG, { headers })
+      return new Response(FALLBACK_SVG, {
+        headers: {
+          "Content-Type": "image/svg+xml",
+          "Cache-Control": "public, max-age=3600",
+        },
+      })
     }
   }
 }

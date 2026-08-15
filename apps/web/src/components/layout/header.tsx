@@ -73,7 +73,7 @@ export function Header({ categories }: { categories: NavCategory[] }) {
           >
             <SiteLogo
               src={logoSrc}
-              invertInDark={site.logoInvertInDark ?? true}
+              invertInDark={site.logoInvertInDark ?? false}
               className="size-9 rounded-md"
               chip
             />

@@ -66,7 +66,7 @@ export const defaultSiteConfig: SiteConfig = {
   siteUrl: resolveSiteUrl(),
   ogImage: process.env.NEXT_PUBLIC_OG_IMAGE || "/images/og-default.jpg",
   logoUrl: "",
-  logoInvertInDark: true,
+  logoInvertInDark: false,
   social: {
     github: "https://github.com/zephyr110/zlog",
     twitter: "https://twitter.com",
@@ -75,25 +75,9 @@ export const defaultSiteConfig: SiteConfig = {
 }
 
 export const DEFAULT_SITE_LOGO = "/zlog-logo.png"
-/** White-glyph variant of the legacy vector marks, used in dark mode so
- *  the logo never needs a CSS invert filter (filter forces bitmap
- *  rasterization, which renders jagged on some engines/HiDPI setups). */
-export const DEFAULT_SITE_LOGO_DARK = "/logo-dark.svg"
-/** Built-in favicon mark — also the fallback the /icon route serves. */
-export const DEFAULT_FAVICON = "/favicon.svg"
+/** Built-in favicon — same colorful mark as the navbar. */
+export const DEFAULT_FAVICON = "/zlog-logo.png"
 
 export function siteLogoSrc(config: Pick<SiteConfig, "logoUrl">): string {
   return config.logoUrl || DEFAULT_SITE_LOGO
-}
-
-/** True when src is a vector mark that HAS a dedicated dark variant file
- *  (logo.svg ↔ logo-dark.svg swap, no CSS filter). Bitmap marks like
- *  /zlog-logo.png and custom uploads are excluded on purpose — they use
- *  the CSS invert fallback in dark mode instead. */
-export function isBuiltInLogoSrc(src: string): boolean {
-  return (
-    src === "/logo.svg" ||
-    src === "/logo-dark.svg" ||
-    src === "/spooky.svg"
-  )
 }

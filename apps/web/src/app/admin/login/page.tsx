@@ -240,7 +240,7 @@ export default function AdminLoginPage() {
             <span className="flex size-11 items-center justify-center overflow-hidden rounded-lg border bg-card shadow-sm">
               <SiteLogo
                 src={logoSrc}
-                invertInDark={site.logoInvertInDark ?? true}
+                invertInDark={site.logoInvertInDark ?? false}
                 className="size-full rounded-lg object-cover"
               />
             </span>

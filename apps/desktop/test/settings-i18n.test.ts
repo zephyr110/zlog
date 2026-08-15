@@ -10,6 +10,12 @@ function dictKeys(block: string): string[] {
   return [...block.matchAll(/"([^"]+)":/g)].map((m) => m[1])
 }
 
+function dictValues(block: string): string[] {
+  return [...block.matchAll(/": "((?:\\.|[^"\\])*)"/g)].map((m) =>
+    m[1].replace(/\\"/g, '"')
+  )
+}
+
 function parseI18n(): { zh: string[]; en: string[] } {
   const zh = js.match(/zh: \{([\s\S]*?)\n  \},\n  en:/)
   const en = js.match(/en: \{([\s\S]*?)\n  \},\n\}/)
@@ -25,6 +31,14 @@ describe("settings i18n coverage", () => {
     expect([...zh].sort()).toEqual([...en].sort())
   })
 
+  it("文案末尾不加句号", () => {
+    const zhBlock = js.match(/zh: \{([\s\S]*?)\n  \},\n  en:/)![1]
+    const enBlock = js.match(/en: \{([\s\S]*?)\n  \},\n\}/)![1]
+    for (const value of [...dictValues(zhBlock), ...dictValues(enBlock)]) {
+      expect(value, JSON.stringify(value)).not.toMatch(/[。.]$/)
+    }
+  })
+
   it("HTML 的 data-i18n 都在中英字典里", () => {
     const missingZh = htmlKeys.filter((k) => !zh.includes(k))
     const missingEn = htmlKeys.filter((k) => !en.includes(k))
@@ -32,16 +46,36 @@ describe("settings i18n coverage", () => {
     expect(missingEn, `missing in en: ${missingEn.join(", ")}`).toEqual([])
   })
 
-  it("侧栏五项都挂了 data-i18n，避免语言切换后残留中文", () => {
-    for (const key of ["nav.sync", "nav.analytics", "nav.data", "nav.lang", "nav.about"]) {
+  it("侧栏导航都挂了 data-i18n，避免语言切换后残留中文", () => {
+    for (const key of [
+      "nav.sync",
+      "nav.analytics",
+      "nav.publish",
+      "nav.data",
+      "nav.lang",
+      "nav.about",
+    ]) {
       expect(html).toContain(`data-i18n="${key}"`)
       expect(zh).toContain(key)
       expect(en).toContain(key)
     }
   })
 
+  it("侧栏顺序：线上部署在同步设置之后", () => {
+    const nav = html.match(/<nav class="sidebar-nav">([\s\S]*?)<\/nav>/)![1]
+    const panels = [...nav.matchAll(/data-panel="([^"]+)"/g)].map((m) => m[1])
+    expect(panels).toEqual(["sync", "publish", "analytics", "data", "lang", "about"])
+  })
+
   it("各面板内容区用浅底 .block 分组，流量拆成 Vercel / GA", () => {
-    for (const id of ["panel-sync", "panel-analytics", "panel-data", "panel-lang", "panel-about"]) {
+    for (const id of [
+      "panel-sync",
+      "panel-analytics",
+      "panel-publish",
+      "panel-data",
+      "panel-lang",
+      "panel-about",
+    ]) {
       expect(html).toMatch(new RegExp(`id="${id}"[\\s\\S]*?class="block`))
     }
     expect(html).toContain('data-i18n="analytics.vercelTitle"')
@@ -62,6 +96,19 @@ describe("settings i18n coverage", () => {
     expect(html).toMatch(/class="block-title"[^>]*>[\s\S]*?class="block"/)
     expect(html).toContain('class="about-line"')
     expect(html).toContain('data-i18n="analytics.vercelTeamIdNote"')
+    expect(html).toMatch(/about-link-ext[\s\S]*?data-i18n="publish.step1Link"/)
+    expect(html).toMatch(/about-link-ext[\s\S]*?data-i18n="publish.step2Link"/)
+    expect(html).toMatch(/about-link-ext[\s\S]*?data-i18n="sync.helpSignupLink"/)
+    expect(html).toMatch(/about-link-ext[\s\S]*?data-i18n="sync.helpGuide"/)
+    expect(html).toMatch(/about-link-ext[\s\S]*?data-i18n="sync.helpTokenDoc"/)
+    expect(html).not.toMatch(/<a[^>]*data-i18n="publish.step1Link"/)
+    expect(html).not.toMatch(/<a[^>]*data-i18n="publish.step2Link"/)
+    expect(html).not.toMatch(/<a[^>]*data-i18n="sync.helpSignupLink"/)
+    expect(html).not.toMatch(/<a[^>]*data-i18n="sync.helpGuide"/)
+    expect(html).not.toMatch(/<a[^>]*data-i18n="sync.helpTokenDoc"/)
+    expect(html).not.toMatch(/<div class="select-item"[^>]*data-i18n=/)
+    expect(html).toContain('class="guide-step-row"')
+    expect(html).not.toContain("guide-step-head")
   })
 
   it("英文侧栏文案不含汉字，且短到单行放得下", () => {

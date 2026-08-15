@@ -45,7 +45,7 @@ export function siteConfigFromRow(
       avatar: defaultSiteConfig.author.avatar,
     },
     logoUrl: row.logoUrl,
-    logoInvertInDark: row.logoInvertDark ?? true,
+    logoInvertInDark: row.logoInvertDark ?? defaultSiteConfig.logoInvertInDark,
     social: {
       github: row.githubUrl,
       twitter: row.twitterUrl,
