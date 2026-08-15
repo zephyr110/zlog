@@ -1,4 +1,5 @@
 import { Tray, Menu, nativeImage } from "electron"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import type { ResolvedLang } from "./lang"
 
@@ -21,23 +22,59 @@ const SYNC_SUFFIX: Record<ResolvedLang, { synced: string; error: string }> = {
 
 /**
  * 托盘图标选择：
- * - macOS：模板图标（黑色图形 + alpha）。文件名以 Template 结尾 →
- *   Electron 自动标记为模板图（isTemplateImage），系统按菜单栏
- *   浅色/深色主题自动渲染黑/白（Apple HIG）；@2x 相邻文件自动作为
- *   Retina 尺寸。
+ * - macOS：模板图标（黑色图形 + alpha）。系统按菜单栏浅色/深色染成黑/白。
+ *   createFromPath 只读一个文件，不会带上旁边的 @2x，所以这里用
+ *   createFromBuffer({ scaleFactor: 2 }) 把 36px 标成 18pt，Retina 才不糊。
  * - Windows/Linux：模板图语义不适用，用彩色图标。
  * - 模板图缺失（派生失败/旧资源）时回退彩色图标。
  */
 function trayIcon(): Electron.NativeImage {
   if (process.platform === "darwin") {
-    const template = nativeImage.createFromPath(
-      join(__dirname, "..", "assets", "trayTemplate.png")
-    )
-    if (!template.isEmpty()) return template
+    const template = macTrayTemplate()
+    if (template) return template
   }
   return nativeImage
     .createFromPath(join(__dirname, "..", "assets", "tray.png"))
     .resize({ width: 16, height: 16 })
+}
+
+function readPng(file: string): Buffer | null {
+  try {
+    return existsSync(file) ? readFileSync(file) : null
+  } catch {
+    return null
+  }
+}
+
+function macTrayTemplate(): Electron.NativeImage | null {
+  const dir = join(__dirname, "..", "assets")
+  const p1 = join(dir, "trayTemplate.png")
+  const p2 = join(dir, "trayTemplate@2x.png")
+  try {
+    let image: Electron.NativeImage | null = null
+    const retina = readPng(p2)
+    if (retina) {
+      image = nativeImage.createFromBuffer(retina, { scaleFactor: 2 })
+      if (image.isEmpty()) image = null
+    }
+    const one = nativeImage.createFromPath(p1)
+    if (image && !one.isEmpty()) {
+      const { width, height } = one.getSize()
+      image.addRepresentation({
+        scaleFactor: 1,
+        width,
+        height,
+        buffer: one.toPNG(),
+      })
+    } else if (!image && !one.isEmpty()) {
+      image = one
+    }
+    if (!image || image.isEmpty()) return null
+    image.setTemplateImage(true)
+    return image
+  } catch {
+    return null
+  }
 }
 
 function buildMenu(lang: ResolvedLang, actions: TrayActions): Menu {
