@@ -475,7 +475,7 @@
     /* 面板内标题：设置模式由内容区头部承载，此处隐藏（仅首启模式显示） */
     body.mode-settings .panel-title { display: none; }
 
-    /* ── 状态区与操作栏间距（hairline 分隔） ─────────────────────── */
+    /* ── 状态区与操作栏 ───────────────────────────────────────────── */
     .status {
       min-height: 0;
       margin-top: 16px;
@@ -487,32 +487,31 @@
     .status.error { color: var(--destructive); }
     .actions-bar {
       margin-top: 16px;
-      border-top: 1px solid var(--border);
       padding-top: 16px;
       display: flex;
       align-items: center;
       gap: 8px;
     }
     .status:empty { display: none; }
+    /* 设置模式：状态在上、按钮右下，无分割线 */
     body.mode-settings .content-footer {
       flex: none;
-      padding: 14px 32px 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+      padding: 12px 32px 20px;
       background: var(--background);
-      border-top: 1px solid var(--border);
     }
     body.mode-settings .content-footer .status {
-      margin-top: 0;
-    }
-    body.mode-settings .content-footer .status:not(:empty) {
-      margin-bottom: 12px;
+      margin: 0;
     }
     body.mode-settings .content-footer .actions-bar {
-      margin-top: 0;
-      border-top: none;
-      padding-top: 0;
+      align-self: flex-end;
+      margin: 0;
+      padding: 0;
     }
     body.mode-firstrun .actions-bar {
-      border-top: none;
       margin-top: 20px;
       padding-top: 0;
       flex-direction: column;
@@ -937,14 +936,13 @@
     </div>
 
     <div class="content-footer">
-    <div class="status" id="status" aria-live="polite"></div>
-
-    <div class="actions-bar">
-      <button class="primary" id="saveBtn">
-        <span id="saveBtnLabel" data-i18n="save.firstRun">保存并启动</span>
-      </button>
-      <button class="secondary" id="syncBtn" data-i18n="sync.now">立即同步</button>
-    </div>
+      <div class="status" id="status" aria-live="polite"></div>
+      <div class="actions-bar">
+        <button class="secondary" id="syncBtn" data-i18n="sync.now">立即同步</button>
+        <button class="primary" id="saveBtn">
+          <span id="saveBtnLabel" data-i18n="save.firstRun">保存并启动</span>
+        </button>
+      </div>
     </div>
   </main>
 
