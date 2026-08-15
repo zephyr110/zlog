@@ -28,8 +28,8 @@ const I18N = {
     "lang.title": "语言",
     "lang.subtitle": "界面语言与显示",
     "account.title": "管理员账号",
-    "tag.required": "必填",
-    "tag.optional": "可选",
+    "tag.required": "（必填）",
+    "tag.optional": "（可选）",
     "account.username": "用户名",
     "account.password": "密码",
     "account.confirmPassword": "确认密码",
@@ -46,7 +46,8 @@ const I18N = {
     "analytics.vercelTokenPh": "Vercel 控制台 → Settings → Tokens",
     "analytics.vercelProjectId": "Project ID",
     "analytics.vercelProjectIdPh": "项目 Settings → General 页面底部",
-    "analytics.vercelTeamId": "Team ID（团队项目才需要）",
+    "analytics.vercelTeamId": "Team ID",
+    "analytics.vercelTeamIdNote": "（团队项目才需要）",
     "analytics.vercelTeamIdPh": "留空表示个人项目",
     "analytics.gaTitle": "Google Analytics 4",
     "analytics.gaId": "媒体资源 ID",
@@ -54,7 +55,6 @@ const I18N = {
     "analytics.gaKey": "服务账号私钥",
     "analytics.hint": "服务账号需在该媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节",
     "analytics.proxyTitle": "HTTP 代理",
-    "analytics.proxyLabel": "代理 URL",
     "analytics.proxyPh": "http://127.0.0.1:端口",
     "analytics.proxyHint": "用于拉取 Vercel Analytics 与 Google Analytics 4。留空则自动读取系统/VPN 的 HTTP 代理；读不到或超时时再填写。",
     "data.location": "位置",
@@ -124,8 +124,8 @@ const I18N = {
     "lang.title": "Language",
     "lang.subtitle": "Interface language",
     "account.title": "Admin Account",
-    "tag.required": "Required",
-    "tag.optional": "Optional",
+    "tag.required": " (required)",
+    "tag.optional": " (optional)",
     "account.username": "Username",
     "account.password": "Password",
     "account.confirmPassword": "Confirm Password",
@@ -142,7 +142,8 @@ const I18N = {
     "analytics.vercelTokenPh": "Vercel console → Settings → Tokens",
     "analytics.vercelProjectId": "Project ID",
     "analytics.vercelProjectIdPh": "Bottom of project Settings → General",
-    "analytics.vercelTeamId": "Team ID (teams only)",
+    "analytics.vercelTeamId": "Team ID",
+    "analytics.vercelTeamIdNote": " (teams only)",
     "analytics.vercelTeamIdPh": "Leave empty for personal projects",
     "analytics.gaTitle": "Google Analytics 4",
     "analytics.gaId": "Property ID",
@@ -150,7 +151,6 @@ const I18N = {
     "analytics.gaKey": "Service account private key",
     "analytics.hint": "Grant the service account Viewer access on this property; see the README deployment section for steps",
     "analytics.proxyTitle": "HTTP Proxy",
-    "analytics.proxyLabel": "Proxy URL",
     "analytics.proxyPh": "http://127.0.0.1:port",
     "analytics.proxyHint": "Used to fetch Vercel Analytics and Google Analytics 4. Leave empty to read the system/VPN HTTP proxy; fill this in if detection fails or requests time out.",
     "data.location": "Location",
@@ -322,10 +322,10 @@ function renderUpdateState() {
 }
 
 // ── 模式差异 ──────────────────────────────────────────────────────────
-// 首启：品牌头部 + 全宽主按钮；隐藏侧栏、内容区标题、立即同步、流量分析
-// 与语言面板（首启跟随系统语言，不提供手动切换）
+// 首启：品牌头部 + 全宽主按钮。侧栏由 body.mode-firstrun 的 CSS 隐藏；
+// JS 再藏掉同步按钮、流量/数据/语言/关于面板和内容区标题。
 if (isFirstRun) {
-  // 首启向导保持最小化：同步按钮、流量分析/数据/语言/关于面板、内容区标题全部隐藏
+  // 首启向导保持最小化：只留账号 + 可选同步
   document.getElementById("syncBtn").style.display = "none"
   document.getElementById("panel-analytics").style.display = "none"
   document.getElementById("panel-data").style.display = "none"
@@ -338,7 +338,8 @@ if (isFirstRun) {
   // 预填已保存的配置（C1：表单必须回显存量值，否则空字段会被当
   // 成"清空"保存，静默抹掉流量分析凭据）。密码类字段同样回显，
   // 用户清空即表示删除。
-  zlogApi.loadConfig().then((cfg) => {
+  // 无 preload（浏览器直接打开 HTML）时不能抛：后面还要绑侧栏点击。
+  zlogApi?.loadConfig?.()?.then((cfg) => {
     if (!cfg) return
     const set = (id, v) => { document.getElementById(id).value = v || "" }
     set("syncUrl", cfg.syncUrl)
@@ -418,7 +419,7 @@ for (const item of langPopup.querySelectorAll(".select-item")) {
   item.addEventListener("click", async (e) => {
     e.stopPropagation()
     const pref = item.dataset.value
-    const res = await zlogApi.setLang(pref)
+    const res = await zlogApi?.setLang?.(pref)
     if (res && res.ok && res.state) {
       currentPref = pref
       lang = res.state.resolved
@@ -428,15 +429,12 @@ for (const item of langPopup.querySelectorAll(".select-item")) {
   })
 }
 
-zlogApi
-  .getLang()
-  .then((state) => {
+zlogApi?.getLang?.()?.then((state) => {
     if (!state) return
     currentPref = state.pref
     lang = state.resolved
     applyLang()
-  })
-  .catch(() => {
+  })?.catch(() => {
     // IPC 失败（如语言文件目录不可写）：保持 zh 默认，静态渲染已由
     // 上方的同步 applyLang() 完成
   })
@@ -493,6 +491,7 @@ function renderStatus(s) {
 }
 
 async function refreshStatus() {
+  if (!zlogApi?.getSyncStatus) return
   renderStatus(await zlogApi.getSyncStatus())
 }
 
@@ -660,7 +659,7 @@ async function downloadUpdatePackage() {
 }
 
 // 主进程流式下载进度（百分比文本）
-zlogApi.onUpdateProgress(({ percent }) => {
+zlogApi?.onUpdateProgress?.(({ percent }) => {
   updatePercent = percent
   if (updateUiState === "downloading") renderUpdateState()
 })
@@ -677,12 +676,9 @@ updateBtn.addEventListener("click", () => {
 })
 
 // 版本号常驻显示（无需网络）
-zlogApi
-  .getVersion()
-  .then((v) => {
+zlogApi?.getVersion?.()?.then((v) => {
     if (v) appVersionEl.textContent = v
-  })
-  .catch(() => {
+  })?.catch(() => {
     // IPC 失败时保留占位符（…），不产生未处理的 rejection
   })
 

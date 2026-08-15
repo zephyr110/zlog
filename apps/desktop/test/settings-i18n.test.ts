@@ -50,11 +50,18 @@ describe("settings i18n coverage", () => {
     expect(html).toContain('id="httpsProxy"')
     expect(html).toContain('data-i18n="analytics.proxyTitle"')
     expect(html).toContain('data-i18n="analytics.proxyHint"')
+    expect(html).not.toContain("analytics.proxyLabel")
+    expect(js).not.toContain("analytics.proxyLabel")
+    expect(js).toContain("zlogApi?.loadConfig")
     expect(html).not.toContain("about-group")
     expect(html).not.toContain("data-card")
     expect(html).toContain('id="openBtn2"')
     expect(html).toContain('data-i18n="data.location"')
     expect(html).toContain('data-i18n="data.backupHint"')
+    expect(html).toContain('class="group"')
+    expect(html).toMatch(/class="block-title"[^>]*>[\s\S]*?class="block"/)
+    expect(html).toContain('class="about-line"')
+    expect(html).toContain('data-i18n="analytics.vercelTeamIdNote"')
   })
 
   it("英文侧栏文案不含汉字，且短到单行放得下", () => {

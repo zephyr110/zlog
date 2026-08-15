@@ -201,7 +201,7 @@
     }
     .content-header {
       flex: none;
-      padding: 28px 32px 20px;
+      padding: 24px 32px 16px;
     }
     .content-header h1 {
       margin: 0 0 6px;
@@ -209,13 +209,6 @@
       font-weight: 600;
       letter-spacing: -0.025em;
       line-height: 1.3;
-    }
-    .content header { margin-bottom: 20px; }
-    .content h1 {
-      margin: 0 0 4px;
-      font-size: 16px;
-      font-weight: 600;
-      letter-spacing: -0.01em;
     }
     body.mode-settings .content header.content-header { margin-bottom: 0; }
     .subtitle {
@@ -230,7 +223,7 @@
     }
     body.mode-settings .content-scroll {
       overflow-y: auto;
-      padding: 0 32px 8px;
+      padding: 4px 32px 28px;
       scrollbar-width: thin;
       scrollbar-color: var(--border) transparent;
     }
@@ -277,11 +270,27 @@
       max-width: 36rem;
     }
     body.mode-settings .panel.active { display: block; }
-    /* 子块 = shadcn Card：bg-card + border-border。
-       浅色 card 与 background 同为 1，靠 --border 勾出分组；
-       深色 card(0.205) 从 background(0.145) 托起，再加 10% 描边。
-       不用 --muted 铺底：浅色 0.97≈1 看不清；深色 0.269 会让
-       outline 按钮 hover（也是 muted）和输入框糊成一层。 */
+    /* 分组：标题在色块外左上。浅色 --muted(0.97)≈白，混一点
+       --border 才看得出井；深色 muted 本身已够。输入落在 --card。 */
+    .group + .group { margin-top: 24px; }
+    .block-title {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      margin: 0 0 10px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      line-height: 1.3;
+      color: var(--foreground);
+    }
+    .block-title .opt {
+      font-size: inherit;
+      font-weight: inherit;
+      letter-spacing: inherit;
+      color: var(--muted-foreground);
+    }
+    .block-title .opt.req { color: var(--destructive); }
     .block {
       display: flex;
       flex-direction: column;
@@ -289,32 +298,18 @@
       padding: 16px;
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
-      background: var(--card);
-      color: var(--card-foreground);
+      background: color-mix(in oklch, var(--muted) 72%, var(--border));
+      color: var(--foreground);
     }
-    .block + .block { margin-top: 12px; }
-    body.mode-firstrun .block + .block { margin-top: 16px; }
-    /* 输入落在 card 上：浅色与 card 同底、靠 --input 描边；
-       深色用更暗的 --background 做凹陷，避免和 card 糊在一起。 */
+    @media (prefers-color-scheme: dark) {
+      .block { background: var(--muted); }
+    }
     .block input,
-    .block .select-trigger {
-      background: var(--background);
+    .block .select-trigger,
+    .block button.secondary {
+      background: var(--card);
     }
-    .block-title {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-      margin: 0;
-      font-size: 13px;
-      font-weight: 500;
-      letter-spacing: -0.01em;
-    }
-    .block-title .tag {
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--muted-foreground);
-    }
-    .block-title .tag.req { color: var(--destructive); }
+    .block > .hint { margin-top: 0; }
 
     .field { display: flex; flex-direction: column; }
     label {
@@ -322,6 +317,12 @@
       font-size: 13px;
       font-weight: 500;
       letter-spacing: -0.005em;
+    }
+    label .opt {
+      font-size: inherit;
+      font-weight: inherit;
+      letter-spacing: inherit;
+      color: var(--muted-foreground);
     }
     input {
       width: 100%;
@@ -335,11 +336,6 @@
       border-radius: var(--radius-md);
       outline: none;
       transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
-    }
-    @media (prefers-color-scheme: dark) {
-      input, .select-trigger {
-        background: color-mix(in oklch, var(--input) 30%, var(--card));
-      }
     }
     input::placeholder { color: var(--muted-foreground); opacity: 0.7; }
     input:hover { border-color: var(--ring); }
@@ -364,7 +360,10 @@
       cursor: pointer;
       outline: none;
     }
-    .secret-toggle:hover { color: var(--foreground); background: var(--muted); }
+    .secret-toggle:hover {
+      color: var(--foreground);
+      background: color-mix(in oklch, var(--foreground) 6%, var(--card));
+    }
     .secret-toggle:focus-visible {
       box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
     }
@@ -374,14 +373,13 @@
     .secret-toggle[aria-pressed="true"] .secret-eye-off { display: block; }
 
     /* ── shadcn Select（自定义下拉，原生 select 不可样式化） ──────── */
-    .select { position: relative; width: 100%; max-width: 20rem; }
+    .select { position: relative; width: 100%; }
     .select-trigger {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
       width: 100%;
-      max-width: 20rem;
       height: 32px;
       padding: 0 12px;
       font: inherit;
@@ -411,7 +409,7 @@
       position: absolute;
       top: calc(100% + 4px);
       left: 0;
-      min-width: min(100%, 20rem);
+      min-width: 100%;
       z-index: 50;
       padding: 4px;
       color: var(--popover-foreground);
@@ -460,7 +458,9 @@
       display: flex;
       align-items: flex-start;
       gap: 8px;
-      margin: 4px 0 0;
+      margin: 0;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
       font-size: 12px;
       line-height: 1.5;
       color: var(--muted-foreground);
@@ -496,7 +496,7 @@
     .status:empty { display: none; }
     body.mode-settings .content-footer {
       flex: none;
-      padding: 16px 32px 20px;
+      padding: 14px 32px 18px;
       background: var(--background);
       border-top: 1px solid var(--border);
     }
@@ -550,10 +550,8 @@
     /* 首启模式：主按钮全宽 */
     body.mode-firstrun button.primary { width: 100%; }
 
-    /* 次按钮 = shadcn outline：bg-background + border，hover 为 accent。
-       不用 --secondary 实心——浅色 0.97、深色 0.269 贴在 card 上会糊。 */
-    button.secondary,
-    button.link {
+    /* 次按钮 = shadcn outline。色块内另有 .block button.secondary 用 --card。 */
+    button.secondary {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -573,26 +571,21 @@
       white-space: nowrap;
       transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
     }
-    button.secondary:hover:not(:disabled),
-    button.link:hover:not(:disabled) {
+    button.secondary:hover:not(:disabled) {
       background: var(--accent);
       color: var(--accent-foreground);
     }
-    button.secondary:focus-visible,
-    button.link:focus-visible {
+    button.secondary:focus-visible {
       box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
     }
-    button.secondary:disabled,
-    button.link:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary:disabled { opacity: 0.5; cursor: not-allowed; }
     @media (prefers-color-scheme: dark) {
-      button.secondary,
-      button.link {
+      button.secondary {
         border-color: var(--input);
         background: var(--background);
         box-shadow: none;
       }
-      button.secondary:hover:not(:disabled),
-      button.link:hover:not(:disabled) {
+      button.secondary:hover:not(:disabled) {
         background: var(--accent);
         color: var(--accent-foreground);
       }
@@ -613,34 +606,42 @@
       .spinner { animation-duration: 1.4s; }
     }
 
-    /* 只读元数据：同一 Card 内用 --border 分行 */
-    .block-meta { gap: 0; }
+    /* 只读元数据：标签左、值右，同一行；hint 独占下一行 */
+    .block-meta { gap: 0; padding-top: 4px; padding-bottom: 4px; }
     .block-meta .field {
-      padding: 14px 0;
+      padding: 11px 0;
       border-bottom: 1px solid var(--border);
     }
-    .block-meta .field:first-child { padding-top: 2px; }
-    .block-meta .field:last-child { border-bottom: none; padding-bottom: 2px; }
-    .about-row {
+    .block-meta .field:last-child { border-bottom: none; }
+    .about-line {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 16px;
       min-height: 32px;
     }
-    .about-row button { flex: none; }
+    .about-line button { flex: none; }
     .about-label {
-      margin-bottom: 6px;
-      font-size: 12px;
-      font-weight: 500;
+      margin: 0;
+      flex: none;
+      font-size: 13px;
+      font-weight: 400;
       color: var(--muted-foreground);
+    }
+    .about-value {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      min-width: 0;
+      text-align: right;
     }
     .about-version {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       font-variant-numeric: tabular-nums;
       letter-spacing: -0.02em;
@@ -655,13 +656,16 @@
       font-size: 13px;
       color: var(--primary);
       text-decoration: none;
-      overflow-wrap: break-word;
+      overflow-wrap: anywhere;
+      text-align: right;
     }
     .about-link:hover { text-decoration: underline; text-underline-offset: 2px; }
     .about-license {
       font-size: 13px;
-      color: var(--muted-foreground);
+      color: var(--foreground);
+      text-align: right;
     }
+    .block-meta .field > .hint { margin-top: 6px; }
     #updateStatus.error { color: var(--destructive); }
 
     .about-files {
@@ -676,7 +680,7 @@
       font-size: 12px;
       padding: 1px 6px;
       border-radius: var(--radius-sm);
-      background: var(--muted);
+      background: var(--card);
       color: var(--foreground);
       border: 1px solid var(--border);
     }
@@ -734,8 +738,9 @@
     <div class="content-scroll">
     <!-- 面板：同步设置 -->
     <section class="panel active" id="panel-sync">
-      <div class="block" id="passwordFields">
-        <h2 class="block-title"><span data-i18n="account.title">管理员账号</span><span class="tag req" data-i18n="tag.required">必填</span></h2>
+      <div class="group" id="passwordFields">
+        <h2 class="block-title"><span data-i18n="account.title">管理员账号</span><span class="opt req" data-i18n="tag.required">（必填）</span></h2>
+        <div class="block">
         <div class="field">
           <label for="username" data-i18n="account.username">用户名</label>
           <input id="username" autocomplete="username" placeholder="admin" />
@@ -760,11 +765,13 @@
             </button>
           </div>
         </div>
+        </div>
       </div>
 
-      <div class="block">
+      <div class="group">
         <!-- 块标题仅首启需要（设置模式页头已是「同步设置」）。 -->
-        <h2 class="block-title panel-title"><span data-i18n="sync.title">同步设置</span><span class="tag" data-i18n="tag.optional">可选</span></h2>
+        <h2 class="block-title panel-title"><span data-i18n="sync.title">同步设置</span><span class="opt" data-i18n="tag.optional">（可选）</span></h2>
+        <div class="block">
         <div class="field">
           <label for="syncUrl" data-i18n="sync.url">数据库 URL</label>
           <input id="syncUrl" placeholder="libsql://your-db.turso.io" />
@@ -790,13 +797,15 @@
             <a href="https://docs.turso.tech/cli/db/tokens/create" target="_blank" rel="noopener" data-i18n="sync.helpTokenDoc">Token 文档</a>
           </span>
         </p>
+        </div>
       </div>
     </section>
 
-    <!-- 面板：流量分析（Vercel / GA 各一块浅底） -->
+    <!-- 面板：流量分析（Vercel / GA / 代理：标题在色块外） -->
     <section class="panel" id="panel-analytics">
-      <div class="block">
+      <div class="group">
         <h2 class="block-title" data-i18n="analytics.vercelTitle">Vercel Analytics</h2>
+        <div class="block">
         <div class="field">
           <label for="vercelApiToken" data-i18n="analytics.vercelToken">API Token</label>
           <div class="secret">
@@ -812,12 +821,14 @@
           <input id="vercelProjectId" data-i18n-placeholder="analytics.vercelProjectIdPh" placeholder="项目 Settings → General 页面底部" />
         </div>
         <div class="field">
-          <label for="vercelTeamId" data-i18n="analytics.vercelTeamId">Team ID（团队项目才需要）</label>
+          <label for="vercelTeamId"><span data-i18n="analytics.vercelTeamId">Team ID</span><span class="opt" data-i18n="analytics.vercelTeamIdNote">（团队项目才需要）</span></label>
           <input id="vercelTeamId" data-i18n-placeholder="analytics.vercelTeamIdPh" placeholder="留空表示个人项目" />
         </div>
+        </div>
       </div>
-      <div class="block">
+      <div class="group">
         <h2 class="block-title" data-i18n="analytics.gaTitle">Google Analytics 4</h2>
+        <div class="block">
         <div class="field">
           <label for="gaPropertyId" data-i18n="analytics.gaId">媒体资源 ID</label>
           <input id="gaPropertyId" placeholder="123456789" />
@@ -837,23 +848,25 @@
           </div>
         </div>
         <p class="hint" data-i18n="analytics.hint">服务账号需在该媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节</p>
+        </div>
       </div>
-      <div class="block">
-        <h2 class="block-title"><span data-i18n="analytics.proxyTitle">HTTP 代理</span><span class="tag" data-i18n="tag.optional">可选</span></h2>
+      <div class="group">
+        <h2 class="block-title" id="proxyHeading"><span data-i18n="analytics.proxyTitle">HTTP 代理</span><span class="opt" data-i18n="tag.optional">（可选）</span></h2>
+        <div class="block">
         <div class="field">
-          <label for="httpsProxy" data-i18n="analytics.proxyLabel">代理 URL</label>
-          <input id="httpsProxy" data-i18n-placeholder="analytics.proxyPh" placeholder="http://127.0.0.1:端口" />
+          <input id="httpsProxy" aria-labelledby="proxyHeading" data-i18n-placeholder="analytics.proxyPh" placeholder="http://127.0.0.1:端口" />
           <p class="hint" data-i18n="analytics.proxyHint">用于拉取 Vercel Analytics 与 Google Analytics 4。留空则自动读取系统/VPN 的 HTTP 代理；读不到或超时时再填写。</p>
+        </div>
         </div>
       </div>
     </section>
 
     <!-- 面板：数据目录 -->
     <section class="panel" id="panel-data">
-      <div class="block block-meta">
-        <div class="field">
-          <span class="about-label" data-i18n="data.location">位置</span>
-          <div class="about-row">
+      <div class="group">
+        <h2 class="block-title" data-i18n="data.location">位置</h2>
+        <div class="block">
+          <div class="about-line">
             <span class="about-files">
               <code>zlog.db</code>
               <code>zlog-config.json</code>
@@ -871,11 +884,11 @@
 
     <!-- 面板：语言（自定义 shadcn 风格 select） -->
     <section class="panel" id="panel-lang">
-      <div class="block">
-        <div class="field">
-          <label for="langSelectBtn" data-i18n="lang.label">界面语言</label>
+      <div class="group">
+        <h2 class="block-title" id="langHeading" data-i18n="lang.label">界面语言</h2>
+        <div class="block">
           <div class="select">
-            <button type="button" class="select-trigger" id="langSelectBtn" aria-haspopup="listbox" aria-expanded="false">
+            <button type="button" class="select-trigger" id="langSelectBtn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="langHeading">
               <span id="langSelectValue">跟随系统</span>
               <svg class="icon select-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
             </button>
@@ -894,24 +907,30 @@
     <section class="panel" id="panel-about">
       <div class="block block-meta">
         <div class="field">
-          <span class="about-label" data-i18n="about.version">版本</span>
-          <div class="about-row">
-            <span id="appVersion" class="about-version">…</span>
-            <!-- 按钮/状态行由 settings.js 状态机维护文案（renderUpdateState），
-                 不挂 data-i18n——语言切换时按当前状态重渲染，不被静态字典覆盖 -->
-            <button class="secondary small" id="updateBtn">检查更新</button>
+          <div class="about-line">
+            <span class="about-label" data-i18n="about.version">版本</span>
+            <div class="about-value">
+              <span id="appVersion" class="about-version">…</span>
+              <!-- 按钮/状态行由 settings.js 状态机维护文案（renderUpdateState），
+                   不挂 data-i18n——语言切换时按当前状态重渲染，不被静态字典覆盖 -->
+              <button class="secondary small" id="updateBtn">检查更新</button>
+            </div>
           </div>
           <p class="hint" id="updateStatus">自动检查 GitHub Releases 最新版本</p>
         </div>
 
         <div class="field">
-          <span class="about-label" data-i18n="about.repository">代码仓库</span>
-          <a class="about-link" href="https://github.com/zephyr110/zlog" target="_blank" rel="noopener">https://github.com/zephyr110/zlog</a>
+          <div class="about-line">
+            <span class="about-label" data-i18n="about.repository">代码仓库</span>
+            <a class="about-link" href="https://github.com/zephyr110/zlog" target="_blank" rel="noopener">github.com/zephyr110/zlog</a>
+          </div>
         </div>
 
         <div class="field">
-          <span class="about-label" data-i18n="about.license">开源协议</span>
-          <span class="about-license">MIT · © zephyr110</span>
+          <div class="about-line">
+            <span class="about-label" data-i18n="about.license">开源协议</span>
+            <span class="about-license">MIT · © zephyr110</span>
+          </div>
         </div>
       </div>
     </section>
