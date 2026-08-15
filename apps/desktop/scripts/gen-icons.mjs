@@ -1,5 +1,5 @@
 import { deflateSync, inflateSync } from "node:zlib"
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { applySquircleMask, composeMacAppIcon } from "./mac-icon-mask.mjs"
@@ -33,6 +33,12 @@ if (existsSync(LOGO_SOURCE)) {
 } else {
   console.warn(`zlog-logo.png not found at ${LOGO_SOURCE} — generating placeholder icons`)
   generatePlaceholderIcons()
+}
+
+const icnsCache = join(root, "release", ".icon-icns")
+if (existsSync(icnsCache)) {
+  rmSync(icnsCache, { recursive: true, force: true })
+  console.log("cleared electron-builder icon cache", icnsCache)
 }
 
 /** 应用图标：主体缩进板内再套 squircle（托盘仍用未裁切的方图）。 */

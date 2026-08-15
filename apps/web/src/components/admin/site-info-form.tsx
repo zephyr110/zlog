@@ -78,8 +78,6 @@ export function SiteInfoForm({
   className,
 }: {
   idPrefix?: string
-  /** Override the form's vertical rhythm — the settings dialog uses a
-   *  tighter space-y-4 than the standalone settings page. */
   className?: string
 }) {
   const { t } = useT()
