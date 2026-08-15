@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Users, Eye } from "lucide-react"
+import { UsersRound, Eye } from "lucide-react"
 import {
   Bar,
   BarChart,
@@ -793,7 +793,7 @@ export function TrafficAnalytics() {
                 </CardTitle>
                 <CardAction>
                   <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Users size={16} />
+                    <UsersRound size={16} />
                   </span>
                 </CardAction>
               </CardHeader>
