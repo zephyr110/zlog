@@ -1,16 +1,33 @@
 import { createSign } from "node:crypto"
 import {
   Agent,
+  ProxyAgent,
+  Socks5ProxyAgent,
   fetch as undiciFetch,
   type Dispatcher,
 } from "undici"
 import {
-  createProxyDispatcher,
   isCachedProxyEquivalent,
   isSocksProxyUrl,
   proxyListenPort,
   socksUrlForHttpProxy,
 } from "@/lib/proxy-dispatcher"
+
+/**
+ * 用 undici 官方代理 Agent（ProxyAgent / Socks5ProxyAgent）。
+ *
+ * 不用手写 CONNECT dispatcher：自定义 connect 返回的 socket 会被 undici
+ * 直接当传输层使用，而官方 Agent 通过 httpSocket 机制把隧道交给内部
+ * TLS 层——手写实现无法可靠复现该契约（实测：裸 TCP 返回 = 明文请求
+ * 被 Google 拒（403 "SSL is required"）；自行包 TLS = undici 二次握手
+ * 断开）。官方 ProxyAgent 在 Node 22.17（Electron 内置 undici 6.21.2）
+ * 与本地 7.29 下均实测通过 GA4 全链路（token 交换 + runReport 200）。
+ */
+function createProxyDispatcher(proxyUrl: string): Dispatcher {
+  return isSocksProxyUrl(proxyUrl)
+    ? new Socks5ProxyAgent(proxyUrl)
+    : new ProxyAgent(proxyUrl)
+}
 import {
   collectProxyCandidates,
   envLocalFilePaths,
