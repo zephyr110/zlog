@@ -677,7 +677,7 @@ updateBtn.addEventListener("click", () => {
 
 // 版本号常驻显示（无需网络）
 zlogApi?.getVersion?.()?.then((v) => {
-    if (v) appVersionEl.textContent = v
+    if (v) appVersionEl.textContent = /^v/i.test(v) ? v : `v${v}`
   })?.catch(() => {
     // IPC 失败时保留占位符（…），不产生未处理的 rejection
   })
