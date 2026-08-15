@@ -44,6 +44,40 @@ pnpm workspace monorepo:
 
 Both targets share one Turso database. They differ in **when** posts are read and whether the admin API is available.
 
+### 0. First-time setup (no accounts yet)
+
+If you have **no GitHub / Vercel / Turso accounts** yet, this is the
+one-time path to get a blog that anyone can visit:
+
+1. **Create a Turso database** at https://turso.tech → create a DB →
+   note the `libsql://…` URL and generate an auth token.
+2. **Deploy the app** at https://vercel.com → *Add New → Project* →
+   import this repository (you can fork it first, or import directly
+   from GitHub) → Root Directory `apps/web` → Build Command `pnpm build`.
+3. **Set Vercel environment variables** (Project → Settings →
+   Environment Variables) — all five are required:
+   - `TURSO_DATABASE_URL` = `libsql://…` from step 1
+   - `TURSO_AUTH_TOKEN` = the token from step 1
+   - `ADMIN_USERNAME` and `ADMIN_PASSWORD_HASH` — generate the hash with
+     `node -e "const b=require('bcryptjs');b.hash('YOUR_PASSWORD',10).then(h=>console.log(Buffer.from(h).toString('base64')))"`
+   - `SESSION_SECRET` — `openssl rand -hex 32`
+4. **Redeploy** the project after saving env vars (Deployments → ⋯ →
+   Redeploy), then visit your `*.vercel.app` URL.
+
+Writing then happens in two places, both syncing to the same Turso DB:
+
+- **Desktop app** — Settings → Sync, paste the same `libsql://` URL and
+  token; posts you publish sync up and are live on the web within ~60s
+  (no redeploy needed for content).
+- **Local `pnpm dev`** — add the sync config to `apps/web/.env.local`
+  (see the template): `TURSO_DATABASE_URL=file:./bitlog.db`,
+  `TURSO_SYNC_URL=<libsql://…>`, `TURSO_AUTH_TOKEN=…`. The local
+  SQLite file becomes an embedded replica of Turso — writes sync
+  automatically.
+
+See the [deployment guide](https://zephyr110.vercel.app/posts/zlog-deployment-guide)
+for diagrams and checklists.
+
 ### 1. Vercel (SSR + admin)
 
 Full Next.js server deployment. Blog pages and `/api/*` run as Server Components / Route Handlers and query Turso **on each request** (CDN `s-maxage=60`). `/admin` works in production.

@@ -659,6 +659,32 @@
       text-align: right;
     }
     .about-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+    /* 发布到线上：步骤列表 */
+    .publish-steps {
+      margin: 4px 0 0;
+      padding-left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .publish-steps li {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--foreground);
+    }
+    .publish-steps li::marker {
+      color: var(--muted-foreground);
+      font-weight: 500;
+    }
+    .publish-step-text {
+      flex: 1;
+      min-width: 0;
+    }
     .about-license {
       font-size: 13px;
       color: var(--foreground);
@@ -708,6 +734,10 @@
       <button class="nav-item" data-panel="lang">
         <svg class="icon" viewBox="0 0 24 24"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
         <span data-i18n="nav.lang">语言</span>
+      </button>
+      <button class="nav-item" data-panel="publish">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+        <span data-i18n="nav.publish">发布到线上</span>
       </button>
       <button class="nav-item" data-panel="about">
         <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
@@ -899,6 +929,27 @@
           </div>
           <p class="hint" data-i18n="lang.hint">跟随系统时，系统语言为中文则显示中文；其他语言一律显示英文</p>
         </div>
+      </div>
+    </section>
+
+    <!-- 面板：发布到线上（首次上线的一次性引导；外链走系统浏览器） -->
+    <section class="panel" id="panel-publish">
+      <div class="section">
+        <p class="hint" data-i18n="publish.intro">完成下面三个步骤后，任何人通过网址就能访问你的文章</p>
+        <ol class="publish-steps">
+          <li>
+            <span class="publish-step-text" data-i18n="publish.step1">创建 Turso 数据库（文章数据存储）</span>
+            <a class="about-link" href="https://turso.tech" target="_blank" rel="noopener" data-i18n="publish.step1Link">打开 turso.tech</a>
+          </li>
+          <li>
+            <span class="publish-step-text" data-i18n="publish.step2">把博客部署到 Vercel（一次性；含环境变量清单）</span>
+            <a class="about-link" href="https://zephyr110.vercel.app/posts/zlog-deployment-guide" target="_blank" rel="noopener" data-i18n="publish.step2Link">部署指南</a>
+          </li>
+          <li>
+            <span class="publish-step-text" data-i18n="publish.step3">回到「同步设置」，填入数据库 URL 和 Token</span>
+          </li>
+        </ol>
+        <p class="hint" data-i18n="publish.done">之后发布文章会自动同步到线上，约 1 分钟内可见</p>
       </div>
     </section>
 

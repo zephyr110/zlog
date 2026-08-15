@@ -15,6 +15,7 @@ const I18N = {
     "nav.analytics": "流量分析",
     "nav.data": "数据目录",
     "nav.lang": "语言",
+    "nav.publish": "发布到线上",
     "nav.about": "关于",
     "firstrun.title": "Zlog 首次设置",
     "firstrun.subtitle": "创建管理员账号；同步可稍后在设置中补充",
@@ -65,6 +66,15 @@ const I18N = {
     "lang.zh": "中文",
     "lang.en": "English",
     "lang.hint": "跟随系统时，系统语言为中文则显示中文；其他语言一律显示英文",
+    "publish.title": "发布到线上",
+    "publish.subtitle": "让文章在 web 上可访问",
+    "publish.intro": "完成下面三个步骤后，任何人通过网址就能访问你的文章",
+    "publish.step1": "创建 Turso 数据库（文章数据存储）",
+    "publish.step1Link": "打开 turso.tech",
+    "publish.step2": "把博客部署到 Vercel（一次性；含环境变量清单）",
+    "publish.step2Link": "部署指南",
+    "publish.step3": "回到「同步设置」，填入数据库 URL 和 Token",
+    "publish.done": "之后发布文章会自动同步到线上，约 1 分钟内可见",
     "about.title": "关于",
     "about.subtitle": "版本信息与项目链接",
     "about.version": "版本",
@@ -111,6 +121,7 @@ const I18N = {
     "nav.analytics": "Analytics",
     "nav.data": "Data Folder",
     "nav.lang": "Language",
+    "nav.publish": "Go Live",
     "nav.about": "About",
     "firstrun.title": "Zlog First-Time Setup",
     "firstrun.subtitle": "Create an admin account; sync can be added later in Settings",
@@ -161,6 +172,15 @@ const I18N = {
     "lang.zh": "中文",
     "lang.en": "English",
     "lang.hint": "With \"Follow System\", Chinese system languages show Chinese; anything else shows English",
+    "publish.title": "Publish Online",
+    "publish.subtitle": "Make your posts accessible on the web",
+    "publish.intro": "Complete these three steps and anyone can visit your posts via a URL",
+    "publish.step1": "Create a Turso database (post storage)",
+    "publish.step1Link": "Open turso.tech",
+    "publish.step2": "Deploy the blog to Vercel (one-time; includes the env var checklist)",
+    "publish.step2Link": "Deployment guide",
+    "publish.step3": "Back in Sync, paste the database URL and token",
+    "publish.done": "Posts you publish sync automatically and go live within ~1 minute",
     "about.title": "About",
     "about.subtitle": "Version info and project links",
     "about.version": "Version",
@@ -330,6 +350,7 @@ if (isFirstRun) {
   document.getElementById("panel-analytics").style.display = "none"
   document.getElementById("panel-data").style.display = "none"
   document.getElementById("panel-lang").style.display = "none"
+  document.getElementById("panel-publish").style.display = "none"
   document.getElementById("panel-about").style.display = "none"
   document.getElementById("contentHeader").style.display = "none"
   document.getElementById("username").focus()
@@ -360,6 +381,7 @@ const PANEL_META = {
   analytics: { titleKey: "analytics.title", subtitleKey: "analytics.subtitle" },
   data: { titleKey: "data.title", subtitleKey: "data.subtitle" },
   lang: { titleKey: "lang.title", subtitleKey: "lang.subtitle" },
+  publish: { titleKey: "publish.title", subtitleKey: "publish.subtitle" },
   about: { titleKey: "about.title", subtitleKey: "about.subtitle" },
 }
 function renderPanelMeta() {
