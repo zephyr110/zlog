@@ -38,10 +38,12 @@ import {
 import { useT } from "@/components/layout/trans"
 import { apiFetch } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
-import type {
-  AnalyticsRange,
-  AnalyticsReport,
-  AnalyticsSource,
+import {
+  analyticsTimeoutI18nKeys,
+  type AnalyticsRange,
+  type AnalyticsReport,
+  type AnalyticsSource,
+  type AnalyticsTimeoutHint,
 } from "@/lib/ga-analytics"
 
 const RANGES: AnalyticsRange[] = ["today", "7d", "30d"]
@@ -52,7 +54,7 @@ type ErrorKind = "timeout" | "permission" | "unavailable"
 type FetchState =
   | { status: "loading" }
   | { status: "unconfigured" }
-  | { status: "error"; kind: ErrorKind }
+  | { status: "error"; kind: ErrorKind; timeoutHint?: AnalyticsTimeoutHint }
   | { status: "ok"; data: AnalyticsReport }
 
 function parseErrorKind(raw: unknown): ErrorKind {
@@ -60,6 +62,11 @@ function parseErrorKind(raw: unknown): ErrorKind {
     return raw
   }
   return "unavailable"
+}
+
+function parseTimeoutHint(raw: unknown): AnalyticsTimeoutHint | undefined {
+  if (raw === "direct" || raw === "proxy" || raw === "hosted") return raw
+  return undefined
 }
 
 /** Shared chrome for the four breakdown panels (title + content column). */
@@ -569,10 +576,10 @@ export function TrafficAnalytics() {
 
     async function load() {
       try {
-        // The server-side GA chain (OAuth + batch, with direct→proxy
-        // failover) can legitimately take 15-40s — far beyond the default
-        // 15s apiFetch timeout, which would abort slow-but-successful
-        // reports and misreport them as a network timeout.
+        // The server-side GA chain (OAuth + batch, proxy then direct)
+        // can take 15-40s — far beyond the default 15s apiFetch timeout,
+        // which would abort slow-but-successful reports and misreport
+        // them as a network timeout.
         const res = await apiFetch(
           `/api/admin/analytics?source=${source}&range=${range}`,
           { timeout: 60_000 }
@@ -616,13 +623,18 @@ export function TrafficAnalytics() {
         }
         if (!res.ok) {
           let kind: ErrorKind = "unavailable"
+          let timeoutHint: AnalyticsTimeoutHint | undefined
           try {
-            const body = (await res.json()) as { error?: unknown }
+            const body = (await res.json()) as {
+              error?: unknown
+              timeoutHint?: unknown
+            }
             kind = parseErrorKind(body.error)
+            timeoutHint = parseTimeoutHint(body.timeoutHint)
           } catch {
             /* ignore */
           }
-          if (!cancelled) setState({ status: "error", kind })
+          if (!cancelled) setState({ status: "error", kind, timeoutHint })
           return
         }
         const data = (await res.json()) as AnalyticsReport
@@ -671,9 +683,10 @@ export function TrafficAnalytics() {
     if (state.status === "error") {
       if (source === "vercel") {
         if (state.kind === "timeout") {
+          const keys = analyticsTimeoutI18nKeys("vercel", state.timeoutHint)
           return {
-            title: t("admin.analyticsVercelTimeout"),
-            description: t("admin.analyticsVercelTimeoutDesc"),
+            title: t(keys.titleKey),
+            description: t(keys.descKey),
           }
         }
         if (state.kind === "permission") {
@@ -688,9 +701,10 @@ export function TrafficAnalytics() {
         }
       }
       if (state.kind === "timeout") {
+        const keys = analyticsTimeoutI18nKeys("ga", state.timeoutHint)
         return {
-          title: t("admin.analyticsTimeout"),
-          description: t("admin.analyticsTimeoutDesc"),
+          title: t(keys.titleKey),
+          description: t(keys.descKey),
         }
       }
       if (state.kind === "permission") {
@@ -726,7 +740,7 @@ export function TrafficAnalytics() {
             <SelectTrigger
               size="sm"
               aria-label={t("admin.analyticsSource") as string}
-              className="w-40"
+              className="w-56"
             >
               <SelectValue>{sourceLabel(source)}</SelectValue>
             </SelectTrigger>

@@ -17,6 +17,8 @@ export interface DesktopConfig {
   gaPropertyId?: string
   gaClientEmail?: string
   gaPrivateKey?: string
+  /** 选填 HTTP 代理。有值则覆盖自动检测，供 Vercel / GA4 拉取。 */
+  httpsProxy?: string
 }
 
 /** 本地配置读写。路径可注入以便测试（主进程传 userData 目录）。 */

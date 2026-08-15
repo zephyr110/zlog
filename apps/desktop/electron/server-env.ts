@@ -3,7 +3,10 @@ import type { DesktopConfig } from "./config-store"
 /** 由桌面配置组装服务器 env（纯函数，便于测试）。 */
 export function buildServerEnv(
   cfg: DesktopConfig,
-  dbPath: string
+  dbPath: string,
+  langFilePath?: string,
+  /** 系统/VPN HTTP 代理（Electron resolveProxy 或进程 env）。有值才注入。 */
+  httpsProxy?: string
 ): Record<string, string> {
   const env: Record<string, string> = {
     TURSO_DATABASE_URL: `file:${dbPath}`,
@@ -15,6 +18,8 @@ export function buildServerEnv(
     ADMIN_PASSWORD_HASH: Buffer.from(cfg.adminPasswordHash, "utf8").toString("base64"),
     ZLOG_DESKTOP_KEY: cfg.desktopKey,
   }
+  // 语言单一事实源（lang.json）路径：web 端 /api/lang 读它接入统一语言源
+  if (langFilePath) env.DESKTOP_LANG_FILE = langFilePath
   if (cfg.syncUrl) env.TURSO_SYNC_URL = cfg.syncUrl
   if (cfg.syncToken) env.TURSO_AUTH_TOKEN = cfg.syncToken
   // 流量分析（线上站点只读报表）：有值才传，未配置则仪表盘显示空状态
@@ -24,5 +29,15 @@ export function buildServerEnv(
   if (cfg.gaPropertyId) env.GA_PROPERTY_ID = cfg.gaPropertyId
   if (cfg.gaClientEmail) env.GA_CLIENT_EMAIL = cfg.gaClientEmail
   if (cfg.gaPrivateKey) env.GA_PRIVATE_KEY = cfg.gaPrivateKey
+  const proxy =
+    httpsProxy?.trim() ||
+    process.env.HTTPS_PROXY?.trim() ||
+    process.env.https_proxy?.trim() ||
+    process.env.HTTP_PROXY?.trim() ||
+    process.env.http_proxy?.trim()
+  if (proxy) {
+    env.HTTPS_PROXY = proxy
+    env.HTTP_PROXY = proxy
+  }
   return env
 }

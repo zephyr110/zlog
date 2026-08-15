@@ -45,7 +45,7 @@ const nextConfig: NextConfig = {
   // serverless (Vercel) builds instead of bundling it into the server
   // chunks, where the platform binary can fail to load and every
   // request to a sharp-importing route 500s (e.g. /api/upload).
-  serverExternalPackages: ["sharp"],
+  serverExternalPackages: ["sharp", "undici"],
   // Pin the Turbopack root to the pnpm workspace root. The auto-detector
   // walks up for a lockfile and can pick a stray one above the repo
   // (e.g. ~/package-lock.json), setting a root that excludes

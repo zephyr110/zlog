@@ -1,12 +1,29 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron"
+import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron"
 import { randomBytes } from "node:crypto"
 import bcrypt from "bcryptjs"
-import { join } from "node:path"
+import { join, resolve, sep } from "node:path"
 import { ConfigStore, type DesktopConfig } from "./config-store"
+import { LangFile, isLangPref, type LangPref, type ResolvedLang } from "./lang"
+import {
+  compareVersions,
+  downloadUpdate,
+  fetchLatestRelease,
+  openDownloadedUpdate,
+  pickAssetUrl,
+  updatesDir,
+  type UpdateCheckResult,
+} from "./updater"
 import { ServerManager } from "./server-manager"
 import { buildServerEnv } from "./server-env"
+import { parseManualHttpProxy, resolveDesktopHttpProxy } from "./system-proxy"
 import { isValidSyncUrl } from "./validate"
-import { createTray, updateTraySyncStatus, type TrayActions } from "./tray"
+import { createTray, updateTrayLanguage, updateTraySyncStatus, type TrayActions } from "./tray"
+
+/** 设置类窗口标题（跟随生效语言；语言切换时由 setWindowTitles 更新）。 */
+const WINDOW_TITLES: Record<ResolvedLang, { settings: string; firstRun: string }> = {
+  zh: { settings: "Zlog 设置", firstRun: "Zlog 首次设置" },
+  en: { settings: "Zlog Settings", firstRun: "Zlog First-Time Setup" },
+}
 
 // 测试与 CI：可覆盖 userData 目录（Playwright 冒烟测试使用）。
 if (process.env.ZLOG_USER_DATA_DIR) {
@@ -41,8 +58,15 @@ async function main() {
 
   let server: ServerManager | null = null
   let mainWindow: BrowserWindow | null = null
+  let settingsWindow: BrowserWindow | null = null
   let firstRunWindow: BrowserWindow | null = null
   let config: DesktopConfig | null = configStore.load()
+
+  // ── 语言：单一事实源 = userData/lang.json（见 lang.ts）。
+  // systemLocale 只取启动时刻（跟随系统模式）；系统语言变更需重启生效。
+  const systemLocale = process.env.ZLOG_LANG || app.getLocale()
+  const langFile = new LangFile(app.getPath("userData"))
+  let currentLang: ResolvedLang = langFile.loadOrInit(systemLocale).resolved
   // 旧版本可能写入过非法 syncUrl（校验是后加的）——启动时兜底清除，
   // 否则 libsql 原生客户端解析 panic、服务器每次启动即崩溃
   if (config?.syncUrl && !isValidSyncUrl(config.syncUrl)) {
@@ -51,12 +75,15 @@ async function main() {
   }
   const logDir = join(app.getPath("userData"), "logs")
 
-  const tray = createTray({
+  // 托盘动作单处构造（createTray 与 updateTrayLanguage 共用）：
+  // 两处手写字面量会随 TrayActions 成员演化而漂移
+  const trayActions: TrayActions = {
     onOpen: () => showMainWindow(),
     onSettings: () => openSettingsWindow(),
     onSyncNow: () => void requestSyncNow(),
     onQuit: () => app.quit(),
-  })
+  }
+  const tray = createTray(trayActions, currentLang)
 
   // 崩溃处理：自动重启一次（spec §6），再次崩溃只弹窗提示，不循环。
   let crashRestarts = 0
@@ -68,7 +95,7 @@ async function main() {
       stopping = false
       return
     }
-    updateTraySyncStatus(tray, "server-exited")
+    updateTraySyncStatus(tray, "server-exited", undefined, currentLang)
     if ((app as unknown as { isQuitting?: boolean }).isQuitting) return
     if (config && crashRestarts < 1) {
       crashRestarts++
@@ -89,7 +116,14 @@ async function main() {
   const serverManager = new ServerManager(serverJsPath, logDir, onServerExit)
 
   async function startServerAndShow(cfg: DesktopConfig) {
-    await serverManager.start(buildServerEnv(cfg, dbPath))
+    const httpsProxy = await resolveDesktopHttpProxy({
+      override: cfg.httpsProxy,
+      resolveChromium: () =>
+        session.defaultSession.resolveProxy("https://oauth2.googleapis.com/"),
+    })
+    await serverManager.start(
+      buildServerEnv(cfg, dbPath, langFile.filePath, httpsProxy)
+    )
     server = serverManager
     showMainWindow()
   }
@@ -147,14 +181,31 @@ async function main() {
   }
 
   function openSettingsWindow() {
-    // 640 宽容纳左侧栏（176px）+ 内容区；面板切换后内容高度变化，
-    // 窗口内滚动即可（body 无固定高度）
+    // 单实例：托盘/重复点击只聚焦已有窗口，不叠开多个设置窗口
+    // （多窗口会让 settingsWindow ref 互相覆盖，语言切换广播丢目标）
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      // macOS 上 app 未激活（托盘常驻菜单栏）时仅 focus() 不生效：
+      // 需 show + restore + app.focus({steal:true}) 才能置前
+      if (settingsWindow.isMinimized()) settingsWindow.restore()
+      settingsWindow.show()
+      settingsWindow.focus()
+      app.focus({ steal: true })
+      return
+    }
+    // 720 宽：左侧栏 208px + 内容区；侧栏固定，内容区内部滚动
     const win = new BrowserWindow({
-      width: 640,
+      width: 720,
       height: 720,
-      title: "Zlog 设置",
+      title: WINDOW_TITLES[currentLang].settings,
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },
+    })
+    settingsWindow = win
+    win.on("closed", () => {
+      // 只在自身仍是当前引用时清空：关闭后立即重开时，若旧窗口的
+      // closed 回调晚于新窗口赋值执行，会把新窗口的引用抹掉，
+      // 下次托盘点击又叠开一个窗口
+      if (settingsWindow === win) settingsWindow = null
     })
     openExternalLinksInBrowser(win)
     void win.loadFile(join(__dirname, "..", "renderer", "settings.html"), {
@@ -182,10 +233,10 @@ async function main() {
         headers: { "X-Zlog-Desktop-Key": config?.desktopKey ?? "" },
       })
       const body = (await res.json()) as { status?: unknown }
-      updateTraySyncStatus(tray, res.ok ? "synced" : "error")
+      updateTraySyncStatus(tray, res.ok ? "synced" : "error", undefined, currentLang)
       return body.status as Promise<unknown> as unknown as void
     } catch {
-      updateTraySyncStatus(tray, "error")
+      updateTraySyncStatus(tray, "error", undefined, currentLang)
     }
   }
 
@@ -212,7 +263,17 @@ async function main() {
     gaPropertyId?: string
     gaClientEmail?: string
     gaPrivateKey?: string
+    httpsProxy?: string
   }) => {
+    // 与渲染层同源的防御性校验（唯一权威实现见 validate.ts）：非法
+    // syncUrl 会让 libsql 原生客户端解析时 panic、拖垮整个服务器进程
+    // （真实事故：URL 字段误填用户名）。校验先于 config 合并执行。
+    if (cfg.syncUrl?.trim() && !isValidSyncUrl(cfg.syncUrl.trim())) {
+      return { ok: false, error: "数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io" }
+    }
+    if (cfg.httpsProxy?.trim() && !parseManualHttpProxy(cfg.httpsProxy)) {
+      return { ok: false, error: "HTTP 代理格式应为 http://主机:端口" }
+    }
     if (!config) {
       const passwordHash = bcrypt.hashSync(String(cfg.password ?? ""), 10)
       config = {
@@ -235,13 +296,8 @@ async function main() {
         gaPropertyId: cfg.gaPropertyId?.trim() || undefined,
         gaClientEmail: cfg.gaClientEmail?.trim() || undefined,
         gaPrivateKey: cfg.gaPrivateKey?.trim() || undefined,
+        httpsProxy: parseManualHttpProxy(cfg.httpsProxy),
       }
-    }
-    // 与渲染层同源的防御性校验（唯一权威实现见 validate.ts）：非法
-    // syncUrl 会让 libsql 原生客户端解析时 panic、拖垮整个服务器进程
-    // （真实事故：URL 字段误填用户名）。校验先于 config 合并执行。
-    if (cfg.syncUrl?.trim() && !isValidSyncUrl(cfg.syncUrl.trim())) {
-      return { ok: false, error: "数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io" }
     }
     configStore.save(config)
     // 配置变更（同步信息）后重启服务器使 env 生效
@@ -276,14 +332,113 @@ async function main() {
   ipcMain.handle("app:openDataDir", () => {
     void shell.openPath(app.getPath("userData"))
   })
+  ipcMain.handle("app:version", () => app.getVersion())
   ipcMain.handle("app:quit", () => app.quit())
+
+  // ── 更新检查与下载（关于面板） ───────────────────────────────────
+  // GitHub API 走 net.fetch（Chromium 栈，跟随系统代理）。
+  ipcMain.handle("update:check", async (): Promise<UpdateCheckResult> => {
+    const current = app.getVersion()
+    try {
+      const release = await fetchLatestRelease()
+      if (!release) return { ok: false, hasUpdate: false, current, error: "fetch" }
+      const latest = release.tag.replace(/^v/, "")
+      const hasUpdate = compareVersions(latest, current) > 0
+      return {
+        ok: true,
+        hasUpdate,
+        current,
+        latest,
+        downloadUrl: hasUpdate
+          ? (pickAssetUrl(release.assets, process.platform, process.arch) ?? undefined)
+          : undefined,
+      }
+    } catch (err) {
+      return { ok: false, hasUpdate: false, current, error: String(err) }
+    }
+  })
+  ipcMain.handle("update:download", async (_e, url: unknown) => {
+    if (typeof url !== "string" || !url.startsWith("https://")) {
+      return { ok: false, error: "invalid url" }
+    }
+    let dest: string
+    try {
+      // 文件名兜底空串（URL 尾 / 时 pathname 末段为空）→ 退化为 "update"
+      dest = join(updatesDir(), new URL(url).pathname.split("/").pop() || "update")
+    } catch {
+      return { ok: false, error: "invalid url" }
+    }
+    const sendProgress = (percent: number) => {
+      try {
+        // 窗口可能在下载中被关闭：webContents 已销毁时 send 抛异常，
+        // 捕获后下载继续（孤儿包留在 updatesDir，重开窗口可重新下载）
+        settingsWindow?.webContents.send("update:progress", { percent })
+      } catch {
+        // 忽略：进度无人接收，下载仍须完成
+      }
+    }
+    try {
+      await downloadUpdate(url, dest, sendProgress)
+      // 只下载不自动打开：由用户在设置窗口确认后触发（update:open）
+      return { ok: true, dest }
+    } catch (err) {
+      return { ok: false, error: String(err) }
+    }
+  })
+  ipcMain.handle("update:open", (_e, dest: unknown) => {
+    // 只允许打开 updatesDir 内的文件（渲染层传路径不可信）。
+    // resolve 后校验：前缀匹配防不住 "../" 段，须归一化再比较
+    if (typeof dest !== "string") return { ok: false, error: "invalid dest" }
+    const base = resolve(updatesDir())
+    const target = resolve(dest)
+    if (target !== base && !target.startsWith(`${base}${sep}`)) {
+      return { ok: false, error: "outside updates dir" }
+    }
+    openDownloadedUpdate(target)
+    return { ok: true }
+  })
+
+  // ── 语言（单一事实源 lang.json；每次读盘，设置窗口与 /api/lang 共享）──
+  ipcMain.handle("lang:get", () => langFile.loadOrInit(systemLocale))
+  ipcMain.handle("lang:set", (_e, pref: unknown) => {
+    if (!isLangPref(pref)) return { ok: false, error: "invalid pref" }
+    const state = langFile.setPref(pref, systemLocale)
+    currentLang = state.resolved
+    // 设置类窗口标题 + 托盘菜单 + tooltip 后缀跟随新语言
+    updateTrayLanguage(tray, currentLang, trayActions)
+    for (const w of [settingsWindow, firstRunWindow]) {
+      if (w && !w.isDestroyed()) {
+        const isFirstRun = w === firstRunWindow
+        w.setTitle(
+          isFirstRun ? WINDOW_TITLES[currentLang].firstRun : WINDOW_TITLES[currentLang].settings
+        )
+      }
+    }
+    // 广播给博客/admin 主窗口（无 preload）：i18n-provider 监听
+    // "zlog-lang-change" 事件即时切换，无需刷新。
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      void mainWindow.webContents
+        .executeJavaScript(
+          `window.dispatchEvent(new CustomEvent("zlog-lang-change", { detail: ${JSON.stringify(state)} }))`
+        )
+        .catch((err) => {
+          // 页面正在导航/崩溃时广播失败：博客窗口停留在旧语言，
+          // 下次整页加载时 i18n-provider 会从 /api/lang 重新同步
+          console.warn("zlog-lang-change broadcast failed:", err)
+        })
+    }
+    return { ok: true, state }
+  })
 
   // ── 首启向导 ──
   if (!config) {
+    // 800 + useContentSize：高度按网页内容算（不含标题栏）。760 含窗框时
+    // 品牌/CTA 间距加大后主按钮会被裁到折线以下。
     firstRunWindow = new BrowserWindow({
       width: 560,
-      height: 920,
-      title: "Zlog 首次设置",
+      height: 800,
+      useContentSize: true,
+      title: WINDOW_TITLES[currentLang].firstRun,
       autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, "preload.js") },
     })
@@ -309,8 +464,12 @@ async function main() {
     serverManager.stop()
   })
 
-  // 同步状态轮询（30s，仅供托盘 tooltip）
+  // 同步状态轮询（30s，仅供托盘 tooltip）。同时从 lang.json 重读生效
+  // 语言：web 端（/api/lang）切换语言不会走 lang:set IPC，主进程内存值
+  // 会陈旧——轮询时顺带同步托盘菜单与 tooltip 语言（最长滞后一个周期）。
   setInterval(() => {
-    void getSyncStatus().then((s) => updateTraySyncStatus(tray, "idle", s))
+    currentLang = langFile.loadOrInit(systemLocale).resolved
+    updateTrayLanguage(tray, currentLang, trayActions)
+    void getSyncStatus().then((s) => updateTraySyncStatus(tray, "idle", s, currentLang))
   }, 30_000)
 }

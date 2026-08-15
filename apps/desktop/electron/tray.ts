@@ -1,11 +1,22 @@
 import { Tray, Menu, nativeImage } from "electron"
 import { join } from "node:path"
+import type { ResolvedLang } from "./lang"
 
 export interface TrayActions {
   onOpen: () => void
   onSettings: () => void
   onSyncNow: () => void
   onQuit: () => void
+}
+
+const TRAY_LABELS: Record<ResolvedLang, { open: string; settings: string; sync: string; quit: string }> = {
+  zh: { open: "打开", settings: "设置", sync: "立即同步", quit: "退出" },
+  en: { open: "Open", settings: "Settings", sync: "Sync Now", quit: "Quit" },
+}
+
+const SYNC_SUFFIX: Record<ResolvedLang, { synced: string; error: string }> = {
+  zh: { synced: "✓ 已同步", error: "⚠ 同步异常" },
+  en: { synced: "✓ Synced", error: "⚠ Sync error" },
 }
 
 /**
@@ -29,24 +40,41 @@ function trayIcon(): Electron.NativeImage {
     .resize({ width: 16, height: 16 })
 }
 
-export function createTray(actions: TrayActions): Tray {
-  const icon = trayIcon()
-  const tray = new Tray(icon)
+function buildMenu(lang: ResolvedLang, actions: TrayActions): Menu {
+  const labels = TRAY_LABELS[lang]
+  return Menu.buildFromTemplate([
+    { label: labels.open, click: actions.onOpen },
+    { label: labels.settings, click: actions.onSettings },
+    { label: labels.sync, click: actions.onSyncNow },
+    { type: "separator" },
+    { label: labels.quit, click: actions.onQuit },
+  ])
+}
+
+export function createTray(actions: TrayActions, lang: ResolvedLang): Tray {
+  const tray = new Tray(trayIcon())
   tray.setToolTip("Zlog")
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: "打开", click: actions.onOpen },
-      { label: "设置", click: actions.onSettings },
-      { label: "立即同步", click: actions.onSyncNow },
-      { type: "separator" },
-      { label: "退出", click: actions.onQuit },
-    ])
-  )
+  tray.setContextMenu(buildMenu(lang, actions))
   return tray
 }
 
-export function updateTraySyncStatus(tray: Tray, state: string, detail?: unknown): void {
-  const suffix = state === "synced" ? "✓ 已同步" : state === "error" ? "⚠ 同步异常" : ""
+/** 语言切换后重建上下文菜单（托盘菜单文案跟随 resolved 语言）。 */
+export function updateTrayLanguage(tray: Tray, lang: ResolvedLang, actions: TrayActions): void {
+  tray.setContextMenu(buildMenu(lang, actions))
+}
+
+export function updateTraySyncStatus(
+  tray: Tray,
+  state: string,
+  detail?: unknown,
+  lang: ResolvedLang = "zh"
+): void {
+  const suffix =
+    state === "synced"
+      ? ` ${SYNC_SUFFIX[lang].synced}`
+      : state === "error"
+        ? ` ${SYNC_SUFFIX[lang].error}`
+        : ""
   tray.setToolTip(`Zlog${suffix}`)
   void detail
 }
