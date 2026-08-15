@@ -362,26 +362,36 @@ async function main() {
   let currentDeployer: VercelDeployer | null = null
 
   ipcMain.handle("deploy:info", () => ({
-    token: config?.vercelDeployToken,
+    // 不把 token 送回渲染层（settings.js 只需知道已保存）
+    hasToken: Boolean(config?.vercelDeployToken),
     projectName: config?.vercelProjectName,
     url: config?.vercelDeployUrl,
   }))
   ipcMain.handle("deploy:start", async (_e, payload: unknown) => {
+    if (currentDeployer) {
+      return { ok: false, error: "部署正在进行中", kind: "busy" }
+    }
     const p = (payload ?? {}) as { token?: unknown; projectName?: unknown }
     const token =
       typeof p.token === "string" && p.token.trim()
         ? p.token.trim()
         : config?.vercelDeployToken
-    if (!token) return { ok: false, error: "token required" }
+    if (!token) {
+      return { ok: false, error: "请在 Vercel 控制台生成 Token 后粘贴到上方输入框", kind: "token" }
+    }
     const projectName =
       typeof p.projectName === "string" && p.projectName.trim()
         ? p.projectName.trim()
         : (config?.vercelProjectName ?? `zlog-blog-${randomBytes(3).toString("hex")}`)
-    if (!config) return { ok: false, error: "config missing" }
-    if (missingSyncConfig(config)) {
+    if (!config) return { ok: false, error: "本地配置缺失", kind: "api" }
+    const syncIssue = missingSyncConfig(config)
+    if (syncIssue) {
       return {
         ok: false,
-        error: "请先在「同步设置」中配置 Turso 数据库 URL 和 Token",
+        error:
+          syncIssue === "syncUrl"
+            ? "同步设置中的数据库 URL 不是 libsql:// 开头，请修正"
+            : "请先在「同步设置」中配置 Turso 数据库 URL 和 Token",
         kind: "sync",
       }
     }
@@ -396,7 +406,15 @@ async function main() {
       version: app.getVersion(),
       config,
       proxyUrl: httpsProxy,
-      onProgress: (progress) => settingsWindow?.webContents.send("deploy:progress", progress),
+      onProgress: (progress) => {
+        try {
+          // 设置窗口可能在部署中被关闭：webContents 已销毁时 send 抛异常，
+          // 捕获后部署继续（与 update:download 相同的防护）
+          settingsWindow?.webContents.send("deploy:progress", progress)
+        } catch {
+          // 进度无人接收，部署仍须完成
+        }
+      },
     })
     currentDeployer = deployer
     try {
@@ -415,7 +433,8 @@ async function main() {
       }
       return { ok: false, error: String(err) }
     } finally {
-      currentDeployer = null
+      // 只清当前部署器的引用（并发守卫保证同一时刻只有一个）
+      if (currentDeployer === deployer) currentDeployer = null
     }
   })
   ipcMain.handle("deploy:cancel", () => {

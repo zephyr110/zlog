@@ -76,6 +76,8 @@ const I18N = {
     "deploy.intro": "粘贴 Vercel Token 后点「部署」：自动创建项目、配置环境变量并上传代码（无需 GitHub、无需命令行）。前提：先在「同步设置」填好 Turso 数据库 URL 和 Token",
     "deploy.tokenLabel": "Vercel API Token",
     "deploy.tokenHint": "Vercel 控制台 → Settings → Tokens → Create Token（无需 GitHub 账号）",
+    "deploy.tokenSaved": "已保存，留空继续使用（输入新值可覆盖）",
+    "deploy.canceling": "正在取消…",
     "deploy.projectLabel": "项目名（可选，留空自动生成）",
     "deploy.start": "部署",
     "deploy.cancel": "取消",
@@ -211,6 +213,8 @@ const I18N = {
     "deploy.intro": "Paste your Vercel Token and click Deploy: it creates the project, sets environment variables, and uploads the code for you (no GitHub, no terminal). Prerequisite: configure the Turso database URL and token in Sync first",
     "deploy.tokenLabel": "Vercel API Token",
     "deploy.tokenHint": "Vercel console → Settings → Tokens → Create Token (no GitHub account needed)",
+    "deploy.tokenSaved": "Saved — leave empty to reuse (type a new one to replace)",
+    "deploy.canceling": "Canceling…",
     "deploy.projectLabel": "Project name (optional; auto-generated if empty)",
     "deploy.start": "Deploy",
     "deploy.cancel": "Cancel",
@@ -812,8 +816,9 @@ function setDeployStatus(text, isError = false) {
 
 zlogApi.onDeployProgress((p) => {
   if (!deployBusy || !p) return
+  // 单源进度文案：一律用 phase 映射（i18n），主进程 message 仅作日志
   const phaseText = DEPLOY_PHASE_TEXT[p.phase]
-  setDeployStatus(phaseText ? phaseText() : (p.message || ""))
+  if (phaseText) setDeployStatus(phaseText())
 })
 
 deployBtn.addEventListener("click", async () => {
@@ -830,7 +835,9 @@ deployBtn.addEventListener("click", async () => {
   deployBtn.disabled = false
   deployCancelBtn.style.display = "none"
   if (!res || !res.ok) {
-    setDeployStatus((res && res.error) || t("deploy.failed"), true)
+    // 取消不是错误：普通样式提示；其余按失败（红色）展示
+    const isCanceled = res && res.kind === "canceled"
+    setDeployStatus((res && res.error) || t("deploy.failed"), !isCanceled)
     return
   }
   setDeployStatus(t("deploy.done"))
@@ -843,6 +850,7 @@ deployBtn.addEventListener("click", async () => {
 
 deployCancelBtn.addEventListener("click", () => {
   void zlogApi.deployCancel()
+  setDeployStatus(t("deploy.canceling"))
 })
 
 deployCopyBtn.addEventListener("click", async () => {
@@ -854,10 +862,14 @@ deployCopyBtn.addEventListener("click", async () => {
   }
 })
 
-// 预填上次部署的项目名与结果
+// 预填上次部署的项目名与结果；token 不回传渲染层（仅提示已保存）
 zlogApi.deployInfo().then((info) => {
   if (!info) return
   if (info.projectName) deployProjectName.value = info.projectName
+  if (info.hasToken) {
+    deployToken.placeholder = t("deploy.tokenSaved")
+    deployToken.value = ""
+  }
   if (info.url) {
     deployUrlLink.textContent = info.url
     deployUrlLink.href = info.url

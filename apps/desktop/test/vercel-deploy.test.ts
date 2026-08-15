@@ -51,6 +51,24 @@ function makeTar(entries: Buffer[]): Buffer {
   return Buffer.concat([...entries, Buffer.alloc(1024)])
 }
 
+/** pax 扩展头（type 'g'）——真实 codeload tarball 的开头条目。 */
+function paxGlobalHeader(name: string): Buffer {
+  const data = Buffer.from(`${name}\0`)
+  const header = tarHeader(name, data.length)
+  header[156] = 103 // 'g'
+  const padded = Buffer.alloc(Math.ceil(data.length / 512) * 512)
+  data.copy(padded)
+  return Buffer.concat([header, padded])
+}
+
+/** 真实格式的 tar.gz：pax_global_header 开头 + 顶层目录。 */
+function realTarGz(repoDir: string, entries: Buffer[]): Buffer {
+  return makeTarGz([
+    paxGlobalHeader("pax_global_header"),
+    ...entries,
+  ])
+}
+
 function makeTarGz(entries: Buffer[]): Buffer {
   return gzipSync(makeTar(entries))
 }
@@ -58,8 +76,8 @@ function makeTarGz(entries: Buffer[]): Buffer {
 // ── parseTar / parseTarGz ──────────────────────────────────────────────
 
 describe("parseTarGz", () => {
-  it("解压并去掉顶层目录前缀", () => {
-    const gz = makeTarGz([
+  it("真实 codeload 格式（pax_global_header 开头）解压并去顶层目录前缀", () => {
+    const gz = realTarGz("zlog-main", [
       tarDir("zlog-main/"),
       tarEntry("zlog-main/package.json", Buffer.from('{"name":"zlog"}')),
       tarEntry("zlog-main/apps/web/next.config.ts", Buffer.from("export default {}")),
@@ -82,6 +100,20 @@ describe("parseTarGz", () => {
     expect(entries).toHaveLength(1)
     expect(entries[0].path).toBe("a.txt")
   })
+
+  it("longlink（type L）为下一个条目提供长名称", () => {
+    const longName = "zlog-main/" + "a".repeat(120) + ".ts"
+    // L 条目：header 名 "././@PaxHeader"（type L），数据 = 长名
+    const lHeader = tarHeader("././@PaxHeader", longName.length + 1)
+    lHeader[156] = 76 // 'L'
+    const lPadded = Buffer.alloc(Math.ceil((longName.length + 1) / 512) * 512)
+    Buffer.from(`${longName}\0`).copy(lPadded)
+    // 后续条目：真实文件名（截断到 100 字符内的占位——解析器应用 L 名）
+    const real = tarEntry("zlog-main/truncated-name.ts", Buffer.from("export const x = 1"))
+    const tar = makeTar([tarDir("zlog-main/"), Buffer.concat([lHeader, lPadded]), real])
+    const entries = parseTar(tar)
+    expect(entries[0].path).toBe(longName)
+  })
 })
 
 // ── buildDeployFiles ───────────────────────────────────────────────────
@@ -96,20 +128,23 @@ describe("buildDeployFiles", () => {
       { path: "docs/spec.md", data: Buffer.from("x") },
       { path: "apps/web/src/app/page.tsx", data: Buffer.from("export default Page") },
     ]
-    const files = buildDeployFiles(entries)
+    const { files, skipped } = buildDeployFiles(entries)
     expect(files.map((f) => f.file).sort()).toEqual([
       "apps/web/src/app/page.tsx",
       "package.json",
     ])
+    expect(skipped).toHaveLength(0)
   })
 
-  it("跳过含 NUL 的二进制与超大文件", () => {
-    const files = buildDeployFiles([
+  it("跳过含 NUL 的二进制与超大文件并统计", () => {
+    const { files, skipped } = buildDeployFiles([
       { path: "a.png", data: Buffer.from([0x89, 0x50, 0x00, 0x47]) },
       { path: "big.bin", data: Buffer.alloc(1_500_000) },
       { path: "ok.txt", data: Buffer.from("text") },
     ])
     expect(files.map((f) => f.file)).toEqual(["ok.txt"])
+    expect(skipped).toHaveLength(2)
+    expect(skipped[0]).toContain("a.png")
   })
 })
 
@@ -127,8 +162,8 @@ describe("buildEnvList", () => {
     const hash = env.find((e) => e.key === "ADMIN_PASSWORD_HASH")
     expect(hash?.value).toBe(Buffer.from("$2b$10$x", "utf8").toString("base64"))
     expect(env.find((e) => e.key === "TURSO_DATABASE_URL")?.value).toBe("libsql://x.turso.io")
-    // SESSION_SECRET 每次生成（随机）
-    expect(env.find((e) => e.key === "SESSION_SECRET")?.value).toMatch(/^[0-9a-f]{64}$/)
+    // SESSION_SECRET 复用本地会话密钥（每次部署重新生成会登出线上所有用户）
+    expect(env.find((e) => e.key === "SESSION_SECRET")?.value).toBe("s")
   })
 
   it("透传可选流量分析凭据", () => {
@@ -187,7 +222,7 @@ describe("VercelDeployer", () => {
         status: 200,
         body: { id: "prj_1" },
       },
-      "https://api.vercel.com/v10/projects/prj_1/env": {
+      "https://api.vercel.com/v10/projects/prj_1/env?upsert=true": {
         status: 200,
         body: { key: "TURSO_DATABASE_URL" },
       },
@@ -206,7 +241,7 @@ describe("VercelDeployer", () => {
     })
     // codeload 源码拉取：返回构造的 tar.gz
     const sourceUrl = "https://codeload.github.com/zephyr110/zlog/tar.gz/refs/tags/v1.0.0"
-    const gz = makeTarGz([
+    const gz = realTarGz("zlog-1.0.0", [
       tarDir("zlog-1.0.0/"),
       tarEntry("zlog-1.0.0/package.json", Buffer.from('{"name":"zlog"}')),
       tarEntry("zlog-1.0.0/apps/web/next.config.ts", Buffer.from("export default {}")),
@@ -269,7 +304,7 @@ describe("VercelDeployer", () => {
     const apiRoutes = fakeFetch({
       "https://api.vercel.com/v9/user": { status: 200, body: { id: "u" } },
       "https://api.vercel.com/v9/projects/p": { status: 200, body: { id: "prj" } },
-      "https://api.vercel.com/v10/projects/prj/env": { status: 200, body: {} },
+      "https://api.vercel.com/v10/projects/prj/env?upsert=true": { status: 200, body: {} },
       "https://api.vercel.com/v13/deployments": {
         status: 200,
         body: { id: "dpl" },
@@ -279,7 +314,7 @@ describe("VercelDeployer", () => {
         body: { readyState: "ERROR", error: { message: "pnpm build failed" } },
       },
     })
-    const gz = makeTarGz([
+    const gz = realTarGz("zlog-1.0.0", [
       tarDir("zlog-1.0.0/"),
       tarEntry("zlog-1.0.0/package.json", Buffer.from("{}")),
     ])
