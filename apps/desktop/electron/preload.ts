@@ -18,4 +18,13 @@ contextBridge.exposeInMainWorld("zlog", {
     ipcRenderer.on("update:progress", listener)
     return () => ipcRenderer.removeListener("update:progress", listener)
   },
+  deployInfo: () => ipcRenderer.invoke("deploy:info"),
+  deployStart: (payload: { token?: string; projectName?: string }) =>
+    ipcRenderer.invoke("deploy:start", payload),
+  deployCancel: () => ipcRenderer.invoke("deploy:cancel"),
+  onDeployProgress: (cb: (p: unknown) => void) => {
+    const listener = (_e: unknown, p: unknown) => cb(p)
+    ipcRenderer.on("deploy:progress", listener)
+    return () => ipcRenderer.removeListener("deploy:progress", listener)
+  },
 })

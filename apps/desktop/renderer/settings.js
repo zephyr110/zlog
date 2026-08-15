@@ -71,7 +71,24 @@ const I18N = {
     "lang.hint": "跟随系统时，系统语言为中文则显示中文；其他语言一律显示英文",
     "publish.title": "线上部署",
     "publish.subtitle": "可选，仅在需要把文章公开时配置",
-    "publish.stepsTitle": "部署步骤",
+    "publish.stepsTitle": "手动部署步骤",
+    "deploy.title": "一键部署",
+    "deploy.intro": "粘贴 Vercel Token 后点「部署」：自动创建项目、配置环境变量并上传代码（无需 GitHub、无需命令行）。前提：先在「同步设置」填好 Turso 数据库 URL 和 Token",
+    "deploy.tokenLabel": "Vercel API Token",
+    "deploy.tokenHint": "Vercel 控制台 → Settings → Tokens → Create Token（无需 GitHub 账号）",
+    "deploy.projectLabel": "项目名（可选，留空自动生成）",
+    "deploy.start": "部署",
+    "deploy.cancel": "取消",
+    "deploy.validating": "正在校验 Token…",
+    "deploy.project": "正在准备 Vercel 项目…",
+    "deploy.env": "正在配置环境变量…",
+    "deploy.source": "正在获取博客代码…",
+    "deploy.upload": "正在上传代码…",
+    "deploy.building": "正在云端构建（约 2-5 分钟）…",
+    "deploy.done": "部署完成！",
+    "deploy.copy": "复制地址",
+    "deploy.copied": "已复制",
+    "deploy.failed": "部署失败",
     "publish.intro": "应用默认只在这台电脑使用。若希望别人通过网址阅读文章，再按下面步骤配置即可。不部署也不影响本地写作和预览",
     "publish.step1Label": "Step 1",
     "publish.step1Title": "创建 Turso 数据库",
@@ -189,7 +206,24 @@ const I18N = {
     "lang.hint": "With \"Follow System\", Chinese system languages show Chinese; anything else shows English",
     "publish.title": "Deploy Online",
     "publish.subtitle": "Optional — only if you want posts on the public web",
-    "publish.stepsTitle": "Steps",
+    "publish.stepsTitle": "Manual deployment steps",
+    "deploy.title": "One-Click Deploy",
+    "deploy.intro": "Paste your Vercel Token and click Deploy: it creates the project, sets environment variables, and uploads the code for you (no GitHub, no terminal). Prerequisite: configure the Turso database URL and token in Sync first",
+    "deploy.tokenLabel": "Vercel API Token",
+    "deploy.tokenHint": "Vercel console → Settings → Tokens → Create Token (no GitHub account needed)",
+    "deploy.projectLabel": "Project name (optional; auto-generated if empty)",
+    "deploy.start": "Deploy",
+    "deploy.cancel": "Cancel",
+    "deploy.validating": "Validating token…",
+    "deploy.project": "Preparing Vercel project…",
+    "deploy.env": "Setting environment variables…",
+    "deploy.source": "Fetching blog source…",
+    "deploy.upload": "Uploading source…",
+    "deploy.building": "Building in the cloud (about 2-5 min)…",
+    "deploy.done": "Deployment complete!",
+    "deploy.copy": "Copy URL",
+    "deploy.copied": "Copied",
+    "deploy.failed": "Deployment failed",
     "publish.intro": "The app works on this computer by default. Follow the steps below only if you want other people to read your posts at a URL. Skipping them does not affect local writing or preview",
     "publish.step1Label": "Step 1",
     "publish.step1Title": "Create a Turso database",
@@ -748,3 +782,85 @@ document.getElementById("openBtn2")?.addEventListener("click", () => {
 })
 
 refreshStatus()
+
+// ── 一键部署（Go Live 面板） ─────────────────────────────────────────
+// 状态机：idle → validating → project → env → source → upload → building
+//   → done | failed；进度由主进程推送（deploy:progress）。
+const deployToken = document.getElementById("deployToken")
+const deployProjectName = document.getElementById("deployProjectName")
+const deployBtn = document.getElementById("deployBtn")
+const deployCancelBtn = document.getElementById("deployCancelBtn")
+const deployStatus = document.getElementById("deployStatus")
+const deployResult = document.getElementById("deployResult")
+const deployUrlLink = document.getElementById("deployUrlLink")
+const deployCopyBtn = document.getElementById("deployCopyBtn")
+let deployBusy = false
+
+const DEPLOY_PHASE_TEXT = {
+  validating: () => t("deploy.validating"),
+  project: () => t("deploy.project"),
+  env: () => t("deploy.env"),
+  source: () => t("deploy.source"),
+  upload: () => t("deploy.upload"),
+  building: () => t("deploy.building"),
+}
+
+function setDeployStatus(text, isError = false) {
+  deployStatus.textContent = text
+  deployStatus.classList.toggle("error", isError)
+}
+
+zlogApi.onDeployProgress((p) => {
+  if (!deployBusy || !p) return
+  const phaseText = DEPLOY_PHASE_TEXT[p.phase]
+  setDeployStatus(phaseText ? phaseText() : (p.message || ""))
+})
+
+deployBtn.addEventListener("click", async () => {
+  if (deployBusy) return
+  deployBusy = true
+  deployBtn.disabled = true
+  deployCancelBtn.style.display = "inline-flex"
+  deployResult.style.display = "none"
+  setDeployStatus(t("deploy.validating"))
+  const res = await zlogApi
+    .deployStart({ token: deployToken.value, projectName: deployProjectName.value })
+    .catch(() => null)
+  deployBusy = false
+  deployBtn.disabled = false
+  deployCancelBtn.style.display = "none"
+  if (!res || !res.ok) {
+    setDeployStatus((res && res.error) || t("deploy.failed"), true)
+    return
+  }
+  setDeployStatus(t("deploy.done"))
+  deployUrlLink.textContent = res.url
+  deployUrlLink.href = res.url
+  deployResult.style.display = "flex"
+  // 已存入本地配置，清空输入框避免明文残留
+  deployToken.value = ""
+})
+
+deployCancelBtn.addEventListener("click", () => {
+  void zlogApi.deployCancel()
+})
+
+deployCopyBtn.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(deployUrlLink.textContent)
+    setDeployStatus(t("deploy.copied"))
+  } catch {
+    setDeployStatus(t("deploy.failed"), true)
+  }
+})
+
+// 预填上次部署的项目名与结果
+zlogApi.deployInfo().then((info) => {
+  if (!info) return
+  if (info.projectName) deployProjectName.value = info.projectName
+  if (info.url) {
+    deployUrlLink.textContent = info.url
+    deployUrlLink.href = info.url
+    deployResult.style.display = "flex"
+  }
+})

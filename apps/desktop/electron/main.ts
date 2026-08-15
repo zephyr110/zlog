@@ -13,6 +13,7 @@ import {
   updatesDir,
   type UpdateCheckResult,
 } from "./updater"
+import { VercelDeployer, VercelDeployError, missingSyncConfig } from "./vercel-deploy"
 import { ServerManager } from "./server-manager"
 import { buildServerEnv } from "./server-env"
 import { parseManualHttpProxy, resolveDesktopHttpProxy } from "./system-proxy"
@@ -353,6 +354,74 @@ async function main() {
   })
   ipcMain.handle("app:version", () => app.getVersion())
   ipcMain.handle("app:quit", () => app.quit())
+
+  // ── 一键部署到 Vercel（Go Live 面板） ────────────────────────────
+  // 流程见 docs/superpowers/specs/2026-08-15-one-click-deploy-design.md：
+  // token → 项目 → env（复用本地同步与 admin 凭据）→ 源码（官方 tag）→
+  // 上传部署 → 轮询构建 → 线上地址。全程无需 GitHub/命令行/手动 env。
+  let currentDeployer: VercelDeployer | null = null
+
+  ipcMain.handle("deploy:info", () => ({
+    token: config?.vercelDeployToken,
+    projectName: config?.vercelProjectName,
+    url: config?.vercelDeployUrl,
+  }))
+  ipcMain.handle("deploy:start", async (_e, payload: unknown) => {
+    const p = (payload ?? {}) as { token?: unknown; projectName?: unknown }
+    const token =
+      typeof p.token === "string" && p.token.trim()
+        ? p.token.trim()
+        : config?.vercelDeployToken
+    if (!token) return { ok: false, error: "token required" }
+    const projectName =
+      typeof p.projectName === "string" && p.projectName.trim()
+        ? p.projectName.trim()
+        : (config?.vercelProjectName ?? `zlog-blog-${randomBytes(3).toString("hex")}`)
+    if (!config) return { ok: false, error: "config missing" }
+    if (missingSyncConfig(config)) {
+      return {
+        ok: false,
+        error: "请先在「同步设置」中配置 Turso 数据库 URL 和 Token",
+        kind: "sync",
+      }
+    }
+    const httpsProxy = await resolveDesktopHttpProxy({
+      override: config.httpsProxy,
+      resolveChromium: () =>
+        session.defaultSession.resolveProxy("https://api.vercel.com/"),
+    })
+    const deployer = new VercelDeployer({
+      token,
+      projectName,
+      version: app.getVersion(),
+      config,
+      proxyUrl: httpsProxy,
+      onProgress: (progress) => settingsWindow?.webContents.send("deploy:progress", progress),
+    })
+    currentDeployer = deployer
+    try {
+      const url = await deployer.run()
+      config = {
+        ...config,
+        vercelDeployToken: token,
+        vercelProjectName: projectName,
+        vercelDeployUrl: url,
+      }
+      configStore.save(config)
+      return { ok: true, url }
+    } catch (err) {
+      if (err instanceof VercelDeployError) {
+        return { ok: false, error: err.message, kind: err.kind }
+      }
+      return { ok: false, error: String(err) }
+    } finally {
+      currentDeployer = null
+    }
+  })
+  ipcMain.handle("deploy:cancel", () => {
+    currentDeployer?.cancel()
+    return { ok: true }
+  })
 
   // ── 更新检查与下载（关于面板） ───────────────────────────────────
   // GitHub API 走 net.fetch（Chromium 栈，跟随系统代理）。
