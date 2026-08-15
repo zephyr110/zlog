@@ -1,10 +1,9 @@
 import {
   AnalyticsFetchError,
-  analyticsFetch,
-  analyticsTimeoutHint,
   type AnalyticsRange,
   type AnalyticsReport,
-} from "@/lib/ga-analytics"
+} from "@/lib/analytics-shared"
+import { analyticsFetch, analyticsTimeoutHint } from "@/lib/analytics-proxy"
 import { foldChinaRegions } from "@/lib/analytics-countries"
 import { isPublicTrafficPath } from "@/lib/analytics-paths"
 
