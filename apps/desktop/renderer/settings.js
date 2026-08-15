@@ -790,6 +790,8 @@ refreshStatus()
 // ── 一键部署（Go Live 面板） ─────────────────────────────────────────
 // 状态机：idle → validating → project → env → source → upload → building
 //   → done | failed；进度由主进程推送（deploy:progress）。
+// 所有 UI 更新集中在 renderDeployState：状态（busy/phase/status/result）
+// 与 DOM 分离，语言切换（applyLang 场景）与进度事件都能一致地重渲染。
 const deployToken = document.getElementById("deployToken")
 const deployProjectName = document.getElementById("deployProjectName")
 const deployBtn = document.getElementById("deployBtn")
@@ -798,7 +800,6 @@ const deployStatus = document.getElementById("deployStatus")
 const deployResult = document.getElementById("deployResult")
 const deployUrlLink = document.getElementById("deployUrlLink")
 const deployCopyBtn = document.getElementById("deployCopyBtn")
-let deployBusy = false
 
 const DEPLOY_PHASE_TEXT = {
   validating: () => t("deploy.validating"),
@@ -809,41 +810,56 @@ const DEPLOY_PHASE_TEXT = {
   building: () => t("deploy.building"),
 }
 
+/** 部署面板 UI 状态（renderDeployState 的唯一输入）。 */
+const deployUi = {
+  busy: false,
+  statusText: "",
+  statusError: false,
+  resultUrl: null, // string | null
+}
+
+function renderDeployState() {
+  deployBtn.disabled = deployUi.busy
+  deployCancelBtn.style.display = deployUi.busy ? "inline-flex" : "none"
+  deployResult.style.display = deployUi.resultUrl ? "flex" : "none"
+  if (deployUi.resultUrl) {
+    deployUrlLink.textContent = deployUi.resultUrl
+    deployUrlLink.href = deployUi.resultUrl
+  }
+  deployStatus.textContent = deployUi.statusText
+  deployStatus.classList.toggle("error", deployUi.statusError)
+}
+
 function setDeployStatus(text, isError = false) {
-  deployStatus.textContent = text
-  deployStatus.classList.toggle("error", isError)
+  deployUi.statusText = text
+  deployUi.statusError = isError
+  renderDeployState()
 }
 
 zlogApi.onDeployProgress((p) => {
-  if (!deployBusy || !p) return
+  if (!deployUi.busy || !p) return
   // 单源进度文案：一律用 phase 映射（i18n），主进程 message 仅作日志
   const phaseText = DEPLOY_PHASE_TEXT[p.phase]
   if (phaseText) setDeployStatus(phaseText())
 })
 
 deployBtn.addEventListener("click", async () => {
-  if (deployBusy) return
-  deployBusy = true
-  deployBtn.disabled = true
-  deployCancelBtn.style.display = "inline-flex"
-  deployResult.style.display = "none"
+  if (deployUi.busy) return
+  deployUi.busy = true
+  deployUi.resultUrl = null
   setDeployStatus(t("deploy.validating"))
   const res = await zlogApi
     .deployStart({ token: deployToken.value, projectName: deployProjectName.value })
     .catch(() => null)
-  deployBusy = false
-  deployBtn.disabled = false
-  deployCancelBtn.style.display = "none"
+  deployUi.busy = false
   if (!res || !res.ok) {
     // 取消不是错误：普通样式提示；其余按失败（红色）展示
     const isCanceled = res && res.kind === "canceled"
     setDeployStatus((res && res.error) || t("deploy.failed"), !isCanceled)
     return
   }
+  deployUi.resultUrl = res.url
   setDeployStatus(t("deploy.done"))
-  deployUrlLink.textContent = res.url
-  deployUrlLink.href = res.url
-  deployResult.style.display = "flex"
   // 已存入本地配置，清空输入框避免明文残留
   deployToken.value = ""
 })
@@ -871,8 +887,7 @@ zlogApi.deployInfo().then((info) => {
     deployToken.value = ""
   }
   if (info.url) {
-    deployUrlLink.textContent = info.url
-    deployUrlLink.href = info.url
-    deployResult.style.display = "flex"
+    deployUi.resultUrl = info.url
+    renderDeployState()
   }
 })

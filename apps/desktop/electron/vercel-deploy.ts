@@ -1,6 +1,8 @@
 import { gunzipSync } from "node:zlib"
-import { ProxyAgent, Socks5ProxyAgent, fetch } from "undici"
+import { fetch, type Dispatcher } from "undici"
 import type { DesktopConfig } from "./config-store"
+import { createProxyDispatcher } from "./proxy-agent"
+import { encodeEnvHash } from "./server-env"
 
 /**
  * 一键部署到 Vercel（upload deployment，无需 Git 集成）。
@@ -186,10 +188,8 @@ export function buildEnvList(cfg: DesktopConfig): DeployEnv[] {
       target: ["production"],
     },
     {
-      // web 端约定 ADMIN_PASSWORD_HASH 为 base64 编码的 bcrypt 哈希
-      // （users.ts decodeEnvHash）——与 buildServerEnv 的编码一致
       key: "ADMIN_PASSWORD_HASH",
-      value: Buffer.from(cfg.adminPasswordHash, "utf8").toString("base64"),
+      value: encodeEnvHash(cfg.adminPasswordHash),
       target: ["production"],
     },
     {
@@ -270,12 +270,16 @@ export class VercelDeployer {
   private readonly fetchImpl: typeof fetch
   private readonly now: () => number
   private readonly pollIntervalMs: number
-  private readonly dispatcher: ProxyAgent | Socks5ProxyAgent | undefined
+  private readonly dispatcher: Dispatcher | undefined
   /** 取消信号：传给所有进行中的请求，cancel() 能真正中止而非只靠检查点。 */
   private readonly controller = new AbortController()
   private cancelled = false
 
   constructor(opts: VercelDeployOptions) {
+    // 参数校验：必填项缺失直接拒绝（避免运行到中途才暴露 undefined）
+    if (!opts.token || !opts.projectName || !opts.version) {
+      throw new VercelDeployError("部署参数不完整（token/项目名/版本）", "api")
+    }
     this.token = opts.token
     this.projectName = opts.projectName
     this.version = opts.version
@@ -284,12 +288,7 @@ export class VercelDeployer {
     this.fetchImpl = opts.fetchImpl ?? fetch
     this.now = opts.now ?? Date.now
     this.pollIntervalMs = opts.pollIntervalMs ?? POLL_INTERVAL_MS
-    if (opts.proxyUrl) {
-      // socks5 走 Socks5ProxyAgent（ProxyAgent 拒绝 socks 协议）
-      this.dispatcher = /^socks/i.test(opts.proxyUrl)
-        ? new Socks5ProxyAgent(opts.proxyUrl.replace(/^socks5h:/i, "socks5:"))
-        : new ProxyAgent(opts.proxyUrl)
-    }
+    this.dispatcher = createProxyDispatcher(opts.proxyUrl ?? "")
   }
 
   cancel(): void {
