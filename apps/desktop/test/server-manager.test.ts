@@ -6,7 +6,7 @@ import { join } from "node:path"
 const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }))
 vi.mock("node:child_process", () => ({ spawn: spawnMock }))
 
-import { ServerManager } from "../electron/server-manager"
+import { ServerManager, envWithoutInheritedProxy } from "../electron/server-manager"
 
 function fakeChild() {
   const events: Record<string, Function[]> = {}
@@ -18,6 +18,23 @@ function fakeChild() {
     emit: (ev: string, ...args: unknown[]) => (events[ev] || []).forEach((cb) => cb(...args)),
   }
 }
+
+describe("envWithoutInheritedProxy", () => {
+  it("去掉父进程代理 env，避免 IDE 死代理传给 Next", () => {
+    const cleaned = envWithoutInheritedProxy({
+      PATH: "/bin",
+      HTTPS_PROXY: "http://127.0.0.1:1",
+      https_proxy: "http://127.0.0.1:1",
+      ALL_PROXY: "socks5://127.0.0.1:1",
+      ANALYTICS_HTTPS_PROXY: "http://127.0.0.1:1",
+    })
+    expect(cleaned.PATH).toBe("/bin")
+    expect(cleaned.HTTPS_PROXY).toBeUndefined()
+    expect(cleaned.https_proxy).toBeUndefined()
+    expect(cleaned.ALL_PROXY).toBeUndefined()
+    expect(cleaned.ANALYTICS_HTTPS_PROXY).toBeUndefined()
+  })
+})
 
 describe("ServerManager", () => {
   let dir: string
@@ -54,6 +71,9 @@ describe("ServerManager", () => {
     expect(args).toEqual(["/fake/server.js"])
     expect(opts.env.ELECTRON_RUN_AS_NODE).toBe("1")
     expect(opts.env.HOSTNAME).toBe("127.0.0.1")
+    expect(opts.env.HTTPS_PROXY).toBeUndefined()
+    expect(opts.env.https_proxy).toBeUndefined()
+    expect(opts.env.ALL_PROXY).toBeUndefined()
     expect(Number(opts.env.PORT)).toBeGreaterThan(0)
     expect(mgr.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/)
   })

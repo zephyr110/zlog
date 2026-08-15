@@ -182,8 +182,8 @@ export function AdminSidebar({ collapsed, onToggle, user, mobileOpen, onMobileCl
         </Link>
       </div>
 
-      {/* Primary action — solid CTA + view-site control. Collapsed: circle
-          CTA so it stays distinct from rounded-md nav items. */}
+      {/* Primary action — expanded: solid CTA + view-site. Collapsed: New
+          Post matches View Blog (ghost icon, no primary fill). */}
       <div
         className={cn(
           "shrink-0",
@@ -201,7 +201,7 @@ export function AdminSidebar({ collapsed, onToggle, user, mobileOpen, onMobileCl
                     href="/admin/posts/new"
                     onClick={onMobileClose}
                     aria-label={t("admin.newPost")}
-                    className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+                    className="flex size-9 items-center justify-center rounded-md text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   >
                     <SquarePen size={16} />
                   </Link>

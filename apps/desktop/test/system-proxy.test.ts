@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
+  acceptInheritedEnvProxy,
+  alignHttpUrlWithSocks,
   parseChromiumProxy,
   parseGnomeManualProxy,
   parseManualHttpProxy,
@@ -30,8 +32,8 @@ describe("parseChromiumProxy", () => {
     )
   })
 
-  it("只有 SOCKS 时不编造 HTTP 代理", () => {
-    expect(parseChromiumProxy("SOCKS5 127.0.0.1:7891")).toBeUndefined()
+  it("只有 SOCKS 时给出 socks5 URL，不编造 HTTP", () => {
+    expect(parseChromiumProxy("SOCKS5 127.0.0.1:1080")).toBe("socks5://127.0.0.1:1080")
   })
 })
 
@@ -102,7 +104,35 @@ describe("parseScutilProxy", () => {
   })
 
   it("都未启用时为空", () => {
-    expect(parseScutilProxy("HTTPEnable : 0\nHTTPSEnable : 0\n")).toBeUndefined()
+    expect(parseScutilProxy("HTTPEnable : 0\nHTTPSEnable : 0\nSOCKSEnable : 0\n")).toBeUndefined()
+  })
+
+  it("只开 SOCKS 时给出 socks5 URL", () => {
+    expect(
+      parseScutilProxy(`
+      HTTPEnable : 0
+      HTTPSEnable : 0
+      SOCKSEnable : 1
+      SOCKSPort : 1080
+      SOCKSProxy : 127.0.0.1
+    `)
+    ).toBe("socks5://127.0.0.1:1080")
+  })
+
+  it("网页/安全网页/SOCKS 同时开启时用 HTTP，不改写成 SOCKS", () => {
+    expect(
+      parseScutilProxy(`
+      HTTPEnable : 1
+      HTTPPort : 1080
+      HTTPProxy : 127.0.0.1
+      HTTPSEnable : 1
+      HTTPSPort : 1080
+      HTTPSProxy : 127.0.0.1
+      SOCKSEnable : 1
+      SOCKSPort : 1080
+      SOCKSProxy : 127.0.0.1
+    `)
+    ).toBe("http://127.0.0.1:1080")
   })
 })
 
@@ -118,8 +148,12 @@ describe("parseManualHttpProxy", () => {
     expect(parseManualHttpProxy("127.0.0.1:65502")).toBe("http://127.0.0.1:65502")
   })
 
-  it("拒绝 SOCKS、缺端口、非法值", () => {
-    expect(parseManualHttpProxy("socks5://127.0.0.1:1080")).toBeUndefined()
+  it("接受 socks5 / socks URL", () => {
+    expect(parseManualHttpProxy("socks5://127.0.0.1:1080")).toBe("socks5://127.0.0.1:1080")
+    expect(parseManualHttpProxy("socks://127.0.0.1:1080")).toBe("socks5://127.0.0.1:1080")
+  })
+
+  it("拒绝缺端口、非法值", () => {
     expect(parseManualHttpProxy("127.0.0.1")).toBeUndefined()
     expect(parseManualHttpProxy("http://127.0.0.1")).toBeUndefined()
     expect(parseManualHttpProxy("not a proxy")).toBeUndefined()
@@ -151,19 +185,53 @@ describe("resolveDesktopHttpProxy", () => {
     }
   })
 
-  it("进程 env 优先于 Chromium 系统代理", async () => {
+  it("Chromium / 系统代理优先于进程 env，避免 IDE 注入的死代理抢先", async () => {
     const prev = process.env.HTTPS_PROXY
     process.env.HTTPS_PROXY = "http://127.0.0.1:65500"
     try {
       await expect(
         resolveDesktopHttpProxy({
-          resolveChromium: async () => "PROXY 127.0.0.1:1",
+          resolveChromium: async () => "PROXY 127.0.0.1:65501",
         })
-      ).resolves.toBe("http://127.0.0.1:65500")
+      ).resolves.toBe("http://127.0.0.1:65501")
     } finally {
       if (prev === undefined) delete process.env.HTTPS_PROXY
       else process.env.HTTPS_PROXY = prev
     }
+  })
+
+  it("仅系统 SOCKS 同端口时，手动 http:// 改写成 socks5", () => {
+    expect(
+      alignHttpUrlWithSocks("http://127.0.0.1:1080", "socks5://127.0.0.1:1080")
+    ).toBe("socks5://127.0.0.1:1080")
+    expect(
+      alignHttpUrlWithSocks("http://localhost:1080", "socks5://127.0.0.1:1080")
+    ).toBe("socks5://127.0.0.1:1080")
+    expect(
+      alignHttpUrlWithSocks("http://127.0.0.1:1080", "socks5://127.0.0.1:1081")
+    ).toBe("http://127.0.0.1:1080")
+  })
+
+  it("系统同时开了 HTTP 与 SOCKS 同端口时保持 http://（mixed）", () => {
+    expect(
+      alignHttpUrlWithSocks(
+        "http://127.0.0.1:1080",
+        "socks5://127.0.0.1:1080",
+        "http://127.0.0.1:1080"
+      )
+    ).toBe("http://127.0.0.1:1080")
+  })
+
+  it("本机 IDE 死代理不可达时丢弃，远程 env 代理保留", () => {
+    expect(
+      acceptInheritedEnvProxy("http://127.0.0.1:1", false)
+    ).toBeUndefined()
+    expect(acceptInheritedEnvProxy("http://127.0.0.1:65502", true)).toBe(
+      "http://127.0.0.1:65502"
+    )
+    expect(acceptInheritedEnvProxy("http://proxy.example:8080", false)).toBe(
+      "http://proxy.example:8080"
+    )
   })
 
   it("无 env 时用 Chromium resolveProxy 结果", async () => {

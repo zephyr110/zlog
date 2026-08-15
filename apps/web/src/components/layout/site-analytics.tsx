@@ -26,6 +26,18 @@ function getServerAdminSnapshot() {
   return false
 }
 
+function subscribeClientReady() {
+  return () => {}
+}
+
+function getClientReadySnapshot() {
+  return true
+}
+
+function getServerReadySnapshot() {
+  return false
+}
+
 /**
  * Site-wide pageview collectors. Drops owner noise at send time:
  * - admin session (token in localStorage / cookie) — covers public pages
@@ -43,6 +55,11 @@ export function SiteAnalytics({ gaId }: { gaId?: string }) {
     getServerAdminSnapshot
   )
   const allowGa = !isAdmin
+  const gaReady = useSyncExternalStore(
+    subscribeClientReady,
+    getClientReadySnapshot,
+    getServerReadySnapshot
+  )
 
   useEffect(() => {
     if (!gaId) return
@@ -74,7 +91,7 @@ export function SiteAnalytics({ gaId }: { gaId?: string }) {
         <script dangerouslySetInnerHTML={{ __html: gaDisableBootstrap }} />
       ) : null}
       <Analytics beforeSend={beforeSend} />
-      {gaId && allowGa ? <GoogleAnalytics gaId={gaId} /> : null}
+      {gaId && gaReady && allowGa ? <GoogleAnalytics gaId={gaId} /> : null}
     </>
   )
 }

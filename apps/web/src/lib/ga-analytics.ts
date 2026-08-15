@@ -1,50 +1,46 @@
 import { createSign } from "node:crypto"
 import {
   Agent,
-  ProxyAgent,
   fetch as undiciFetch,
   type Dispatcher,
 } from "undici"
+import {
+  createProxyDispatcher,
+  isCachedProxyEquivalent,
+  isSocksProxyUrl,
+  proxyListenPort,
+  socksUrlForHttpProxy,
+} from "@/lib/proxy-dispatcher"
+import {
+  collectProxyCandidates,
+  envLocalFilePaths,
+  isDesktopAnalyticsProcess,
+  isLoopbackProxyUrl,
+  parseDotenvProxyValues,
+  selectProxyUrl,
+  trustedProxyUrls,
+} from "@/lib/analytics-proxy-env"
+import { readFileSync } from "node:fs"
+import net from "node:net"
 import { isPublicTrafficPath } from "@/lib/analytics-paths"
 import { foldChinaRegions } from "@/lib/analytics-countries"
+import {
+  AnalyticsFetchError,
+  type AnalyticsRange,
+  type AnalyticsReport,
+  type AnalyticsTimeoutHint,
+} from "@/lib/analytics-shared"
 
-export type AnalyticsRange = "today" | "7d" | "30d"
-
-/** Which backend powers the admin Traffic panels. */
-export type AnalyticsSource = "ga" | "vercel"
-
-export type AnalyticsReport = {
-  configured: true
-  source: AnalyticsSource
-  range: AnalyticsRange
-  totals: { activeUsers: number; screenPageViews: number }
-  topPages: { path: string; views: number }[]
-  sources: { source: string; users: number }[]
-  devices: { device: string; users: number }[]
-  browsers: { browser: string; users: number }[]
-  operatingSystems: { os: string; users: number }[]
-  countries: { country: string; countryId: string; users: number }[]
-}
-
-type AnalyticsFetchErrorKind = "timeout" | "permission" | "unavailable"
-
-/** How to hint the admin empty-state when kind is timeout. */
-export type AnalyticsTimeoutHint = "direct" | "proxy" | "hosted"
-
-export class AnalyticsFetchError extends Error {
-  kind: AnalyticsFetchErrorKind
-  timeoutHint?: AnalyticsTimeoutHint
-  constructor(
-    kind: AnalyticsFetchErrorKind,
-    message: string,
-    timeoutHint?: AnalyticsTimeoutHint
-  ) {
-    super(message)
-    this.kind = kind
-    this.timeoutHint = timeoutHint
-    this.name = "AnalyticsFetchError"
-  }
-}
+export {
+  AnalyticsFetchError,
+  analyticsTimeoutI18nKeys,
+  parseAnalyticsRange,
+  parseAnalyticsSource,
+  type AnalyticsRange,
+  type AnalyticsReport,
+  type AnalyticsSource,
+  type AnalyticsTimeoutHint,
+} from "@/lib/analytics-shared"
 
 const RANGES: Record<AnalyticsRange, { startDate: string; endDate: string }> = {
   today: { startDate: "today", endDate: "today" },
@@ -77,46 +73,6 @@ type RunReportRequest = {
   /** GA REST encodes int64 limit as a string. */
   limit?: string
   dimensionFilter?: Record<string, unknown>
-}
-
-export function parseAnalyticsRange(raw: string | null): AnalyticsRange {
-  if (raw === "today" || raw === "7d" || raw === "30d") return raw
-  // Legacy Traffic URL/cache used 28d — treat as the month window.
-  if (raw === "28d") return "30d"
-  return "7d"
-}
-
-export function parseAnalyticsSource(raw: string | null): AnalyticsSource {
-  if (raw === "vercel" || raw === "ga") return raw
-  return "vercel"
-}
-
-/** Admin empty-state i18n keys for a traffic timeout. Hosted Vercel
- *  must not tell the user to fill desktop Settings. */
-export function analyticsTimeoutI18nKeys(
-  source: AnalyticsSource,
-  hint?: AnalyticsTimeoutHint
-) {
-  if (source === "vercel") {
-    return {
-      titleKey: "admin.analyticsVercelTimeout",
-      descKey:
-        hint === "proxy"
-          ? "admin.analyticsVercelTimeoutProxyDesc"
-          : hint === "hosted"
-            ? "admin.analyticsVercelTimeoutHostedDesc"
-            : "admin.analyticsVercelTimeoutDesc",
-    } as const
-  }
-  return {
-    titleKey: "admin.analyticsTimeout",
-    descKey:
-      hint === "proxy"
-        ? "admin.analyticsTimeoutProxyDesc"
-        : hint === "hosted"
-          ? "admin.analyticsTimeoutHostedDesc"
-          : "admin.analyticsTimeoutDesc",
-  } as const
 }
 
 export function isGaConfigured(): boolean {
@@ -209,19 +165,70 @@ function envTrim(name: string): string | undefined {
   return url || undefined
 }
 
-function resolveProxyUrl(): string | undefined {
+function readEnvLocalText(): string | undefined {
+  for (const filePath of envLocalFilePaths(process.cwd())) {
+    try {
+      return readFileSync(filePath, "utf8")
+    } catch {
+      /* cwd 可能是仓库根、apps/web 或 .next */
+    }
+  }
+  return undefined
+}
+
+function tcpReachable(host: string, port: number, timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false
+    const socket = net.connect({ host, port })
+    const done = (ok: boolean) => {
+      if (settled) return
+      settled = true
+      socket.destroy()
+      resolve(ok)
+    }
+    socket.setTimeout(timeoutMs, () => done(false))
+    socket.once("connect", () => done(true))
+    socket.once("error", () => done(false))
+  })
+}
+
+async function isUsableProxy(url: string): Promise<boolean> {
+  try {
+    const parsed = new URL(url)
+    const port = proxyListenPort(parsed)
+    if (!parsed.hostname || port <= 0) return false
+    if (!isLoopbackProxyUrl(url)) return true
+    return tcpReachable(parsed.hostname, port, 600)
+  } catch {
+    return false
+  }
+}
+
+async function resolveProxyUrl(): Promise<string | undefined> {
   // Vercel production/preview can reach Google directly. A copied
   // HTTPS_PROXY=http://127.0.0.1:… from .env.local would point at the
   // serverless instance’s own loopback and only add timeouts.
   if (isHostedVercel()) return undefined
-  return (
-    envTrim("HTTPS_PROXY") ||
-    envTrim("https_proxy") ||
-    envTrim("HTTP_PROXY") ||
-    envTrim("http_proxy") ||
-    envTrim("ALL_PROXY") ||
-    envTrim("all_proxy")
+  const desktop = isDesktopAnalyticsProcess(process.env)
+  const fileText = desktop ? undefined : readEnvLocalText()
+  const fileUrls = fileText ? parseDotenvProxyValues(fileText) : []
+  const candidates = collectProxyCandidates({
+    env: process.env,
+    fileText,
+  })
+  const chosen = await selectProxyUrl(
+    candidates,
+    trustedProxyUrls({ desktop, fileUrls, candidates }),
+    isUsableProxy
   )
+  if (!chosen && candidates.length > 0) {
+    console.warn("[analytics] no usable proxy", {
+      cwd: process.cwd(),
+      fileFound: Boolean(fileText),
+      candidateCount: candidates.length,
+    })
+  }
+  return chosen
 }
 
 function isHostedVercel(): boolean {
@@ -265,34 +272,55 @@ const directAgent = new Agent({
   autoSelectFamilyAttemptTimeout: 300,
 })
 
-let cachedProxyAgent: ProxyAgent | undefined
+let cachedProxyAgent: Dispatcher | undefined
 let cachedProxyUrl: string | undefined
+let resolvedProxyUrl: string | undefined
+let didResolveProxyUrl = false
+let resolveProxyUrlInflight: Promise<string | undefined> | undefined
 
 /** After a direct→proxy failover, prefer the proxy briefly so OAuth +
  *  batchRunReports don’t each burn connectTimeout on a blocked direct path. */
 let preferProxyUntil = 0
 const PREFER_PROXY_MS = 60_000
 
-function getProxyDispatcher(): ProxyAgent | undefined {
-  const proxyUrl = resolveProxyUrl()
+function socksFallbackUrl(proxyUrl: string | undefined): string | undefined {
+  if (!proxyUrl || isSocksProxyUrl(proxyUrl)) return undefined
+  return socksUrlForHttpProxy(proxyUrl)
+}
+
+async function resolveProxyUrlOnce(): Promise<string | undefined> {
+  if (didResolveProxyUrl) return resolvedProxyUrl
+  if (!resolveProxyUrlInflight) {
+    resolveProxyUrlInflight = resolveProxyUrl().then((url) => {
+      resolvedProxyUrl = url
+      didResolveProxyUrl = true
+      resolveProxyUrlInflight = undefined
+      return url
+    })
+  }
+  return resolveProxyUrlInflight
+}
+
+function cachedDispatcherMatches(proxyUrl: string): boolean {
+  if (!cachedProxyAgent || !cachedProxyUrl) return false
+  return isCachedProxyEquivalent(cachedProxyUrl, proxyUrl)
+}
+
+async function getProxyDispatcher(): Promise<Dispatcher | undefined> {
+  const proxyUrl = await resolveProxyUrlOnce()
   if (!proxyUrl) {
     cachedProxyAgent = undefined
     cachedProxyUrl = undefined
     return undefined
   }
-  if (cachedProxyAgent && cachedProxyUrl === proxyUrl) return cachedProxyAgent
+  if (cachedDispatcherMatches(proxyUrl)) return cachedProxyAgent
   try {
     cachedProxyUrl = proxyUrl
-    cachedProxyAgent = new ProxyAgent({
-      uri: proxyUrl,
-      connectTimeout: 8_000,
-      headersTimeout: 20_000,
-      bodyTimeout: 30_000,
-    })
+    cachedProxyAgent = createProxyDispatcher(proxyUrl)
     return cachedProxyAgent
   } catch {
     // Bad HTTPS_PROXY (invalid URL etc.) — keep the original network error
-    // instead of masking it with ProxyAgent construction failure.
+    // instead of masking it with dispatcher construction failure.
     cachedProxyAgent = undefined
     cachedProxyUrl = undefined
     return undefined
@@ -336,7 +364,7 @@ export async function analyticsFetch(
     body?: string
   }
 ): Promise<Response> {
-  const proxy = getProxyDispatcher()
+  const proxy = await getProxyDispatcher()
   const preferProxy = Boolean(proxy && Date.now() < preferProxyUntil)
 
   if (preferProxy && proxy) {
@@ -356,16 +384,29 @@ export async function analyticsFetch(
   } catch (err) {
     if (!proxy || !isNetworkFailure(err)) throw err
     console.warn(
-      "[analytics] direct Google request failed; retrying via HTTP proxy"
+      "[analytics] direct Google request failed; retrying via HTTP/SOCKS proxy"
     )
     try {
       const res = await gaFetchOnce(input, init, proxy)
       preferProxyUntil = Date.now() + PREFER_PROXY_MS
       return res
-    } catch {
+    } catch (proxyErr) {
+      const socksUrl = socksFallbackUrl(cachedProxyUrl)
+      if (socksUrl) {
+        try {
+          const socks = createProxyDispatcher(socksUrl)
+          const res = await gaFetchOnce(input, init, socks)
+          cachedProxyUrl = socksUrl
+          cachedProxyAgent = socks
+          preferProxyUntil = Date.now() + PREFER_PROXY_MS
+          return res
+        } catch {
+          /* 继续抛出原代理错误 */
+        }
+      }
       cachedProxyAgent = undefined
       cachedProxyUrl = undefined
-      markProxyAttempted(err)
+      markProxyAttempted(proxyErr)
     }
   }
 }

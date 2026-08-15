@@ -2,14 +2,15 @@ import { deflateSync, inflateSync } from "node:zlib"
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
+import { applySquircleMask, composeMacAppIcon } from "./mac-icon-mask.mjs"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, "..")
 
 // ── 真实 logo 优先 ──────────────────────────────────────────────────────
-// 默认站点标志（web 包 public/，1024×1024 PNG）：同时作为桌面应用图标
-// （electron-builder 从 build/icon.png 生成 icns/ico）与托盘图标
-// （tray.ts 运行时 resize 到 16×16）。源文件缺失时退回下方占位生成器。
+// 默认站点标志（web 包 public/，1024×1024 PNG）：应用图标写入
+// build/icon.png（主体缩进 + squircle，electron-builder 再生成 icns/ico）；
+// 托盘仍用未裁切的方图。源文件缺失时退回下方占位生成器。
 const LOGO_SOURCE = join(root, "..", "..", "apps", "web", "public", "zlog-logo.png")
 const ICON_TARGET = join(root, "build", "icon.png")
 const TRAY_TARGET = join(root, "assets", "tray.png")
@@ -25,13 +26,22 @@ const TRAY_TEMPLATES = [
 if (existsSync(LOGO_SOURCE)) {
   mkdirSync(join(root, "assets"), { recursive: true })
   mkdirSync(join(root, "build"), { recursive: true })
-  copyFileSync(LOGO_SOURCE, ICON_TARGET)
+  writeMaskedAppIcon(LOGO_SOURCE, ICON_TARGET)
   copyFileSync(LOGO_SOURCE, TRAY_TARGET)
   deriveTrayTemplates(LOGO_SOURCE)
   console.log("icons copied from", LOGO_SOURCE)
 } else {
   console.warn(`zlog-logo.png not found at ${LOGO_SOURCE} — generating placeholder icons`)
   generatePlaceholderIcons()
+}
+
+/** 应用图标：主体缩进板内再套 squircle（托盘仍用未裁切的方图）。 */
+function writeMaskedAppIcon(sourcePath, destPath) {
+  const src = decodePng(readFileSync(sourcePath))
+  if (src.width !== src.height) {
+    throw new Error(`app icon must be square (got ${src.width}×${src.height})`)
+  }
+  writeFileSync(destPath, pngFromRgba(src.width, composeMacAppIcon(src.data, src.width)))
 }
 
 // ── 菜单栏模板图标派生（macOS） ──────────────────────────────────────
@@ -253,11 +263,19 @@ function generatePlaceholderIcons() {
   ])
 }
 
-  // 占位图标：深灰方块（真实 logo 缺失时的兜底）。
+  // 占位图标：深灰方块（真实 logo 缺失时的兜底）。应用图标同样套 squircle。
   const COLOR = [38, 38, 38, 255]
   mkdirSync(join(root, "assets"), { recursive: true })
   mkdirSync(join(root, "build"), { recursive: true })
   writeFileSync(join(root, "assets/tray.png"), png(32, COLOR))
-  writeFileSync(join(root, "build/icon.png"), png(512, COLOR))
+  const size = 512
+  const rgba = Buffer.alloc(size * size * 4)
+  for (let i = 0; i < size * size; i++) {
+    rgba[i * 4] = COLOR[0]
+    rgba[i * 4 + 1] = COLOR[1]
+    rgba[i * 4 + 2] = COLOR[2]
+    rgba[i * 4 + 3] = COLOR[3]
+  }
+  writeFileSync(join(root, "build/icon.png"), pngFromRgba(size, applySquircleMask(rgba, size)))
   console.log("generated assets/tray.png + build/icon.png")
 }

@@ -1,11 +1,27 @@
 import type { DesktopConfig } from "./config-store"
+import { isSocksProxyUrl } from "./system-proxy"
+
+const LOCAL_NO_PROXY = ["127.0.0.1", "localhost", "::1"]
+
+/** 在已有 NO_PROXY 上并入本机项，避免覆盖用户更长的旁路名单。 */
+export function mergeNoProxy(existing: string | undefined): string {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const part of [...(existing ?? "").split(","), ...LOCAL_NO_PROXY]) {
+    const host = part.trim()
+    if (!host || seen.has(host)) continue
+    seen.add(host)
+    out.push(host)
+  }
+  return out.join(",")
+}
 
 /** 由桌面配置组装服务器 env（纯函数，便于测试）。 */
 export function buildServerEnv(
   cfg: DesktopConfig,
   dbPath: string,
   langFilePath?: string,
-  /** 系统/VPN HTTP 代理（Electron resolveProxy 或进程 env）。有值才注入。 */
+  /** 系统/VPN HTTP 或 SOCKS5 代理（Electron resolveProxy 或进程 env）。有值才注入。 */
   httpsProxy?: string
 ): Record<string, string> {
   const env: Record<string, string> = {
@@ -29,15 +45,20 @@ export function buildServerEnv(
   if (cfg.gaPropertyId) env.GA_PROPERTY_ID = cfg.gaPropertyId
   if (cfg.gaClientEmail) env.GA_CLIENT_EMAIL = cfg.gaClientEmail
   if (cfg.gaPrivateKey) env.GA_PRIVATE_KEY = cfg.gaPrivateKey
-  const proxy =
-    httpsProxy?.trim() ||
-    process.env.HTTPS_PROXY?.trim() ||
-    process.env.https_proxy?.trim() ||
-    process.env.HTTP_PROXY?.trim() ||
-    process.env.http_proxy?.trim()
+  const proxy = httpsProxy?.trim()
   if (proxy) {
-    env.HTTPS_PROXY = proxy
-    env.HTTP_PROXY = proxy
+    if (isSocksProxyUrl(proxy)) {
+      env.ALL_PROXY = proxy
+      env.all_proxy = proxy
+    } else {
+      env.HTTPS_PROXY = proxy
+      env.HTTP_PROXY = proxy
+    }
+    // Node 18+ undici 会把 127.0.0.1 也丢进代理；本机 Next / libsql
+    // 走 VPN 代理会失败。分析请求仍走 HTTPS_PROXY / ALL_PROXY。
+    const noProxy = mergeNoProxy(process.env.NO_PROXY || process.env.no_proxy)
+    env.NO_PROXY = noProxy
+    env.no_proxy = noProxy
   }
   return env
 }

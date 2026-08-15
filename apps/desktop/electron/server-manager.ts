@@ -3,6 +3,25 @@ import { createWriteStream, mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { createServer } from "node:net"
 
+/** IDE / 终端常注入已失效的 HTTPS_PROXY；子进程只接受 buildServerEnv 给出的代理。 */
+const INHERITED_PROXY_KEYS = [
+  "HTTPS_PROXY",
+  "https_proxy",
+  "HTTP_PROXY",
+  "http_proxy",
+  "ALL_PROXY",
+  "all_proxy",
+  "ANALYTICS_HTTPS_PROXY",
+] as const
+
+export function envWithoutInheritedProxy(
+  base: NodeJS.ProcessEnv
+): NodeJS.ProcessEnv {
+  const out = { ...base }
+  for (const key of INHERITED_PROXY_KEYS) delete out[key]
+  return out
+}
+
 /** 管理 Next standalone 服务器子进程（数据库唯一持有者）。 */
 export class ServerManager {
   private child: ChildProcess | null = null
@@ -40,7 +59,7 @@ export class ServerManager {
     this.logStream.on("error", () => {})
     this.child = spawn(process.execPath, [this.serverJsPath], {
       env: {
-        ...process.env,
+        ...envWithoutInheritedProxy(process.env),
         ...env,
         ELECTRON_RUN_AS_NODE: "1",
         PORT: String(this.currentPort),

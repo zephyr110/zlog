@@ -1,12 +1,14 @@
 /**
- * 解析本机 HTTP 代理，供 Vercel / GA4 直连失败后回退。
+ * 解析本机代理，供 Vercel / GA4 直连失败后回退。
  * 不写死任何端口：地址来自设置覆盖、VPN「系统代理」或进程 env。
  *
- * 顺序：设置里的选填覆盖 → HTTPS_PROXY 等 env → Chromium
- * resolveProxy → OS 原生配置。只接受 HTTP/HTTPS；纯 SOCKS 无法交给 undici。
+ * 顺序：设置里的选填覆盖 → Chromium resolveProxy → OS 原生配置 →
+ * 进程 env。env 放最后：从 IDE 启动时经常带着已失效的 HTTPS_PROXY。
+ * HTTP 与 SOCKS5 都接受。
  */
 
 import { execFile } from "node:child_process"
+import net from "node:net"
 import { promisify } from "node:util"
 
 const execFileAsync = promisify(execFile)
@@ -17,22 +19,29 @@ export function parseChromiumProxy(result: string): string | undefined {
     .split(";")
     .map((s) => s.trim())
     .filter(Boolean)
+  let socks: string | undefined
   for (const part of parts) {
     if (/^DIRECT$/i.test(part)) continue
-    const m = /^(PROXY|HTTP|HTTPS)\s+(\S+)/i.exec(part)
-    if (!m) continue
-    const host = m[2].replace(/^\[|\]$/g, "")
-    if (!host) continue
-    if (/^https?:\/\//i.test(host)) return host
-    const scheme = m[1].toUpperCase() === "HTTPS" ? "https" : "http"
-    return `${scheme}://${host}`
+    const http = /^(PROXY|HTTP|HTTPS)\s+(\S+)/i.exec(part)
+    if (http) {
+      const host = http[2].replace(/^\[|\]$/g, "")
+      if (!host) continue
+      if (/^https?:\/\//i.test(host)) return host
+      const scheme = http[1].toUpperCase() === "HTTPS" ? "https" : "http"
+      return `${scheme}://${host}`
+    }
+    const sock = /^(SOCKS5h?|SOCKS4a?|SOCKS)\s+(\S+)/i.exec(part)
+    if (sock && !socks) {
+      const host = sock[2].replace(/^\[|\]$/g, "")
+      if (host) socks = toSocksUrl(host)
+    }
   }
-  return undefined
+  return socks
 }
 
 /** 输入是否写了端口。Node URL 会丢掉 http:80 / https:443，不能只看 url.port。 */
 function rawSpecifiesPort(text: string): boolean {
-  const hostPart = text.replace(/^https?:\/\//i, "").split("/")[0] ?? ""
+  const hostPart = text.replace(/^(https?|socks5h?|socks4a?|socks):\/\//i, "").split("/")[0] ?? ""
   const host = hostPart.startsWith("[")
     ? hostPart
     : hostPart.includes("@")
@@ -41,17 +50,115 @@ function rawSpecifiesPort(text: string): boolean {
   return host.startsWith("[") ? /\]:\d+$/.test(host) : /:\d+$/.test(host)
 }
 
-/** 设置页选填：`http://host:port` 或 `host:port`。空=自动；SOCKS/缺端口无效。 */
+export function isSocksProxyUrl(url: string): boolean {
+  try {
+    const p = new URL(url).protocol
+    return p === "socks:" || p === "socks4:" || p === "socks5:" || p === "socks5h:"
+  } catch {
+    return false
+  }
+}
+
+function isLoopbackHost(host: string): boolean {
+  return host === "127.0.0.1" || host === "localhost" || host === "::1" || host === "[::1]"
+}
+
+function proxyPort(url: URL): string {
+  if (url.port) return url.port
+  if (url.protocol === "https:") return "443"
+  if (url.protocol === "http:") return "80"
+  return ""
+}
+
+function sameProxyAuthority(a: string, b: string): boolean {
+  try {
+    const left = new URL(a)
+    const right = new URL(b)
+    const sameHost =
+      left.hostname === right.hostname ||
+      (isLoopbackHost(left.hostname) && isLoopbackHost(right.hostname))
+    return sameHost && proxyPort(left) === proxyPort(right)
+  } catch {
+    return false
+  }
+}
+
+/** 仅当系统只有 SOCKS、没有同端口 HTTP 时，才把手动 http:// 改成 socks5。
+ *  网页代理与 SOCKS 同端口（mixed）时保持 HTTP CONNECT。 */
+export function alignHttpUrlWithSocks(
+  url: string | undefined,
+  socksUrl: string | undefined,
+  httpUrl?: string
+): string | undefined {
+  if (!url) return socksUrl
+  if (!socksUrl || isSocksProxyUrl(url)) return url
+  if (httpUrl && sameProxyAuthority(url, httpUrl)) return url
+  if (sameProxyAuthority(url, socksUrl)) return socksUrl
+  return url
+}
+
+/** 设置页选填：`http://host:port`、`socks5://host:port` 或 `host:port`。 */
 export function parseManualHttpProxy(raw: string | undefined): string | undefined {
   const text = raw?.trim()
-  if (!text || /^socks/i.test(text)) return undefined
+  if (!text) return undefined
   try {
-    const url = new URL(/^https?:\/\//i.test(text) ? text : `http://${text}`)
-    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined
+    const prefixed = /^(https?|socks5h?|socks4a?|socks):\/\//i.test(text) ? text : `http://${text}`
+    const url = new URL(prefixed)
     if (!url.hostname || !rawSpecifiesPort(text)) return undefined
-    return url.href.replace(/\/$/, "")
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return url.href.replace(/\/$/, "")
+    }
+    if (isSocksProxyUrl(url.href)) {
+      return toSocksUrl(url.href)
+    }
+    return undefined
   } catch {
     return undefined
+  }
+}
+
+export function acceptInheritedEnvProxy(
+  url: string | undefined,
+  loopbackReachable: boolean
+): string | undefined {
+  if (!url) return undefined
+  try {
+    const host = new URL(url).hostname
+    if (!isLoopbackHost(host)) return url
+    return loopbackReachable ? url : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function tcpReachable(host: string, port: number, timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false
+    const socket = net.connect({ host, port })
+    const done = (ok: boolean) => {
+      if (settled) return
+      settled = true
+      socket.destroy()
+      resolve(ok)
+    }
+    socket.setTimeout(timeoutMs, () => done(false))
+    socket.once("connect", () => done(true))
+    socket.once("error", () => done(false))
+  })
+}
+
+export async function isReachableProxyEndpoint(
+  url: string,
+  timeoutMs = 600
+): Promise<boolean> {
+  try {
+    const parsed = new URL(url)
+    const port = Number(proxyPort(parsed))
+    if (!parsed.hostname || port <= 0) return false
+    if (!isLoopbackHost(parsed.hostname)) return true
+    return tcpReachable(parsed.hostname, port, timeoutMs)
+  } catch {
+    return false
   }
 }
 
@@ -60,7 +167,9 @@ export function envHttpProxy(): string | undefined {
     process.env.HTTPS_PROXY?.trim() ||
     process.env.https_proxy?.trim() ||
     process.env.HTTP_PROXY?.trim() ||
-    process.env.http_proxy?.trim()
+    process.env.http_proxy?.trim() ||
+    process.env.ALL_PROXY?.trim() ||
+    process.env.all_proxy?.trim()
   return raw || undefined
 }
 
@@ -78,7 +187,9 @@ export function parseWindowsProxyServer(raw: string): string | undefined {
       if (proto && addr) pairs.set(proto, addr)
     }
     const picked = pairs.get("https") || pairs.get("http")
-    return picked ? toHttpUrl(picked) : undefined
+    if (picked) return toHttpUrl(picked)
+    const socks = pairs.get("socks") || pairs.get("socks5")
+    return socks ? toSocksUrl(socks) : undefined
   }
   return toHttpUrl(text)
 }
@@ -109,8 +220,14 @@ export function parseGnomeManualProxy(input: {
   return undefined
 }
 
-/** macOS `scutil --proxy` 文本。 */
-export function parseScutilProxy(stdout: string): string | undefined {
+export function parseScutilSocks(stdout: string): string | undefined {
+  if (!/SOCKSEnable\s*:\s*1\b/.test(stdout)) return undefined
+  const host = /SOCKSProxy\s*:\s*(\S+)/.exec(stdout)?.[1]
+  const port = /SOCKSPort\s*:\s*(\d+)/.exec(stdout)?.[1]
+  return host && port ? toSocksUrl(`${host}:${port}`) : undefined
+}
+
+export function parseScutilHttp(stdout: string): string | undefined {
   const httpsOn = /HTTPSEnable\s*:\s*1\b/.test(stdout)
   const httpOn = /HTTPEnable\s*:\s*1\b/.test(stdout)
   if (httpsOn) {
@@ -126,6 +243,11 @@ export function parseScutilProxy(stdout: string): string | undefined {
   return undefined
 }
 
+/** macOS `scutil --proxy` 文本。HTTP 优先，否则 SOCKS。 */
+export function parseScutilProxy(stdout: string): string | undefined {
+  return parseScutilHttp(stdout) || parseScutilSocks(stdout)
+}
+
 function stripGsettings(raw: string): string {
   return raw.trim().replace(/^['"]|['"]$/g, "").replace(/^uint32\s+/i, "")
 }
@@ -137,20 +259,60 @@ function toHttpUrl(hostPort: string): string | undefined {
   return `http://${value}`
 }
 
+function toSocksUrl(hostPort: string): string | undefined {
+  const value = hostPort.trim()
+  if (!value) return undefined
+  if (/^socks5h?:\/\//i.test(value) || /^socks:\/\//i.test(value)) {
+    try {
+      const url = new URL(value)
+      if (!url.hostname || !url.port) return undefined
+      return `socks5://${url.hostname}:${url.port}`
+    } catch {
+      return undefined
+    }
+  }
+  if (/^socks4/i.test(value)) return undefined
+  if (/^https?:\/\//i.test(value)) return undefined
+  return `socks5://${value}`
+}
+
 async function execOut(cmd: string, args: string[]): Promise<string> {
   const { stdout } = await execFileAsync(cmd, args, EXEC_OPTS)
   return String(stdout)
 }
 
 export async function readOsHttpProxy(): Promise<string | undefined> {
+  return (await readOsProxies()).preferred
+}
+
+async function readOsProxies(): Promise<{
+  preferred?: string
+  http?: string
+  socks?: string
+}> {
   try {
-    if (process.platform === "win32") return await readWindowsProxy()
-    if (process.platform === "darwin") return await readMacProxy()
-    if (process.platform === "linux") return await readLinuxProxy()
+    if (process.platform === "darwin") {
+      const stdout = await execOut("scutil", ["--proxy"])
+      const http = parseScutilHttp(stdout)
+      const socks = parseScutilSocks(stdout)
+      return { preferred: http || socks, http, socks }
+    }
+    if (process.platform === "win32") {
+      const preferred = await readWindowsProxy()
+      const socks = preferred && isSocksProxyUrl(preferred) ? preferred : undefined
+      const http = preferred && !socks ? preferred : undefined
+      return { preferred, http, socks }
+    }
+    if (process.platform === "linux") {
+      const preferred = await readLinuxProxy()
+      const socks = preferred && isSocksProxyUrl(preferred) ? preferred : undefined
+      const http = preferred && !socks ? preferred : undefined
+      return { preferred, http, socks }
+    }
   } catch {
-    return undefined
+    return {}
   }
-  return undefined
+  return {}
 }
 
 async function readWindowsProxy(): Promise<string | undefined> {
@@ -159,10 +321,6 @@ async function readWindowsProxy(): Promise<string | undefined> {
     "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
   ])
   return parseWindowsRegQuery(stdout)
-}
-
-async function readMacProxy(): Promise<string | undefined> {
-  return parseScutilProxy(await execOut("scutil", ["--proxy"]))
 }
 
 async function readLinuxProxy(): Promise<string | undefined> {
@@ -227,22 +385,30 @@ async function readLinuxProxy(): Promise<string | undefined> {
   return undefined
 }
 
-/** 设置覆盖 → env → Chromium 系统代理 → OS 原生配置。 */
+/** 设置覆盖 → Chromium → OS → 进程 env。仅纯 SOCKS 时才把 http:// 改写成 socks5。 */
 export async function resolveDesktopHttpProxy(opts?: {
   override?: string
   resolveChromium?: () => Promise<string>
 }): Promise<string | undefined> {
+  const os = await readOsProxies()
   const fromSettings = parseManualHttpProxy(opts?.override)
-  if (fromSettings) return fromSettings
-  const fromEnv = envHttpProxy()
-  if (fromEnv) return fromEnv
+  if (fromSettings) return alignHttpUrlWithSocks(fromSettings, os.socks, os.http)
+  let fromChromium: string | undefined
   if (opts?.resolveChromium) {
     try {
-      const parsed = parseChromiumProxy(await opts.resolveChromium())
-      if (parsed) return parsed
+      fromChromium = parseChromiumProxy(await opts.resolveChromium())
     } catch {
       /* 继续读 OS */
     }
   }
-  return readOsHttpProxy()
+  if (fromChromium || os.preferred) {
+    return alignHttpUrlWithSocks(fromChromium || os.preferred, os.socks, os.http)
+  }
+  const fromEnv = envHttpProxy()
+  if (!fromEnv) return undefined
+  const usable = acceptInheritedEnvProxy(
+    fromEnv,
+    await isReachableProxyEndpoint(fromEnv)
+  )
+  return alignHttpUrlWithSocks(usable, os.socks, os.http)
 }

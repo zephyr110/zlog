@@ -44,7 +44,7 @@ import {
   type AnalyticsReport,
   type AnalyticsSource,
   type AnalyticsTimeoutHint,
-} from "@/lib/ga-analytics"
+} from "@/lib/analytics-shared"
 
 const RANGES: AnalyticsRange[] = ["today", "7d", "30d"]
 const SOURCES: AnalyticsSource[] = ["vercel", "ga"]

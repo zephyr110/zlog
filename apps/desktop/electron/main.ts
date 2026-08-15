@@ -17,6 +17,11 @@ import { ServerManager } from "./server-manager"
 import { buildServerEnv } from "./server-env"
 import { parseManualHttpProxy, resolveDesktopHttpProxy } from "./system-proxy"
 import { isValidSyncUrl } from "./validate"
+import { isDesktopLocalUrl } from "./local-url"
+import {
+  shouldHideMainWindowOnClose,
+  shouldReloadMainWindow,
+} from "./window-lifecycle"
 import { createTray, updateTrayLanguage, updateTraySyncStatus, type TrayActions } from "./tray"
 
 /** 设置类窗口标题（跟随生效语言；语言切换时由 setWindowTitles 更新）。 */
@@ -148,15 +153,8 @@ async function main() {
       //
       // 每次事件实时求值（不缓存 origin）：config:save 会重启服务器并换端口，
       // 缓存的旧 origin 会让保存后的所有站内链接被误判为外部。
-      const isLocalUrl = (raw: string): boolean => {
-        try {
-          const u = new URL(raw)
-          if (u.protocol !== "http:" && u.protocol !== "https:") return false
-          return u.origin === new URL(serverManager.url).origin
-        } catch {
-          return false
-        }
-      }
+      const isLocalUrl = (raw: string): boolean =>
+        isDesktopLocalUrl(raw, serverManager.url)
       const openExternalIfWeb = (raw: string) => {
         if (/^https?:\/\//.test(raw)) void shell.openExternal(raw)
       }
@@ -174,10 +172,31 @@ async function main() {
           openExternalIfWeb(url)
         }
       })
+      mainWindow.on("close", (e) => {
+        if (shouldHideMainWindowOnClose(isAppQuitting())) {
+          e.preventDefault()
+          mainWindow?.hide()
+        }
+      })
       mainWindow.on("closed", () => { mainWindow = null })
+      void mainWindow.loadURL(serverManager.url)
+    } else if (
+      shouldReloadMainWindow(mainWindow.webContents.getURL(), serverManager.url)
+    ) {
+      void mainWindow.loadURL(serverManager.url)
     }
-    void mainWindow.loadURL(serverManager.url)
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
     mainWindow.focus()
+    app.focus({ steal: true })
+  }
+
+  function isAppQuitting(): boolean {
+    return (app as unknown as { isQuitting?: boolean }).isQuitting === true
+  }
+
+  function markAppQuitting() {
+    ;(app as unknown as { isQuitting: boolean }).isQuitting = true
   }
 
   function openSettingsWindow() {
@@ -272,7 +291,7 @@ async function main() {
       return { ok: false, error: "数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io" }
     }
     if (cfg.httpsProxy?.trim() && !parseManualHttpProxy(cfg.httpsProxy)) {
-      return { ok: false, error: "HTTP 代理格式应为 http://主机:端口" }
+      return { ok: false, error: "代理格式应为 http://主机:端口 或 socks5://主机:端口" }
     }
     if (!config) {
       const passwordHash = bcrypt.hashSync(String(cfg.password ?? ""), 10)
@@ -459,8 +478,24 @@ async function main() {
 
   app.on("second-instance", () => showMainWindow())
 
+  // 红灯只隐藏主窗口；Dock 再点要能回来。首启向导尚未起服务时只亮向导窗。
+  app.on("activate", () => {
+    if (firstRunWindow && !firstRunWindow.isDestroyed()) {
+      if (firstRunWindow.isMinimized()) firstRunWindow.restore()
+      firstRunWindow.show()
+      firstRunWindow.focus()
+      return
+    }
+    showMainWindow()
+  })
+
+  // close 早于 will-quit：必须在 before-quit 立旗，红灯 hide 才不会挡住退出。
+  app.on("before-quit", () => {
+    markAppQuitting()
+  })
+
   app.on("will-quit", () => {
-    ;(app as unknown as { isQuitting: boolean }).isQuitting = true
+    markAppQuitting()
     serverManager.stop()
   })
 

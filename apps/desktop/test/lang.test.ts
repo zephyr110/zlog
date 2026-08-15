@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { LangFile, resolveLang, isLangPref } from "../electron/lang"
+import { isDesktopLangSource } from "../../web/src/lib/desktop-lang-source"
 
 describe("resolveLang", () => {
   it("显式偏好优先于系统语言", () => {
@@ -22,6 +23,15 @@ describe("resolveLang", () => {
     for (const locale of ["ja-JP", "fr-FR", "de", "ko-KR", "es-MX", "ru"]) {
       expect(resolveLang("system", locale)).toBe("en")
     }
+  })
+})
+
+describe("isDesktopLangSource", () => {
+  it("有 DESKTOP_LANG_FILE 即桌面源，不因文件尚未落盘当成 web", () => {
+    expect(isDesktopLangSource("/data/userData/lang.json")).toBe(true)
+    expect(isDesktopLangSource(null)).toBe(false)
+    expect(isDesktopLangSource(undefined)).toBe(false)
+    expect(isDesktopLangSource("")).toBe(false)
   })
 })
 
@@ -75,5 +85,16 @@ describe("LangFile", () => {
     lf.loadOrInit("en-US")
     writeFileSync(join(dir, "lang.json"), JSON.stringify({ pref: "zh", resolved: "zh" }))
     expect(lf.load()).toEqual({ pref: "zh", resolved: "zh" })
+  })
+})
+
+describe("/api/lang desktop 探测", () => {
+  it("文件尚未落盘时仍标 desktop，避免界面停 POST", () => {
+    const src = readFileSync(
+      join(__dirname, "../../web/src/app/api/lang/route.ts"),
+      "utf8"
+    )
+    expect(src).toContain("isDesktopLangSource")
+    expect(src).toMatch(/desktop:\s*true/)
   })
 })
