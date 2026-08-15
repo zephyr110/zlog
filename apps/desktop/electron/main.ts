@@ -1,6 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron"
 import { randomBytes } from "node:crypto"
-import { appendFileSync, mkdirSync } from "node:fs"
 import bcrypt from "bcryptjs"
 import { join, resolve, sep } from "node:path"
 import { ConfigStore, type DesktopConfig } from "./config-store"
@@ -127,20 +126,6 @@ async function main() {
       resolveChromium: () =>
         session.defaultSession.resolveProxy("https://oauth2.googleapis.com/"),
     })
-    // 诊断日志（GA4 代理问题）：代理解析结果 + 注入 server 的代理 env
-    try {
-      mkdirSync(logDir, { recursive: true })
-      appendFileSync(
-        join(logDir, "main.log"),
-        `${new Date().toISOString()} [main] server env diag: ${JSON.stringify({
-          httpsProxy,
-          envProxy: process.env.HTTPS_PROXY ?? process.env.https_proxy ?? null,
-          sysLocale: systemLocale,
-        })}\n`
-      )
-    } catch {
-      /* 诊断日志失败不影响启动 */
-    }
     await serverManager.start(
       buildServerEnv(cfg, dbPath, langFile.filePath, httpsProxy)
     )

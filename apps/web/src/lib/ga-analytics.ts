@@ -12,22 +12,6 @@ import {
   proxyListenPort,
   socksUrlForHttpProxy,
 } from "@/lib/proxy-dispatcher"
-
-/**
- * 用 undici 官方代理 Agent（ProxyAgent / Socks5ProxyAgent）。
- *
- * 不用手写 CONNECT dispatcher：自定义 connect 返回的 socket 会被 undici
- * 直接当传输层使用，而官方 Agent 通过 httpSocket 机制把隧道交给内部
- * TLS 层——手写实现无法可靠复现该契约（实测：裸 TCP 返回 = 明文请求
- * 被 Google 拒（403 "SSL is required"）；自行包 TLS = undici 二次握手
- * 断开）。官方 ProxyAgent 在 Node 22.17（Electron 内置 undici 6.21.2）
- * 与本地 7.29 下均实测通过 GA4 全链路（token 交换 + runReport 200）。
- */
-function createProxyDispatcher(proxyUrl: string): Dispatcher {
-  return isSocksProxyUrl(proxyUrl)
-    ? new Socks5ProxyAgent(proxyUrl)
-    : new ProxyAgent(proxyUrl)
-}
 import {
   collectProxyCandidates,
   envLocalFilePaths,
@@ -58,6 +42,51 @@ export {
   type AnalyticsSource,
   type AnalyticsTimeoutHint,
 } from "@/lib/analytics-shared"
+
+/**
+ * 用 undici 官方代理 Agent（ProxyAgent / Socks5ProxyAgent）——手写 CONNECT
+ * dispatcher 无法正确完成隧道 + TLS（见 proxy-dispatcher.ts 头部说明）。
+ * 超时作为 Agent options 传入：undici 的 fetch 不读 connectTimeout/
+ * headersTimeout/bodyTimeout（实测挂起 300s），必须配置在 Agent 上，
+ * 否则半死代理会让仪表盘挂 5 分钟（沿用原实现的 8s/20s/30s 边界）。
+ */
+const PROXY_AGENT_TIMEOUTS = {
+  connectTimeout: 8_000,
+  headersTimeout: 20_000,
+  bodyTimeout: 30_000,
+}
+
+/** 脱敏代理 URL（日志输出用：去掉 userinfo，避免凭据落日志）。 */
+function redactProxyUrl(proxyUrl: string): string {
+  try {
+    const u = new URL(proxyUrl)
+    return `${u.protocol}//${u.host}`
+  } catch {
+    return "(invalid proxy url)"
+  }
+}
+
+function createProxyDispatcher(proxyUrl: string): Dispatcher | undefined {
+  if (isSocksProxyUrl(proxyUrl)) {
+    const protocol = new URL(proxyUrl).protocol
+    // undici Socks5ProxyAgent 只接受 socks5:/socks:；socks5h（远端 DNS）
+    // 降级为 socks5（本地解析，语义差异可接受）；socks4/socks4a 不支持
+    if (protocol === "socks4:" || protocol === "socks4a:") {
+      console.warn(
+        "[analytics] socks4 proxy not supported, running direct:",
+        redactProxyUrl(proxyUrl)
+      )
+      return undefined
+    }
+    const normalized = proxyUrl.replace(/^socks5h:/i, "socks5:")
+    // Socks5ProxyAgent 是 (proxyUrl, options) 两参数构造；ProxyAgent 是
+    // 单参数 opts（string 或 { uri, ...AgentOptions }）——超时分别按各自
+    // 签名传入，否则 Agent 默认 headers/body 超时 300s 会让半死代理
+    // 把仪表盘挂 5 分钟
+    return new Socks5ProxyAgent(normalized, PROXY_AGENT_TIMEOUTS)
+  }
+  return new ProxyAgent({ uri: proxyUrl, ...PROXY_AGENT_TIMEOUTS })
+}
 
 const RANGES: Record<AnalyticsRange, { startDate: string; endDate: string }> = {
   today: { startDate: "today", endDate: "today" },
@@ -334,6 +363,9 @@ async function getProxyDispatcher(): Promise<Dispatcher | undefined> {
   try {
     cachedProxyUrl = proxyUrl
     cachedProxyAgent = createProxyDispatcher(proxyUrl)
+    // createProxyDispatcher 可能返回 undefined（socks4 不支持等）：同样
+    // 清空缓存，否则缓存永不匹配、每次 fetch 都重建 + 重复 warn
+    if (!cachedProxyAgent) cachedProxyUrl = undefined
     return cachedProxyAgent
   } catch {
     // Bad HTTPS_PROXY (invalid URL etc.) — keep the original network error
@@ -353,6 +385,8 @@ async function gaFetchOnce(
   } | undefined,
   dispatcher: Dispatcher
 ): Promise<Response> {
+  // 超时在 Agent 构造时配置（directAgent 与代理 Agent）——undici 的 fetch
+  // 不读 connectTimeout/headersTimeout/bodyTimeout 选项
   return undiciFetch(input, {
     method: init?.method,
     headers: init?.headers,
@@ -412,11 +446,13 @@ export async function analyticsFetch(
       if (socksUrl) {
         try {
           const socks = createProxyDispatcher(socksUrl)
-          const res = await gaFetchOnce(input, init, socks)
-          cachedProxyUrl = socksUrl
-          cachedProxyAgent = socks
-          preferProxyUntil = Date.now() + PREFER_PROXY_MS
-          return res
+          if (socks) {
+            const res = await gaFetchOnce(input, init, socks)
+            cachedProxyUrl = socksUrl
+            cachedProxyAgent = socks
+            preferProxyUntil = Date.now() + PREFER_PROXY_MS
+            return res
+          }
         } catch {
           /* 继续抛出原代理错误 */
         }
