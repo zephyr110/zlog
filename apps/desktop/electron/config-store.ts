@@ -19,6 +19,10 @@ export interface DesktopConfig {
   gaPrivateKey?: string
   /** 选填 HTTP / SOCKS5 代理。有值则覆盖自动检测，供 Vercel / GA4 拉取。 */
   httpsProxy?: string
+  /** 一键部署（Vercel upload deployment）：API token 与上次部署结果。 */
+  vercelDeployToken?: string
+  vercelProjectName?: string
+  vercelDeployUrl?: string
 }
 
 /** 本地配置读写。路径可注入以便测试（主进程传 userData 目录）。 */

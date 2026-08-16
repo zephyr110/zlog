@@ -18,7 +18,8 @@
     "build:standalone": "node scripts/prepare-standalone.mjs"
   },
   "dependencies": {
-    "bcryptjs": "^3.0.3"
+    "bcryptjs": "^3.0.3",
+    "undici": "^7.29.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.1",

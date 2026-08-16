@@ -71,7 +71,26 @@ const I18N = {
     "lang.hint": "跟随系统时，系统语言为中文则显示中文；其他语言一律显示英文",
     "publish.title": "线上部署",
     "publish.subtitle": "可选，仅在需要把文章公开时配置",
-    "publish.stepsTitle": "部署步骤",
+    "publish.stepsTitle": "手动部署步骤",
+    "deploy.title": "一键部署",
+    "deploy.intro": "粘贴 Vercel Token 后点「部署」：自动创建项目、配置环境变量并上传代码（无需 GitHub、无需命令行）。前提：先在「同步设置」填好 Turso 数据库 URL 和 Token",
+    "deploy.tokenLabel": "Vercel API Token",
+    "deploy.tokenHint": "Vercel 控制台 → Settings → Tokens → Create Token，权限选择「Full Account」或你的团队（Project 级 token 无法创建项目）；无需 GitHub 账号",
+    "deploy.tokenSaved": "已保存，留空继续使用（输入新值可覆盖）",
+    "deploy.canceling": "正在取消…",
+    "deploy.projectLabel": "项目名（可选，留空自动生成）",
+    "deploy.start": "部署",
+    "deploy.cancel": "取消",
+    "deploy.validating": "正在校验 Token…",
+    "deploy.project": "正在准备 Vercel 项目…",
+    "deploy.env": "正在配置环境变量…",
+    "deploy.source": "正在获取博客代码…",
+    "deploy.upload": "正在上传代码…",
+    "deploy.building": "正在云端构建（约 2-5 分钟）…",
+    "deploy.done": "部署完成！",
+    "deploy.copy": "复制地址",
+    "deploy.copied": "已复制",
+    "deploy.failed": "部署失败",
     "publish.intro": "应用默认只在这台电脑使用。若希望别人通过网址阅读文章，再按下面步骤配置即可。不部署也不影响本地写作和预览",
     "publish.step1Label": "Step 1",
     "publish.step1Title": "创建 Turso 数据库",
@@ -189,7 +208,26 @@ const I18N = {
     "lang.hint": "With \"Follow System\", Chinese system languages show Chinese; anything else shows English",
     "publish.title": "Deploy Online",
     "publish.subtitle": "Optional — only if you want posts on the public web",
-    "publish.stepsTitle": "Steps",
+    "publish.stepsTitle": "Manual deployment steps",
+    "deploy.title": "One-Click Deploy",
+    "deploy.intro": "Paste your Vercel Token and click Deploy: it creates the project, sets environment variables, and uploads the code for you (no GitHub, no terminal). Prerequisite: configure the Turso database URL and token in Sync first",
+    "deploy.tokenLabel": "Vercel API Token",
+    "deploy.tokenHint": "Vercel console → Settings → Tokens → Create Token, scope 'Full Account' or your team (project-scoped tokens cannot create projects); no GitHub account needed",
+    "deploy.tokenSaved": "Saved — leave empty to reuse (type a new one to replace)",
+    "deploy.canceling": "Canceling…",
+    "deploy.projectLabel": "Project name (optional; auto-generated if empty)",
+    "deploy.start": "Deploy",
+    "deploy.cancel": "Cancel",
+    "deploy.validating": "Validating token…",
+    "deploy.project": "Preparing Vercel project…",
+    "deploy.env": "Setting environment variables…",
+    "deploy.source": "Fetching blog source…",
+    "deploy.upload": "Uploading source…",
+    "deploy.building": "Building in the cloud (about 2-5 min)…",
+    "deploy.done": "Deployment complete!",
+    "deploy.copy": "Copy URL",
+    "deploy.copied": "Copied",
+    "deploy.failed": "Deployment failed",
     "publish.intro": "The app works on this computer by default. Follow the steps below only if you want other people to read your posts at a URL. Skipping them does not affect local writing or preview",
     "publish.step1Label": "Step 1",
     "publish.step1Title": "Create a Turso database",
@@ -274,6 +312,9 @@ function applyLang() {
   // 直接调用：renderUpdateState 内部自行 getElementById，不能引用
   // 文件后段声明的 updateBtn（TDZ——applyLang 先于 about 区块执行）
   renderUpdateState()
+  // 部署面板状态是 JS 维护的动态文案（不带 data-i18n）：同样按当前
+  // 状态机重渲染（renderDeployState 内部自取元素，规避同样的 TDZ）
+  renderDeployState()
   // 语言 select 的显示值跟随字典（内部取元素，避免 TDZ）
   const langValue = document.getElementById("langSelectValue")
   if (langValue) langValue.textContent = t(`lang.${currentPref}`)
@@ -306,6 +347,15 @@ let updateBusy = false // 检查/下载进行中（按钮禁用）
 let updateDest = null // 下载完成后的本地路径
 let updateUiState = "idle" // 派生 UI 状态（renderUpdateState 的唯一输入）
 let updatePercent = 0 // 下载进度（downloading 状态用）
+// 部署面板 UI 状态（renderDeployState 的唯一输入）也在此声明：applyLang
+// 会调用 renderDeployState 让部署面板跟随语言重渲染，const 声明若在文件
+// 后段会触发 TDZ（applyLang 先于后段逻辑执行）
+const deployUi = {
+  busy: false,
+  statusText: "",
+  statusError: false,
+  resultUrl: null, // string | null
+}
 
 function renderUpdateState() {
   const updateBtn = document.getElementById("updateBtn")
@@ -748,3 +798,115 @@ document.getElementById("openBtn2")?.addEventListener("click", () => {
 })
 
 refreshStatus()
+
+// ── 一键部署（Go Live 面板） ─────────────────────────────────────────
+// 状态机：idle → validating → project → env → source → upload → building
+//   → done | failed；进度由主进程推送（deploy:progress）。
+// 所有 UI 更新集中在 renderDeployState：状态（busy/phase/status/result）
+// 与 DOM 分离，语言切换（applyLang 场景）与进度事件都能一致地重渲染。
+// deployUi 状态本身声明在文件上部（applyLang 之前），元素引用走内部
+// getElementById（applyLang 先于本区块执行，直接引用模块级 const 会 TDZ）。
+const deployToken = document.getElementById("deployToken")
+const deployProjectName = document.getElementById("deployProjectName")
+const deployBtn = document.getElementById("deployBtn")
+const deployCancelBtn = document.getElementById("deployCancelBtn")
+const deployStatus = document.getElementById("deployStatus")
+const deployResult = document.getElementById("deployResult")
+const deployUrlLink = document.getElementById("deployUrlLink")
+const deployCopyBtn = document.getElementById("deployCopyBtn")
+
+const DEPLOY_PHASE_TEXT = {
+  validating: () => t("deploy.validating"),
+  project: () => t("deploy.project"),
+  env: () => t("deploy.env"),
+  source: () => t("deploy.source"),
+  upload: () => t("deploy.upload"),
+  building: () => t("deploy.building"),
+}
+
+/** 部署面板元素自取（renderDeployState 专用；缺任一元素视为面板不存在）。 */
+function deployPanelEls() {
+  const btn = document.getElementById("deployBtn")
+  const cancelBtn = document.getElementById("deployCancelBtn")
+  const status = document.getElementById("deployStatus")
+  const result = document.getElementById("deployResult")
+  const urlLink = document.getElementById("deployUrlLink")
+  if (!btn || !cancelBtn || !status || !result || !urlLink) return null
+  return { btn, cancelBtn, status, result, urlLink }
+}
+
+function renderDeployState() {
+  const els = deployPanelEls()
+  if (!els) return
+  els.btn.disabled = deployUi.busy
+  els.cancelBtn.style.display = deployUi.busy ? "inline-flex" : "none"
+  els.result.style.display = deployUi.resultUrl ? "flex" : "none"
+  if (deployUi.resultUrl) {
+    els.urlLink.textContent = deployUi.resultUrl
+    els.urlLink.href = deployUi.resultUrl
+  }
+  els.status.textContent = deployUi.statusText
+  els.status.classList.toggle("error", deployUi.statusError)
+}
+
+function setDeployStatus(text, isError = false) {
+  deployUi.statusText = text
+  deployUi.statusError = isError
+  renderDeployState()
+}
+
+zlogApi.onDeployProgress((p) => {
+  if (!deployUi.busy || !p) return
+  // 单源进度文案：一律用 phase 映射（i18n），主进程 message 仅作日志
+  const phaseText = DEPLOY_PHASE_TEXT[p.phase]
+  if (phaseText) setDeployStatus(phaseText())
+})
+
+deployBtn.addEventListener("click", async () => {
+  if (deployUi.busy) return
+  deployUi.busy = true
+  deployUi.resultUrl = null
+  setDeployStatus(t("deploy.validating"))
+  const res = await zlogApi
+    .deployStart({ token: deployToken.value, projectName: deployProjectName.value })
+    .catch(() => null)
+  deployUi.busy = false
+  if (!res || !res.ok) {
+    // 取消不是错误：普通样式提示；其余按失败（红色）展示
+    const isCanceled = res && res.kind === "canceled"
+    setDeployStatus((res && res.error) || t("deploy.failed"), !isCanceled)
+    return
+  }
+  deployUi.resultUrl = res.url
+  setDeployStatus(t("deploy.done"))
+  // 已存入本地配置，清空输入框避免明文残留
+  deployToken.value = ""
+})
+
+deployCancelBtn.addEventListener("click", () => {
+  void zlogApi.deployCancel()
+  setDeployStatus(t("deploy.canceling"))
+})
+
+deployCopyBtn.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(deployUrlLink.textContent)
+    setDeployStatus(t("deploy.copied"))
+  } catch {
+    setDeployStatus(t("deploy.failed"), true)
+  }
+})
+
+// 预填上次部署的项目名与结果；token 不回传渲染层（仅提示已保存）
+zlogApi.deployInfo().then((info) => {
+  if (!info) return
+  if (info.projectName) deployProjectName.value = info.projectName
+  if (info.hasToken) {
+    deployToken.placeholder = t("deploy.tokenSaved")
+    deployToken.value = ""
+  }
+  if (info.url) {
+    deployUi.resultUrl = info.url
+    renderDeployState()
+  }
+})

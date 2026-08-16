@@ -660,6 +660,11 @@
       height: 12px;
     }
 
+    /* 一键部署（Go Live 面板） */
+    .deploy-actions { display: flex; align-items: center; gap: 8px; }
+    .deploy-result { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+    #deployStatus.error { color: var(--destructive); }
+
     /* 同步 / 线上部署：步骤列表（序号 / 标题+外链 / 说明） */
     .block > .hint + .guide-steps { margin-top: 4px; }
     .guide-steps {
@@ -890,10 +895,40 @@
       </div>
     </section>
 
-    <!-- 面板：线上部署（可选；外链走系统浏览器） -->
+    <!-- 面板：线上部署（一键部署 + 手动步骤；外链走系统浏览器） -->
     <section class="panel" id="panel-publish">
       <div class="group">
-        <h2 class="block-title"><span data-i18n="publish.stepsTitle">部署步骤</span><span class="opt" data-i18n="tag.optional">（可选）</span></h2>
+        <h2 class="block-title"><span data-i18n="deploy.title">一键部署</span><span class="opt" data-i18n="tag.optional">（可选）</span></h2>
+        <div class="block">
+          <p class="hint" data-i18n="deploy.intro">粘贴 Vercel Token 后点「部署」：自动创建项目、配置环境变量并上传代码（无需 GitHub、无需命令行）。前提：先在「同步设置」填好 Turso 数据库 URL 和 Token</p>
+          <div class="field">
+            <label for="deployToken" data-i18n="deploy.tokenLabel">Vercel API Token</label>
+            <div class="secret">
+              <input id="deployToken" type="password" autocomplete="off" placeholder="vercel_xxx" />
+              <button type="button" class="secret-toggle" aria-controls="deployToken" aria-pressed="false" aria-label="显示">
+                <svg class="icon secret-eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="icon secret-eye-off" viewBox="0 0 24 24" hidden aria-hidden="true"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+              </button>
+            </div>
+            <p class="hint" data-i18n="deploy.tokenHint">Vercel 控制台 → Settings → Tokens → Create Token（无需 GitHub 账号）</p>
+          </div>
+          <div class="field">
+            <label for="deployProjectName" data-i18n="deploy.projectLabel">项目名（可选，留空自动生成）</label>
+            <input id="deployProjectName" placeholder="zlog-blog" />
+          </div>
+          <div class="deploy-actions">
+            <button class="primary" id="deployBtn" data-i18n="deploy.start">部署</button>
+            <button class="secondary" id="deployCancelBtn" style="display: none" data-i18n="deploy.cancel">取消</button>
+          </div>
+          <p class="hint" id="deployStatus"></p>
+          <div class="deploy-result" id="deployResult" style="display: none">
+            <a class="about-link" id="deployUrlLink" href="#" target="_blank" rel="noopener"></a>
+            <button class="link" id="deployCopyBtn" data-i18n="deploy.copy">复制地址</button>
+          </div>
+        </div>
+      </div>
+      <div class="group">
+        <h2 class="block-title"><span data-i18n="publish.stepsTitle">手动部署步骤</span><span class="opt" data-i18n="tag.optional">（可选）</span></h2>
         <div class="block">
           <p class="hint" data-i18n="publish.intro">应用默认只在这台电脑使用。若希望别人通过网址阅读文章，再按下面步骤配置即可。不部署也不影响本地写作和预览</p>
           <ol class="guide-steps">

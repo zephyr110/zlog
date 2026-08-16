@@ -16,8 +16,7 @@ const ICON_TARGET = join(root, "build", "icon.png")
 const TRAY_TARGET = join(root, "assets", "tray.png")
 // 菜单栏模板图标（macOS）：18pt @1x 与 @2x（用户反馈 16pt 偏小，且原图
 // 四周留白等比缩到 16pt 后图形极小——见 boxDownsampleTemplate 的裁剪放大）；
-// 文件名以 Template 结尾 → Electron 自动标记模板图，@2x 相邻文件自动作为
-// Retina 尺寸。
+// 文件名以 Template 结尾；1x + @2x 由 tray.ts 编进同一张 NativeImage。
 const TRAY_TEMPLATES = [
   { size: 18, file: "trayTemplate.png" },
   { size: 36, file: "trayTemplate@2x.png" },

@@ -16,6 +16,13 @@ export function mergeNoProxy(existing: string | undefined): string {
   return out.join(",")
 }
 
+/** 服务器端约定 ADMIN_PASSWORD_HASH 为 base64 编码的 bcrypt 哈希
+ *  （users.ts decodeEnvHash，见 web/.env.local.example）。桌面配置里是
+ *  原始哈希——本函数统一编码，本地 server env 与 Vercel 部署共用。 */
+export function encodeEnvHash(rawHash: string): string {
+  return Buffer.from(rawHash, "utf8").toString("base64")
+}
+
 /** 由桌面配置组装服务器 env（纯函数，便于测试）。 */
 export function buildServerEnv(
   cfg: DesktopConfig,
@@ -28,10 +35,7 @@ export function buildServerEnv(
     TURSO_DATABASE_URL: `file:${dbPath}`,
     SESSION_SECRET: cfg.sessionSecret,
     ADMIN_USERNAME: cfg.adminUsername,
-    // 服务器端 @zlog/database 约定 ADMIN_PASSWORD_HASH 为 base64 编码的
-    // bcrypt 哈希（users.ts decodeEnvHash，见 web/.env.local.example）。
-    // 桌面配置存储里是原始哈希，转交 env 时编码。
-    ADMIN_PASSWORD_HASH: Buffer.from(cfg.adminPasswordHash, "utf8").toString("base64"),
+    ADMIN_PASSWORD_HASH: encodeEnvHash(cfg.adminPasswordHash),
     ZLOG_DESKTOP_KEY: cfg.desktopKey,
   }
   // 语言单一事实源（lang.json）路径：web 端 /api/lang 读它接入统一语言源

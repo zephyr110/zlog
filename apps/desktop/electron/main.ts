@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron"
 import { randomBytes } from "node:crypto"
+import { appendFileSync, mkdirSync } from "node:fs"
 import bcrypt from "bcryptjs"
 import { join, resolve, sep } from "node:path"
 import { ConfigStore, type DesktopConfig } from "./config-store"
@@ -13,8 +14,10 @@ import {
   updatesDir,
   type UpdateCheckResult,
 } from "./updater"
+import { VercelDeployer, VercelDeployError, missingSyncConfig } from "./vercel-deploy"
 import { ServerManager } from "./server-manager"
 import { buildServerEnv } from "./server-env"
+import { redactProxyUrl } from "./proxy-agent"
 import { parseManualHttpProxy, resolveDesktopHttpProxy } from "./system-proxy"
 import { isValidSyncUrl } from "./validate"
 import { isDesktopLocalUrl } from "./local-url"
@@ -353,6 +356,109 @@ async function main() {
   })
   ipcMain.handle("app:version", () => app.getVersion())
   ipcMain.handle("app:quit", () => app.quit())
+
+  // ── 一键部署到 Vercel（Go Live 面板） ────────────────────────────
+  // 流程见 docs/superpowers/specs/2026-08-15-one-click-deploy-design.md：
+  // token → 项目 → env（复用本地同步与 admin 凭据）→ 源码（官方 tag）→
+  // 上传部署 → 轮询构建 → 线上地址。全程无需 GitHub/命令行/手动 env。
+  let currentDeployer: VercelDeployer | null = null
+
+  ipcMain.handle("deploy:info", () => ({
+    // 不把 token 送回渲染层（settings.js 只需知道已保存）
+    hasToken: Boolean(config?.vercelDeployToken),
+    projectName: config?.vercelProjectName,
+    url: config?.vercelDeployUrl,
+  }))
+  ipcMain.handle("deploy:start", async (_e, payload: unknown) => {
+    if (currentDeployer) {
+      return { ok: false, error: "部署正在进行中", kind: "busy" }
+    }
+    const p = (payload ?? {}) as { token?: unknown; projectName?: unknown }
+    const token =
+      typeof p.token === "string" && p.token.trim()
+        ? p.token.trim()
+        : config?.vercelDeployToken
+    if (!token) {
+      return { ok: false, error: "请在 Vercel 控制台生成 Token 后粘贴到上方输入框", kind: "token" }
+    }
+    const projectName =
+      typeof p.projectName === "string" && p.projectName.trim()
+        ? p.projectName.trim()
+        : (config?.vercelProjectName ?? `zlog-blog-${randomBytes(3).toString("hex")}`)
+    if (!config) return { ok: false, error: "本地配置缺失", kind: "api" }
+    const syncIssue = missingSyncConfig(config)
+    if (syncIssue) {
+      return {
+        ok: false,
+        error:
+          syncIssue === "syncUrl"
+            ? "同步设置中的数据库 URL 不是 libsql:// 开头，请修正"
+            : "请先在「同步设置」中配置 Turso 数据库 URL 和 Token",
+        kind: "sync",
+      }
+    }
+    const httpsProxy = await resolveDesktopHttpProxy({
+      override: config.httpsProxy,
+      resolveChromium: () =>
+        session.defaultSession.resolveProxy("https://api.vercel.com/"),
+    })
+    // 二次 busy 检查：上面 await 期间可能有并发请求已通过第一次检查并
+    // 占位（TOCTOU）。本检查与下方赋值之间无 await，检查-赋值原子生效。
+    if (currentDeployer) {
+      return { ok: false, error: "部署正在进行中", kind: "busy" }
+    }
+    // 诊断日志（部署网络问题定位）：代理解析结果 + 是否使用代理。
+    // 代理可能带 user:pass，必须先脱敏再落盘。
+    try {
+      mkdirSync(logDir, { recursive: true })
+      appendFileSync(
+        join(logDir, "main.log"),
+        `${new Date().toISOString()} [deploy] httpsProxy=${redactProxyUrl(httpsProxy ?? "null")} env=${redactProxyUrl(process.env.HTTPS_PROXY ?? "null")}\n`
+      )
+    } catch {
+      /* 日志失败不影响部署 */
+    }
+    const deployer = new VercelDeployer({
+      token,
+      projectName,
+      version: app.getVersion(),
+      config,
+      proxyUrl: httpsProxy,
+      onProgress: (progress) => {
+        try {
+          // 设置窗口可能在部署中被关闭：webContents 已销毁时 send 抛异常，
+          // 捕获后部署继续（与 update:download 相同的防护）
+          settingsWindow?.webContents.send("deploy:progress", progress)
+        } catch {
+          // 进度无人接收，部署仍须完成
+        }
+      },
+    })
+    currentDeployer = deployer
+    try {
+      const url = await deployer.run()
+      config = {
+        ...config,
+        vercelDeployToken: token,
+        vercelProjectName: projectName,
+        vercelDeployUrl: url,
+      }
+      configStore.save(config)
+      return { ok: true, url }
+    } catch (err) {
+      if (err instanceof VercelDeployError) {
+        return { ok: false, error: err.message, kind: err.kind }
+      }
+      return { ok: false, error: String(err) }
+    } finally {
+      // 只清当前部署器的引用（并发守卫保证同一时刻只有一个）
+      if (currentDeployer === deployer) currentDeployer = null
+    }
+  })
+  ipcMain.handle("deploy:cancel", () => {
+    currentDeployer?.cancel()
+    return { ok: true }
+  })
 
   // ── 更新检查与下载（关于面板） ───────────────────────────────────
   // GitHub API 走 net.fetch（Chromium 栈，跟随系统代理）。
