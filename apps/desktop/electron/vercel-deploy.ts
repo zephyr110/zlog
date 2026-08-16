@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { gunzipSync } from "node:zlib"
 import { fetch, type Dispatcher } from "undici"
 import type { DesktopConfig } from "./config-store"
@@ -44,8 +45,12 @@ const REQUEST_TIMEOUT_MS = 15_000
 /** 上传部署（整个源码树内联 JSON）比普通 API 调用大得多——放宽超时。 */
 const UPLOAD_TIMEOUT_MS = 90_000
 const SOURCE_DOWNLOAD_TIMEOUT_MS = 60_000
-/** public/ 资产二进制单文件上限（以 base64 上传）。 */
+/** public/ 资产二进制单文件上限。 */
 const PUBLIC_ASSET_MAX_BYTES = 4 * 1024 * 1024
+/** buildDeployFiles 产出的二进制文件标记（data 前缀）。deploy() 识别该
+ *  前缀后还原原始字节走 /v2/now/files sha 上传——实测 data 前缀本身在
+ *  Vercel 不生效（会当 UTF-8 文本写入，字节损坏）。 */
+export const BINARY_DATA_PREFIX = "data:application/octet-stream;base64,"
 const POLL_INTERVAL_MS = 5_000
 const BUILD_TIMEOUT_MS = 10 * 60_000
 
@@ -187,8 +192,8 @@ export function buildDeployFiles(entries: TarEntry[]): {
       continue
     }
     // public/ 下的资源（logo、favicon、字体等）是站点的必需资产——二进制
-    // 以 base64 data URL 上传（Vercel upload API 支持 data:…;base64, 前缀）。
-    // 超过上限仍跳过（部署体量控制）。
+    // 以 base64 data URL 标记传递（BINARY_DATA_PREFIX），deploy() 识别后
+    // 还原原始字节走 /v2/now/files sha 上传。超过上限仍跳过（部署体量控制）。
     const inPublic = segments.includes("public")
     const isBinary = e.data.includes(0) // 含 NUL 即二进制（文本源码不会有）
     if (inPublic && isBinary) {
@@ -198,7 +203,7 @@ export function buildDeployFiles(entries: TarEntry[]): {
       }
       files.push({
         file: e.path,
-        data: `data:application/octet-stream;base64,${e.data.toString("base64")}`,
+        data: `${BINARY_DATA_PREFIX}${e.data.toString("base64")}`,
       })
       continue
     }
@@ -217,6 +222,28 @@ export function buildDeployFiles(entries: TarEntry[]): {
     files.push({ file: e.path, data: text })
   }
   return flattenWorkspace(files, skipped)
+}
+
+/** 把部署文件拆成文本与二进制两类：二进制（BINARY_DATA_PREFIX 标记的
+ *  base64）还原为原始 Buffer，由 deploy() 走 /v2/now/files sha 上传——
+ *  data 前缀本身在 Vercel 不生效（实测字节损坏）。 */
+export function splitDeployFiles(files: { file: string; data: string }[]): {
+  textFiles: { file: string; data: string }[]
+  binaryFiles: { file: string; buffer: Buffer }[]
+} {
+  const textFiles: { file: string; data: string }[] = []
+  const binaryFiles: { file: string; buffer: Buffer }[] = []
+  for (const f of files) {
+    if (f.data.startsWith(BINARY_DATA_PREFIX)) {
+      binaryFiles.push({
+        file: f.file,
+        buffer: Buffer.from(f.data.slice(BINARY_DATA_PREFIX.length), "base64"),
+      })
+    } else {
+      textFiles.push(f)
+    }
+  }
+  return { textFiles, binaryFiles }
 }
 
 /**
@@ -730,15 +757,75 @@ export class VercelDeployer {
     }
   }
 
+  /** 二进制文件经 /v2/now/files 原始字节流上传（x-now-digest = sha1），
+   *  返回 { file, sha } 引用。并行上传 + 共享取消信号。 */
+  private async uploadBinaryFiles(
+    binaryFiles: { file: string; buffer: Buffer }[]
+  ): Promise<{ file: string; sha: string }[]> {
+    return Promise.all(
+      binaryFiles.map(async ({ file, buffer }) => {
+        this.ensureNotCancelled()
+        const digest = createHash("sha1").update(buffer).digest("hex")
+        const signal = AbortSignal.any([
+          this.controller.signal,
+          AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+        ])
+        let res: Awaited<ReturnType<typeof this.fetchImpl>>
+        try {
+          res = await this.fetchImpl(`${API_BASE}/v2/now/files`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${this.token}`,
+              "Content-Type": "application/octet-stream",
+              "x-now-digest": digest,
+            },
+            body: buffer,
+            dispatcher: this.dispatcher as never,
+            signal,
+          } as never)
+        } catch (err) {
+          if (this.cancelled || this.controller.signal.aborted) {
+            throw new VercelDeployError("部署已取消", "canceled")
+          }
+          throw new VercelDeployError(
+            `上传二进制文件 ${file} 失败：${err instanceof Error ? err.message : String(err)}`,
+            "network"
+          )
+        }
+        if (!res.ok) {
+          throw new VercelDeployError(`上传二进制文件 ${file} 失败（HTTP ${res.status}）`, "api")
+        }
+        const text = await res.text()
+        let body: unknown = null
+        try {
+          body = text ? JSON.parse(text) : null
+        } catch {
+          body = text
+        }
+        // 响应 {"urls":["https://…/<sha>"]}——sha 即 URL 尾段
+        const urls = (body as { urls?: string[] })?.urls
+        const sha = urls?.[0]?.split("/").pop()
+        if (!sha) throw new VercelDeployError(`上传二进制文件 ${file} 响应缺少 sha`, "api")
+        return { file, sha }
+      })
+    )
+  }
+
   /** 创建部署并轮询到完成。返回线上地址。 */
   async deploy(files: { file: string; data: string }[], projectId: string): Promise<string> {
     this.onProgress({ phase: "upload", message: "正在上传代码…" })
     this.ensureNotCancelled()
+    // 二进制（logo 等）先走 /v2/now/files 上传拿 sha，create 时用引用——
+    // files[].data 的 base64 前缀在 Vercel 不生效（会当文本写入）
+    const { textFiles, binaryFiles } = splitDeployFiles(files)
+    const shaFiles = binaryFiles.length
+      ? await this.uploadBinaryFiles(binaryFiles)
+      : []
     const created = await this.request("/v13/deployments", {
       method: "POST",
       body: {
         name: this.projectName,
-        files,
+        files: [...textFiles, ...shaFiles],
         // 显式 production target：不传时 Vercel 按 preview 部署，构建注入
         // preview env（未设置）→ 运行时缺 TURSO_DATABASE_URL 等
         target: "production",
