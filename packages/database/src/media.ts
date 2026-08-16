@@ -45,12 +45,15 @@ export interface MediaRecord {
   createdAt: string
 }
 
-/** List row — explicitly excludes `data` (BLOB) to keep listings cheap. */
+/** List row — explicitly excludes `data` (BLOB) to keep listings cheap.
+ *  githubSha 区分投递层：非 null = 已推送 GitHub（jsdelivr CDN 主路径），
+ *  null = 仅存 Turso（/api/media/[name] 兜底出图）。 */
 export interface MediaMeta {
   name: string
   contentType: string
   size: number
   createdAt: string
+  githubSha: string | null
 }
 
 // ── Queries ─────────────────────────────────────────────────────────────
@@ -142,11 +145,11 @@ export async function listMedia(
   const { sql: where, args } = filterSql(filter)
   const result = limit
     ? await db.execute({
-        sql: `SELECT filename, content_type, size, created_at FROM media ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+        sql: `SELECT filename, content_type, size, created_at, github_sha FROM media ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
         args: [...args, limit, offset],
       })
     : await db.execute(
-        `SELECT filename, content_type, size, created_at FROM media ${where} ORDER BY created_at DESC`,
+        `SELECT filename, content_type, size, created_at, github_sha FROM media ${where} ORDER BY created_at DESC`,
         args
       )
   return result.rows.map((row) => ({
@@ -154,6 +157,7 @@ export async function listMedia(
     contentType: row.content_type as string,
     size: row.size as number,
     createdAt: row.created_at as string,
+    githubSha: (row.github_sha as string | null) ?? null,
   }))
 }
 

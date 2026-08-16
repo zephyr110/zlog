@@ -96,7 +96,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       images: records.map((record) => ({
         name: record.name,
-        url: cdnUrl(record.name),
+        // githubSha null = Turso-only（GitHub 投递不可用时的降级上传）——
+        // 用 /api/media/[name] 兜底出图，而不是指向 jsdelivr 的 404
+        url: record.githubSha ? cdnUrl(record.name) : `/api/media/${record.name}`,
         createdAt: record.createdAt,
       })),
       total,
@@ -215,8 +217,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // ② GitHub is the delivery layer — roll the DB row back ONLY if the
-    //    push itself fails (otherwise the repo ends up with an orphan file).
+    // ② GitHub is the delivery layer (jsdelivr CDN). When it's unavailable —
+    //    e.g. Vercel deploys without BLOG_IMG_GITHUB_TOKEN — degrade
+    //    gracefully instead of failing the upload: Turso is the
+    //    authoritative store and /api/media/[name] serves the bytes
+    //    directly. A failed push does NOT roll back the DB row; the image
+    //    remains fully functional, just without the CDN front.
+    let delivery = false
     try {
       const { uploadToGithub } = await import("@/lib/github-image")
       const { sha } = await uploadToGithub(filename, optimized)
@@ -225,20 +232,27 @@ export async function POST(request: NextRequest) {
       await setMediaSha(filename, sha).catch((error) => {
         console.error("Failed to backfill github_sha:", error)
       })
+      delivery = true
     } catch (error) {
-      console.error("GitHub upload failed:", error)
-      await deleteMedia(filename).catch(() => {})
-      return NextResponse.json(
-        { error: "GitHub upload failed" },
-        { status: 502 }
+      console.warn(
+        "GitHub upload unavailable — serving from Turso (/api/media):",
+        error
       )
     }
 
-    // ③ Warm the jsdelivr cache (best-effort, non-blocking). New files are
-    //    usually reachable within a couple of minutes either way.
-    void fetch(cdnUrl(filename), { method: "HEAD" }).catch(() => {})
+    if (delivery) {
+      // ③ Warm the jsdelivr cache (best-effort, non-blocking). New files are
+      //    usually reachable within a couple of minutes either way.
+      void fetch(cdnUrl(filename), { method: "HEAD" }).catch(() => {})
+    }
 
-    return NextResponse.json({ url: cdnUrl(filename), filename }, { status: 201 })
+    return NextResponse.json(
+      {
+        url: delivery ? cdnUrl(filename) : `/api/media/${filename}`,
+        filename,
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error("Upload error:", error)
     const message = error instanceof Error ? error.message : "Internal server error"
@@ -284,6 +298,10 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Then remove from GitHub; a 404 there is already-gone (idempotent).
+    // githubSha null = Turso-only 降级上传（从未推送）——直接跳过 GitHub。
+    if (record.githubSha === null) {
+      return NextResponse.json({ success: true })
+    }
     try {
       await deleteFromGithub(filename, record.githubSha)
     } catch (error) {
