@@ -112,6 +112,16 @@ See the [deployment guide](https://zlog-test.vercel.app/posts/zlog-deployment-gu
 
 ## Desktop App (macOS / Windows / Linux)
 
+Download the latest installer from [GitHub Releases](https://github.com/zephyr110/zlog/releases/latest):
+
+| Platform | Installer |
+|---|---|
+| macOS (Intel) | [`Zlog-<version>-x64.dmg`](https://github.com/zephyr110/zlog/releases/latest/download/Zlog-1.0.2-x64.dmg) |
+| macOS (Apple Silicon) | [`Zlog-<version>-arm64.dmg`](https://github.com/zephyr110/zlog/releases/latest/download/Zlog-1.0.2-arm64.dmg) |
+| Windows | [`Zlog-Setup-<version>.exe`](https://github.com/zephyr110/zlog/releases/latest/download/Zlog-Setup-1.0.2.exe) |
+| Linux (AppImage) | [`Zlog-<version>-x86_64.AppImage`](https://github.com/zephyr110/zlog/releases/latest/download/Zlog-1.0.2-x86_64.AppImage) |
+| Linux (deb) | [`Zlog-<version>-amd64.deb`](https://github.com/zephyr110/zlog/releases/latest/download/Zlog-1.0.2-amd64.deb) |
+
 Run the whole blog — reading and writing — as a desktop application. The
 app bundles a local standalone server and a local SQLite database; when a
 sync URL is configured it keeps the local copy in two-way sync with your
