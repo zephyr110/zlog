@@ -329,6 +329,27 @@ describe("buildEnvList", () => {
     expect(env.find((e) => e.key === "SESSION_SECRET")?.value).toBe("s")
   })
 
+  it("透传 turnstile 评论防护凭据", () => {
+    const env = buildEnvList({
+      ...base,
+      syncUrl: "libsql://x",
+      syncToken: "t",
+      turnstileSiteKey: "0x4AAAAAA...",
+      turnstileSecretKey: "0x4AAAAAA...",
+    })
+    const site = env.find((e) => e.key === "NEXT_PUBLIC_TURNSTILE_SITE_KEY")
+    const secret = env.find((e) => e.key === "TURNSTILE_SECRET_KEY")
+    expect(site?.value).toBe("0x4AAAAAA...")
+    expect(site?.target).toEqual(["production"])
+    expect(secret?.value).toBe("0x4AAAAAA...")
+    expect(secret?.target).toEqual(["production"])
+  })
+
+  it("未配置 turnstile 时不注入", () => {
+    const env = buildEnvList({ ...base, syncUrl: "libsql://x", syncToken: "t" })
+    expect(env.some((e) => e.key.startsWith("TURNSTILE"))).toBe(false)
+  })
+
   it("透传可选流量分析凭据", () => {
     const env = buildEnvList({
       ...base,

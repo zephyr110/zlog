@@ -11,6 +11,12 @@ const DB_URL =
   "https://zlog-test-zephyr110.aws-ap-northeast-1.turso.io"
 const TOKEN = process.env.TURSO_DEMO_TOKEN ?? ""
 
+// 本地时区日期（toISOString 是 UTC，UTC+8 凌晨会差一天）
+function localDate() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
 const cjk = /[一-龥぀-ゟ゠-ヿ가-힯]/g
 function stats(content) {
   const cjkCount = (content.match(cjk) || []).length
@@ -22,7 +28,7 @@ function stats(content) {
 // 文章日期：脚本运行当天（可被 TURSO_DEMO_DATE 覆盖）——重跑刷新时
 // 文章不会钉死在首次入库的日期
 const today =
-  process.env.TURSO_DEMO_DATE ?? new Date().toISOString().slice(0, 10)
+  process.env.TURSO_DEMO_DATE ?? localDate()
 
 // 与正式站一致的系列文章（docs/guides/series/）
 const guides = [

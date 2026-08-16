@@ -14,18 +14,24 @@ const path = require("node:path")
  * - Gatekeeper 对 quarantine app 的拦截仍需首次「右键 → 打开」放行
  *   （见 README 首次安装说明）；完全无提示需要 Developer ID + 公证
  *
- * 配置了真实证书（mac.identity 非空）时不执行，走 electron-builder
- * 内置正式签名。
+ * 已签名的 .app 跳过（真实证书签名由 electron-builder 或钥匙串自动
+ * 检出完成），只对完全未签名的产物做 ad-hoc。
  */
 exports.default = async function afterPack(context) {
-  const { packager, appOutDir, electronPlatformName } = context
+  const { appOutDir, electronPlatformName } = context
   if (electronPlatformName !== "darwin") return
 
-  const identity = packager.options?.mac?.identity
-  if (identity && identity !== "-") return // 有真实证书，交给 electron-builder
-
-  const appName = packager.appInfo.productFilename
+  const appName = context.packager.appInfo.productFilename
   const appPath = path.join(appOutDir, `${appName}.app`)
+  // 已签名（真实证书——electron-builder 的正式签名在 afterPack 之后执行，
+  // 但也可能来自机器钥匙串自动检出）→ 跳过 ad-hoc，避免覆盖正式签名
+  try {
+    execFileSync("codesign", ["-dv", appPath], { stdio: "ignore" })
+    console.log(`[after-pack] already signed, skipping ad-hoc: ${appPath}`)
+    return
+  } catch {
+    /* 未签名 → 继续 ad-hoc */
+  }
   console.log(`[after-pack] ad-hoc signing ${appPath}`)
   execFileSync("codesign", ["--force", "--deep", "-s", "-", appPath], {
     stdio: "inherit",

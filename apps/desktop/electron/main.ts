@@ -285,6 +285,8 @@ async function main() {
     gaPropertyId?: string
     gaClientEmail?: string
     gaPrivateKey?: string
+    turnstileSiteKey?: string
+    turnstileSecretKey?: string
     httpsProxy?: string
   }) => {
     // 与渲染层同源的防御性校验（唯一权威实现见 validate.ts）：非法
@@ -318,6 +320,8 @@ async function main() {
         gaPropertyId: cfg.gaPropertyId?.trim() || undefined,
         gaClientEmail: cfg.gaClientEmail?.trim() || undefined,
         gaPrivateKey: cfg.gaPrivateKey?.trim() || undefined,
+        turnstileSiteKey: cfg.turnstileSiteKey?.trim() || undefined,
+        turnstileSecretKey: cfg.turnstileSecretKey?.trim() || undefined,
         httpsProxy: parseManualHttpProxy(cfg.httpsProxy),
       }
     }

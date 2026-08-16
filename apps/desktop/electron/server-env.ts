@@ -49,9 +49,11 @@ export function buildServerEnv(
   if (cfg.gaPropertyId) env.GA_PROPERTY_ID = cfg.gaPropertyId
   if (cfg.gaClientEmail) env.GA_CLIENT_EMAIL = cfg.gaClientEmail
   if (cfg.gaPrivateKey) env.GA_PRIVATE_KEY = cfg.gaPrivateKey
-  // 评论防垃圾（Cloudflare Turnstile）：site key 前端加载、secret key 后端校验
-  if (cfg.turnstileSiteKey) env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = cfg.turnstileSiteKey
-  if (cfg.turnstileSecretKey) env.TURNSTILE_SECRET_KEY = cfg.turnstileSecretKey
+  // 评论防垃圾（Cloudflare Turnstile）不在本地注入：NEXT_PUBLIC_* 是构建期
+  // 内联变量，桌面端 standalone 是预构建 bundle，运行时注入的 site key 到
+  // 不了客户端组件；而 secret 单独注入会让后端拒绝所有无 token 的本地评论
+  // （前端无 site key 就不渲染 widget）。Vercel 部署路径在云端构建时内联
+  // site key（buildEnvList 透传），线上评论防护正常。
   const proxy = httpsProxy?.trim()
   if (proxy) {
     if (isSocksProxyUrl(proxy)) {

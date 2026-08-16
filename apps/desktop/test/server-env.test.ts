@@ -10,6 +10,15 @@ const base: DesktopConfig = {
 }
 
 describe("buildServerEnv", () => {
+  it("本地不注入 Turnstile（预构建 bundle 无法内联 site key，注入会让评论被拒）", () => {
+    const env = buildServerEnv(
+      { ...base, turnstileSiteKey: "k1", turnstileSecretKey: "k2" } as DesktopConfig,
+      "/tmp/db.sqlite"
+    )
+    expect(env.NEXT_PUBLIC_TURNSTILE_SITE_KEY).toBeUndefined()
+    expect(env.TURNSTILE_SECRET_KEY).toBeUndefined()
+  })
+
   it("始终包含本地库路径与凭据 env", () => {
     const env = buildServerEnv(base, "/data/zlog.db")
     expect(env.TURSO_DATABASE_URL).toBe("file:/data/zlog.db")

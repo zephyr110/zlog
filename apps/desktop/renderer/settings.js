@@ -65,7 +65,7 @@ const I18N = {
     "comments.secretKey": "Secret Key（私密）",
     "comments.siteKeyPh": "0x4AAAAAA…",
     "comments.secretKeyPh": "0x4AAAAAA…",
-    "comments.hint": "在 Cloudflare Turnstile 控制台创建站点后获得两个 Key。配置后本地评论启用人机验证；一键部署到 Vercel 时自动透传，线上防护一致。留空则评论不显示验证码",
+    "comments.hint": "在 Cloudflare Turnstile 控制台创建站点后获得两个 Key。一键部署到 Vercel 时自动透传，线上评论启用人机验证；本地因内置构建限制不启用验证码（评论照常可用）。留空则线上也不显示验证码",
     "analytics.proxyTitle": "网络代理",
     "analytics.proxyPh": "http:// 或 socks5://主机:端口",
     "analytics.proxyHint": "用于拉取 Vercel Analytics 与 Google Analytics 4。留空则自动读取系统/VPN 的 HTTP 或 SOCKS 代理。SOCKS 端口请填 socks5://，不要写成 http://",
@@ -210,7 +210,7 @@ const I18N = {
     "comments.secretKey": "Secret Key (private)",
     "comments.siteKeyPh": "0x4AAAAAA…",
     "comments.secretKeyPh": "0x4AAAAAA…",
-    "comments.hint": "Create a site in the Cloudflare Turnstile console to get both keys. When set, local comments get human verification, and one-click Vercel deploys carry them over automatically. Leave empty to skip the captcha",
+    "comments.hint": "Create a site in the Cloudflare Turnstile console to get both keys. One-click Vercel deploys carry them over automatically and the live site verifies comments; the local build does not render the widget (pre-built bundle), comments stay fully usable. Leave empty to skip the captcha everywhere",
     "analytics.proxyTitle": "Proxy",
     "analytics.proxyPh": "http:// or socks5://host:port",
     "analytics.proxyHint": "Used to fetch Vercel Analytics and Google Analytics 4. Leave empty to read the system/VPN HTTP or SOCKS proxy. Use socks5:// for a SOCKS port; do not write it as http://",
@@ -440,6 +440,7 @@ if (isFirstRun) {
   // 首启向导保持最小化：只留账号 + 可选同步
   document.getElementById("syncBtn").style.display = "none"
   document.getElementById("panel-analytics").style.display = "none"
+  document.getElementById("panel-comments").style.display = "none"
   document.getElementById("panel-data").style.display = "none"
   document.getElementById("panel-lang").style.display = "none"
   document.getElementById("panel-publish").style.display = "none"
@@ -722,7 +723,8 @@ saveBtn.addEventListener("click", doSave)
 for (const id of [
   "username", "password", "password2", "syncUrl", "syncToken",
   "vercelApiToken", "vercelProjectId", "vercelTeamId",
-  "gaPropertyId", "gaClientEmail", "gaPrivateKey", "httpsProxy",
+  "gaPropertyId", "gaClientEmail", "gaPrivateKey",
+  "turnstileSiteKey", "turnstileSecretKey", "httpsProxy",
 ]) {
   const el = document.getElementById(id)
   el.addEventListener("keydown", (e) => {
