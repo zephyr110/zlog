@@ -1,14 +1,17 @@
 import { describe, it, expect } from "vitest"
+import { createHash } from "node:crypto"
 import { gzipSync } from "node:zlib"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import {
+  BINARY_DATA_PREFIX,
   buildDeployFiles,
   buildEnvList,
   missingSyncConfig,
   parseTar,
   parseTarGz,
   rekeyWebImporter,
+  splitDeployFiles,
   VercelDeployer,
   VercelDeployError,
   type DeployProgress,
@@ -234,6 +237,25 @@ describe("buildDeployFiles", () => {
     expect(files.map((f) => f.file)).toEqual(["ok.ts"])
     expect(skipped).toHaveLength(2)
     expect(skipped[0]).toContain("huge.bin")
+  })
+})
+
+// ── splitDeployFiles ───────────────────────────────────────────────────
+
+describe("splitDeployFiles", () => {
+  it("拆出二进制（还原原始字节）与文本两类", () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01])
+    const { textFiles, binaryFiles } = splitDeployFiles([
+      { file: "package.json", data: "{}" },
+      {
+        file: "public/logo.png",
+        data: `${BINARY_DATA_PREFIX}${png.toString("base64")}`,
+      },
+    ])
+    expect(textFiles).toEqual([{ file: "package.json", data: "{}" }])
+    expect(binaryFiles).toHaveLength(1)
+    expect(binaryFiles[0].file).toBe("public/logo.png")
+    expect(binaryFiles[0].buffer.equals(png)).toBe(true)
   })
 })
 
@@ -573,5 +595,58 @@ describe("VercelDeployer", () => {
     expect(envFired).toHaveLength(5)
     release.forEach((r) => r())
     await p
+  })
+
+  it("deploy 二进制文件走 /v2/now/files sha 引用（data 前缀不直接进 create）", async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02])
+    let uploadedBody: Buffer | null = null
+    let uploadedDigest = ""
+    let createBody: { files?: unknown[] } = {}
+    const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      if (url === "https://api.vercel.com/v2/now/files") {
+        uploadedBody = Buffer.from((init?.body as Buffer) ?? Buffer.alloc(0))
+        uploadedDigest = String((init?.headers as Record<string, string>)["x-now-digest"])
+        return new Response(
+          JSON.stringify({
+            urls: ["https://dmmcy.cloudfront.net/abc123sha"],
+          }),
+          { status: 200 }
+        )
+      }
+      if (url === "https://api.vercel.com/v13/deployments") {
+        createBody = JSON.parse(String(init?.body))
+        return new Response(JSON.stringify({ id: "dpl", url: "p.vercel.app" }), { status: 200 })
+      }
+      if (url === "https://api.vercel.com/v13/deployments/dpl") {
+        return new Response(JSON.stringify({ readyState: "READY" }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ error: { message: "not found" } }), { status: 404 })
+    }) as typeof fetch
+    const deployer = new VercelDeployer({
+      token: "t",
+      projectName: "p",
+      version: "1.0.0",
+      config: cfg,
+      onProgress,
+      fetchImpl,
+      pollIntervalMs: 5,
+    })
+    const url = await deployer.deploy(
+      [
+        { file: "package.json", data: "{}" },
+        { file: "public/logo.png", data: `${BINARY_DATA_PREFIX}${png.toString("base64")}` },
+      ],
+      "prj"
+    )
+    // 上传的原始字节与 sha1 digest 正确
+    expect(uploadedBody?.equals(png)).toBe(true)
+    expect(uploadedDigest).toBe(createHash("sha1").update(png).digest("hex"))
+    // create 的 files 数组：文本用 data，二进制用 sha 引用
+    expect(createBody.files).toEqual([
+      { file: "package.json", data: "{}" },
+      { file: "public/logo.png", sha: "abc123sha" },
+    ])
+    expect(url).toBe("p.vercel.app")
   })
 })
