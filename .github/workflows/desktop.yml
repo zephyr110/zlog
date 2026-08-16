@@ -55,7 +55,15 @@ jobs:
       - uses: actions/upload-artifact@v5
         with:
           name: zlog-desktop-${{ matrix.os }}
-          path: apps/desktop/release/*
+          # 安装包 + 同名 .blockmap（electron-updater 差分更新要用）。
+          # 不传 release/*，避免 asar:false 的内部文件和 latest-*.yml 混进去。
+          path: |
+            apps/desktop/release/Zlog-*.dmg
+            apps/desktop/release/Zlog-*.zip
+            apps/desktop/release/Zlog-Setup*.exe
+            apps/desktop/release/Zlog-*.AppImage
+            apps/desktop/release/Zlog-*.deb
+            apps/desktop/release/*.blockmap
           if-no-files-found: error
 
   release:
