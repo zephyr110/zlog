@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
+import { isDemoMode } from "@/lib/demo-mode"
 import {
   generateRecoveryKey,
   hashPassword,
@@ -15,6 +16,14 @@ import { setUserRecoveryHash } from "@zlog/database"
  */
 export async function POST(request: NextRequest) {
   try {
+    // 演示环境：拦截 recovery key 签发（否则可与 reset 组合绕过改密拦截）
+    if (isDemoMode()) {
+      return NextResponse.json(
+        { error: "Password changes are disabled in the demo environment" },
+        { status: 403 }
+      )
+    }
+
     const user = await requireAuth(request)
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
+import { isDemoMode } from "@/lib/demo-mode"
 import { attemptRecoveryKey, hashPassword } from "@zlog/auth"
 import { setUserPassword } from "@zlog/database"
 import { lockedResponse } from "@/lib/auth-lockout"
@@ -26,6 +27,13 @@ const resetPasswordSchema = z.object({
  * so any previously-issued JWTs are invalidated.
  */
 export async function POST(request: NextRequest) {
+  // 演示环境：拦截密码重置（恢复密钥路径同样能改密，必须一并封锁）
+  if (isDemoMode()) {
+    return NextResponse.json(
+      { error: "Password changes are disabled in the demo environment" },
+      { status: 403 }
+    )
+  }
   try {
     const rawBody = await request.json()
     const parseResult = resetPasswordSchema.safeParse(rawBody)

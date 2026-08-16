@@ -19,11 +19,16 @@ function stats(content) {
   return { wordCount, readingTime: Math.max(1, Math.ceil(wordCount / 200)) }
 }
 
+// 文章日期：脚本运行当天（可被 TURSO_DEMO_DATE 覆盖）——重跑刷新时
+// 文章不会钉死在首次入库的日期
+const today =
+  process.env.TURSO_DEMO_DATE ?? new Date().toISOString().slice(0, 10)
+
 const guides = [
   {
     slug: "zlog-deployment-guide",
     title: "Zlog 部署指南：本地、Turso 同步与一键发布 Vercel",
-    date: "2026-08-16",
+    date: today,
     tags: JSON.stringify(["指南", "部署", "Zlog"]),
     description: "从本地使用到云端同步、再到一键部署 Vercel 发布公网，三种场景的完整图文步骤。",
     file: "docs/guides/zlog-deployment-guide.md",
@@ -31,7 +36,7 @@ const guides = [
   {
     slug: "zlog-deployment-guide-en",
     title: "Zlog Deployment Guide: Local, Turso Sync & One-Click Vercel",
-    date: "2026-08-16",
+    date: today,
     tags: JSON.stringify(["guide", "deploy", "Zlog"]),
     description: "Full walkthrough for three scenarios: local use, Turso cloud sync, and one-click public deployment to Vercel.",
     file: "docs/guides/zlog-deployment-guide.en.md",
@@ -42,7 +47,27 @@ const sql = `INSERT INTO posts (slug, title, date, updated, tags, description, c
 VALUES (?, ?, ?, ?, ?, ?, NULL, 0, NULL, ?, ?, ?)`
 const del = "DELETE FROM posts WHERE slug = ?"
 
-const requests = []
+// posts 表由应用 ensureTable 惰性创建——全新库（未启动过 app）直接
+// INSERT 会报 no such table，这里先行建表
+const CREATE_POSTS = `CREATE TABLE IF NOT EXISTS posts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT UNIQUE NOT NULL,
+  title TEXT NOT NULL DEFAULT 'Untitled',
+  date TEXT NOT NULL,
+  updated TEXT,
+  tags TEXT NOT NULL DEFAULT '[]',
+  description TEXT NOT NULL DEFAULT '',
+  cover TEXT,
+  draft INTEGER NOT NULL DEFAULT 0,
+  pinned_at TEXT,
+  content TEXT NOT NULL DEFAULT '',
+  word_count INTEGER NOT NULL DEFAULT 0,
+  reading_time INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`
+
+const requests = [{ type: "execute", stmt: { sql: CREATE_POSTS, args: [] } }]
 for (const g of guides) {
   const content = readFileSync(join(ROOT, g.file), "utf8")
   const { wordCount, readingTime } = stats(content)

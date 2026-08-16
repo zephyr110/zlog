@@ -834,8 +834,10 @@ export class VercelDeployer {
             }
             // 响应 {"urls":["https://…/<sha>"]}——sha 即 URL 尾段（40 位
             // hex，等于本地 digest）。Vercel 按内容寻址去重：文件已存在
-            // 时返回空响应 {}——此时 sha 就是本地 digest（实测部署文件
-            // 树的 uid 即内容 sha1 hex）。
+            // 时返回字面空对象 {}——此时 sha 就是本地 digest（实测部署
+            // 文件树的 uid 即内容 sha1 hex）。
+            // 去重判定必须精确匹配"空 JSON 对象"：200 + HTML 错误页 /
+            // 空 body / null 都不是去重，应报错而不是静默放行
             const urls = (body as { urls?: unknown[] })?.urls
             const raw =
               Array.isArray(urls) && typeof urls[0] === "string"
@@ -852,8 +854,13 @@ export class VercelDeployer {
                 )
               }
               sha = raw
-            } else if (!urls || urls.length === 0) {
-              sha = digest // 已存在（去重）——内容寻址，digest 即引用
+            } else if (
+              typeof body === "object" &&
+              body !== null &&
+              !Array.isArray(body) &&
+              Object.keys(body).length === 0
+            ) {
+              sha = digest // 空对象 = 内容寻址去重，digest 即引用
             } else {
               throw new VercelDeployError(
                 `上传二进制文件 ${file} 响应异常（sha 格式不符）`,

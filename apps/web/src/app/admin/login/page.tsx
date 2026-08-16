@@ -165,9 +165,10 @@ export default function AdminLoginPage() {
 
       if (res.ok) {
         toast.success(t("admin.resetPasswordSuccess"))
-        // Back to sign-in with the username prefilled.
+        // Back to sign-in with the username prefilled. Demo mode
+        // restores the pre-filled password (demoHint promises it).
         setMode("login")
-        setPassword("")
+        setPassword(demo ? DEMO_ACCOUNT.password : "")
         setRecoveryKey("")
         setNewPassword("")
         setConfirmPassword("")
@@ -431,6 +432,8 @@ export default function AdminLoginPage() {
                       setRecoveryKey("")
                       setNewPassword("")
                       setConfirmPassword("")
+                      // Demo mode restores the pre-filled password.
+                      setPassword(demo ? DEMO_ACCOUNT.password : "")
                       setMode("login")
                     }}
                     className="h-8 self-center text-xs text-muted-foreground transition-colors hover:text-foreground"

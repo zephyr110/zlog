@@ -10,9 +10,12 @@ export function mockAnalyticsReport(
   source: "ga" | "vercel",
   range: AnalyticsRange
 ): AnalyticsReport {
-  const scale = range === "today" ? 1 : range === "7d" ? 7 : 30
-  const users = Math.round(38 * scale * (1 + range.length)) // 轻微随机感
-  const views = Math.round(127 * scale * (1 + range.length))
+  // 日化量随窗口递减（today 单日基准，7d/30d 日均略降），避免
+  // today 看起来比 30d 日均还高的失真。
+  const daily = range === "today" ? 38 : range === "7d" ? 32 : 26
+  const days = range === "today" ? 1 : range === "7d" ? 7 : 30
+  const users = Math.round(daily * days)
+  const views = Math.round(daily * 3.4 * days)
   return {
     configured: true,
     source,
@@ -21,7 +24,7 @@ export function mockAnalyticsReport(
     topPages: [
       { path: "/", views: Math.round(views * 0.34) },
       { path: "/posts/zlog-deployment-guide", views: Math.round(views * 0.21) },
-      { path: "/topics/frontend", views: Math.round(views * 0.12) },
+      { path: "/posts/zlog-deployment-guide-en", views: Math.round(views * 0.12) },
       { path: "/about", views: Math.round(views * 0.09) },
       { path: "/archive", views: Math.round(views * 0.07) },
       { path: "/timeline", views: Math.round(views * 0.05) },
