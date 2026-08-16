@@ -12,6 +12,7 @@ const root = join(here, "..")
 // build/icon.png（主体缩进 + squircle，electron-builder 再生成 icns/ico）；
 // 托盘仍用未裁切的方图。源文件缺失时退回下方占位生成器。
 const LOGO_SOURCE = join(root, "..", "..", "apps", "web", "public", "zlog-logo.png")
+const TRAY_MARK_SOURCE = join(root, "assets", "tray-mark.png")
 const ICON_TARGET = join(root, "build", "icon.png")
 const TRAY_TARGET = join(root, "assets", "tray.png")
 // 菜单栏模板图标（macOS）：18pt @1x 与 @2x（用户反馈 16pt 偏小，且原图
@@ -27,7 +28,11 @@ if (existsSync(LOGO_SOURCE)) {
   mkdirSync(join(root, "build"), { recursive: true })
   writeMaskedAppIcon(LOGO_SOURCE, ICON_TARGET)
   copyFileSync(LOGO_SOURCE, TRAY_TARGET)
-  deriveTrayTemplates(LOGO_SOURCE)
+  const trayMark = existsSync(TRAY_MARK_SOURCE) ? TRAY_MARK_SOURCE : LOGO_SOURCE
+  if (trayMark === LOGO_SOURCE) {
+    console.warn("tray-mark.png not found — deriving menu-bar template from colorful logo")
+  }
+  deriveTrayTemplates(trayMark)
   console.log("icons copied from", LOGO_SOURCE)
 } else {
   console.warn(`zlog-logo.png not found at ${LOGO_SOURCE} — generating placeholder icons`)
@@ -51,9 +56,8 @@ function writeMaskedAppIcon(sourcePath, destPath) {
 
 // ── 菜单栏模板图标派生（macOS） ──────────────────────────────────────
 // 菜单栏图标必须是"模板图"：黑色图形 + alpha 透明通道，系统自动按
-// 浅色/深色菜单栏渲染黑/白（HIG）。logo 是深底白图的单色标识（角落
-// ~RGB 1、图形 ~RGB 250，亮度双峰分布），按阈值提取图形为黑色 + 透明
-// 背景即可自动派生。
+// 浅色/深色菜单栏渲染黑/白（HIG）。源图应是深底白标（tray-mark.png）；
+// 按亮度阈值提取图形为黑色 + 透明背景。彩色 logo 亮度不够，抽出来会发淡。
 function deriveTrayTemplates(sourcePath) {
   let src
   try {
