@@ -44,6 +44,8 @@ const REQUEST_TIMEOUT_MS = 15_000
 /** 上传部署（整个源码树内联 JSON）比普通 API 调用大得多——放宽超时。 */
 const UPLOAD_TIMEOUT_MS = 90_000
 const SOURCE_DOWNLOAD_TIMEOUT_MS = 60_000
+/** public/ 资产二进制单文件上限（以 base64 上传）。 */
+const PUBLIC_ASSET_MAX_BYTES = 4 * 1024 * 1024
 const POLL_INTERVAL_MS = 5_000
 const BUILD_TIMEOUT_MS = 10 * 60_000
 
@@ -184,7 +186,24 @@ export function buildDeployFiles(entries: TarEntry[]): {
     ) {
       continue
     }
-    // 只保留文本源码（忽略二进制/大文件——统计跳过项，避免线上静默缺文件）
+    // public/ 下的资源（logo、favicon、字体等）是站点的必需资产——二进制
+    // 以 base64 data URL 上传（Vercel upload API 支持 data:…;base64, 前缀）。
+    // 超过上限仍跳过（部署体量控制）。
+    const inPublic = segments.includes("public")
+    const isBinary = e.data.includes(0) // 含 NUL 即二进制（文本源码不会有）
+    if (inPublic && isBinary) {
+      if (e.data.length > PUBLIC_ASSET_MAX_BYTES) {
+        skipped.push(`${e.path} (${e.data.length} bytes)`)
+        continue
+      }
+      files.push({
+        file: e.path,
+        data: `data:application/octet-stream;base64,${e.data.toString("base64")}`,
+      })
+      continue
+    }
+    // 其他路径只保留文本源码（忽略二进制/大文件——统计跳过项，避免线上
+    // 静默缺文件）
     if (e.data.length > 1_000_000) {
       skipped.push(`${e.path} (${e.data.length} bytes)`)
       continue

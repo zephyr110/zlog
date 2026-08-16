@@ -207,6 +207,34 @@ describe("buildDeployFiles", () => {
     // .gitignore 等普通点文件保留，env 变体全部排除
     expect(files.map((f) => f.file)).toEqual(["ok.ts", ".gitignore"])
   })
+
+  it("public/ 下的二进制资源以 base64 上传（logo 等必需资产）", () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02])
+    const { files, skipped } = buildDeployFiles([
+      { path: "apps/web/public/zlog-logo.png", data: png },
+      { path: "src/app/page.tsx", data: Buffer.from("export default Page") },
+    ])
+    const logo = files.find((f) => f.file === "public/zlog-logo.png")
+    expect(logo?.data.startsWith("data:application/octet-stream;base64,")).toBe(true)
+    // base64 数据可还原为原始字节
+    const restored = Buffer.from(
+      logo!.data.slice("data:application/octet-stream;base64,".length),
+      "base64"
+    )
+    expect(restored.equals(png)).toBe(true)
+    expect(skipped).toHaveLength(0)
+  })
+
+  it("public/ 下超大二进制仍跳过；非 public 二进制仍跳过", () => {
+    const { files, skipped } = buildDeployFiles([
+      { path: "apps/web/public/huge.bin", data: Buffer.alloc(5 * 1024 * 1024) },
+      { path: "apps/web/src/assets/blob.bin", data: Buffer.from([0x00, 0x01]) },
+      { path: "ok.ts", data: Buffer.from("text") },
+    ])
+    expect(files.map((f) => f.file)).toEqual(["ok.ts"])
+    expect(skipped).toHaveLength(2)
+    expect(skipped[0]).toContain("huge.bin")
+  })
 })
 
 // ── rekeyWebImporter ───────────────────────────────────────────────────
