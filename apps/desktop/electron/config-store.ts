@@ -27,6 +27,9 @@ export interface DesktopConfig {
   vercelDeployToken?: string
   vercelProjectName?: string
   vercelDeployUrl?: string
+  /** 一键部署锚点：填了则按项目 ID 精确锁定（查不到报错，绝不新建）。
+   *  老用户换电脑/迁移时用它固定目标项目，防止误开新项目。 */
+  vercelDeployProjectId?: string
 }
 
 /** 本地配置读写。路径可注入以便测试（主进程传 userData 目录）。 */

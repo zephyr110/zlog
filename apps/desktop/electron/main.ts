@@ -371,13 +371,18 @@ async function main() {
     // 不把 token 送回渲染层（settings.js 只需知道已保存）
     hasToken: Boolean(config?.vercelDeployToken),
     projectName: config?.vercelProjectName,
+    projectId: config?.vercelDeployProjectId,
     url: config?.vercelDeployUrl,
   }))
   ipcMain.handle("deploy:start", async (_e, payload: unknown) => {
     if (currentDeployer) {
       return { ok: false, error: "部署正在进行中", kind: "busy" }
     }
-    const p = (payload ?? {}) as { token?: unknown; projectName?: unknown }
+    const p = (payload ?? {}) as {
+      token?: unknown
+      projectName?: unknown
+      projectId?: unknown
+    }
     const token =
       typeof p.token === "string" && p.token.trim()
         ? p.token.trim()
@@ -389,6 +394,12 @@ async function main() {
       typeof p.projectName === "string" && p.projectName.trim()
         ? p.projectName.trim()
         : (config?.vercelProjectName ?? `zlog-blog-${randomBytes(3).toString("hex")}`)
+    // 项目 ID 锚点（可选）：填了则按 ID 锁定，绝不新建；留空走项目名。
+    // 渲染层输入优先，其次上次成功部署持久化的值。
+    const projectId =
+      typeof p.projectId === "string" && p.projectId.trim()
+        ? p.projectId.trim()
+        : config?.vercelDeployProjectId
     if (!config) return { ok: false, error: "本地配置缺失", kind: "api" }
     const syncIssue = missingSyncConfig(config)
     if (syncIssue) {
@@ -425,6 +436,7 @@ async function main() {
     const deployer = new VercelDeployer({
       token,
       projectName,
+      projectId,
       version: app.getVersion(),
       config,
       proxyUrl: httpsProxy,
@@ -445,6 +457,8 @@ async function main() {
         ...config,
         vercelDeployToken: token,
         vercelProjectName: projectName,
+        // 提交什么存什么：undefined 即清除锚点（渲染层清空输入后不再锁定）
+        vercelDeployProjectId: projectId,
         vercelDeployUrl: url,
       }
       configStore.save(config)

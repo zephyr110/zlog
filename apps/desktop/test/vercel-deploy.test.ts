@@ -495,6 +495,39 @@ describe("VercelDeployer", () => {
     await expect(deployer.run()).rejects.toMatchObject({ kind: "conflict" })
   })
 
+  it("填了 projectId → 按 ID 查到即复用（不查名字、不新建）", async () => {
+    // 路由表里只有 ID 查询：若实现去按名字查或创建，fakeFetch 会 404 → 测试失败
+    const fetchImpl = fakeFetch({
+      "https://api.vercel.com/v9/projects/prj_pin": { status: 200, body: { id: "prj_pin" } },
+    })
+    const deployer = new VercelDeployer({
+      token: "t",
+      projectName: "would-be-created",
+      projectId: "prj_pin",
+      version: "1.0.0",
+      config: cfg,
+      onProgress,
+      fetchImpl,
+    })
+    await expect(deployer.ensureProject()).resolves.toBe("prj_pin")
+  })
+
+  it("填了 projectId 但查不到（404）→ 报错，绝不新建", async () => {
+    const fetchImpl = fakeFetch({
+      "https://api.vercel.com/v9/projects/prj_gone": { status: 404, body: {} },
+    })
+    const deployer = new VercelDeployer({
+      token: "t",
+      projectName: "x",
+      projectId: "prj_gone",
+      version: "1.0.0",
+      config: cfg,
+      onProgress,
+      fetchImpl,
+    })
+    await expect(deployer.ensureProject()).rejects.toThrow(/项目 ID/)
+  })
+
   it("构建失败（ERROR）→ kind=build 且带构建错误信息", async () => {
     const apiRoutes = fakeFetch({
       "https://api.vercel.com/v2/user": { status: 200, body: { id: "u" } },

@@ -87,6 +87,8 @@ const I18N = {
     "deploy.tokenSaved": "已保存，留空继续使用（输入新值可覆盖）",
     "deploy.canceling": "正在取消…",
     "deploy.projectLabel": "项目名（可选，留空自动生成）",
+    "deploy.projectIdLabel": "项目 ID（可选）",
+    "deploy.projectIdHint": "填 ID 精确锁定该项目：查不到报错、绝不新建；留空则按项目名查找，找不到才自动创建",
     "deploy.start": "部署",
     "deploy.cancel": "取消",
     "deploy.validating": "正在校验 Token…",
@@ -232,6 +234,8 @@ const I18N = {
     "deploy.tokenSaved": "Saved — leave empty to reuse (type a new one to replace)",
     "deploy.canceling": "Canceling…",
     "deploy.projectLabel": "Project name (optional; auto-generated if empty)",
+    "deploy.projectIdLabel": "Project ID (optional)",
+    "deploy.projectIdHint": "Pins to this exact project: errors if not found, never creates. Leave empty to find by name and create if missing",
     "deploy.start": "Deploy",
     "deploy.cancel": "Cancel",
     "deploy.validating": "Validating token…",
@@ -837,6 +841,7 @@ refreshStatus()
 // getElementById（applyLang 先于本区块执行，直接引用模块级 const 会 TDZ）。
 const deployToken = document.getElementById("deployToken")
 const deployProjectName = document.getElementById("deployProjectName")
+const deployProjectId = document.getElementById("deployProjectId")
 const deployBtn = document.getElementById("deployBtn")
 const deployCancelBtn = document.getElementById("deployCancelBtn")
 const deployStatus = document.getElementById("deployStatus")
@@ -899,7 +904,11 @@ deployBtn.addEventListener("click", async () => {
   deployUi.resultUrl = null
   setDeployStatus(t("deploy.validating"))
   const res = await zlogApi
-    .deployStart({ token: deployToken.value, projectName: deployProjectName.value })
+    .deployStart({
+      token: deployToken.value,
+      projectName: deployProjectName.value,
+      projectId: deployProjectId.value,
+    })
     .catch(() => null)
   deployUi.busy = false
   if (!res || !res.ok) {
@@ -928,10 +937,11 @@ deployCopyBtn.addEventListener("click", async () => {
   }
 })
 
-// 预填上次部署的项目名与结果；token 不回传渲染层（仅提示已保存）
+// 预填上次部署的项目名/ID 与结果；token 不回传渲染层（仅提示已保存）
 zlogApi.deployInfo().then((info) => {
   if (!info) return
   if (info.projectName) deployProjectName.value = info.projectName
+  if (info.projectId) deployProjectId.value = info.projectId
   if (info.hasToken) {
     deployToken.placeholder = t("deploy.tokenSaved")
     deployToken.value = ""

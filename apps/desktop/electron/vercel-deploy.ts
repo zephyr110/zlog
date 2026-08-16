@@ -514,6 +514,9 @@ export class VercelDeployError extends Error {
 interface VercelDeployOptions {
   token: string
   projectName: string
+  /** 项目 ID 锚点（可选）：填了则按 ID 精确锁定项目（查不到报错，
+   *  绝不新建）；留空走项目名查找、找不到才创建。 */
+  projectId?: string
   /** app 版本（用于拉取匹配的官方仓库 tag）。 */
   version: string
   config: DesktopConfig
@@ -531,6 +534,7 @@ interface VercelDeployOptions {
 export class VercelDeployer {
   private readonly token: string
   private readonly projectName: string
+  private readonly projectId: string | undefined
   private readonly version: string
   private readonly config: DesktopConfig
   private readonly onProgress: (p: DeployProgress) => void
@@ -549,6 +553,7 @@ export class VercelDeployer {
     }
     this.token = opts.token
     this.projectName = opts.projectName
+    this.projectId = opts.projectId
     this.version = opts.version
     this.config = opts.config
     this.onProgress = opts.onProgress
@@ -656,6 +661,26 @@ export class VercelDeployer {
   async ensureProject(): Promise<string> {
     this.onProgress({ phase: "project", message: "正在准备 Vercel 项目…" })
     this.ensureNotCancelled()
+    // 填了项目 ID：按 ID 精确锁定（/v9/projects/{idOrName} 同时接受 ID
+    // 与名称）。查不到直接报错、绝不新建——换电脑/误配也不会开出新项目。
+    if (this.projectId) {
+      const byId = await this.request(`/v9/projects/${encodeURIComponent(this.projectId)}`)
+      if (byId.status === 200) {
+        const id = (byId.body as { id?: string }).id
+        if (!id) throw new VercelDeployError("Vercel 项目响应缺少 id", "api")
+        return id
+      }
+      if (byId.status === 404) {
+        throw new VercelDeployError(
+          "按项目 ID 未找到项目——请检查 ID 是否正确、Token 是否有权访问该项目",
+          "api"
+        )
+      }
+      throw new VercelDeployError(
+        `查询项目失败（HTTP ${byId.status}）`,
+        byId.status === 409 ? "conflict" : "api"
+      )
+    }
     const existing = await this.request(`/v9/projects/${encodeURIComponent(this.projectName)}`)
     if (existing.status === 200) {
       const id = (existing.body as { id?: string }).id
