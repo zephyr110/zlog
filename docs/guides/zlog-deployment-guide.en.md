@@ -64,6 +64,17 @@ Zlog is a blog system with a built-in admin panel: the desktop app ships a compl
 
 ---
 
+## Optional: Comment Spam Protection (Cloudflare Turnstile)
+
+Comments work out of the box (guests, no login). To add human verification against spam, you need two keys from Cloudflare Turnstile:
+
+1. **Sign up for Cloudflare** (free): open [dash.cloudflare.com](https://dash.cloudflare.com).
+2. **Create a Turnstile site**: console → **Turnstile → Add site**; widget name is free-form; **Hostname = your domain** (`localhost` for local use, `xxx.vercel.app` for the deployed site, comma-separated for several) — keys only work on whitelisted domains (error 110200 means the domain is missing).
+3. **Grab the two keys**: **Site Key** (public) and **Secret Key** (private, shown in full only once — copy it immediately).
+4. **Fill them into the desktop app**: Zlog Settings → Comments → paste both keys → Save. Local comments get the widget immediately; one-click deploys pass the keys through automatically.
+
+> Without keys, comments still work — just no captcha. Cloudflare test keys (`1x000...` always passes / `2x000...` always blocks) are for local debugging only, **never deploy them**.
+
 ## FAQ
 
 **Q: Forgot the admin password?**

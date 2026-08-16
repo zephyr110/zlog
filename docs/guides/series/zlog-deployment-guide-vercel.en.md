@@ -35,6 +35,24 @@ The final post: publish your blog as a public website. The only prerequisite is 
 - **Code updates**: click **Deploy** again to overwrite the live version; environment variables are reused.
 - **Images**: media is handled automatically — with a GitHub image-repo token it's served via CDN; without one, images come straight from the database. Functionality is unaffected.
 
+## Optional: Comment Spam Protection (Cloudflare Turnstile)
+
+Comments work out of the box (guests, no login). To add human verification against spam, you need two keys from Cloudflare Turnstile:
+
+1. **Sign up for Cloudflare** (free): open [dash.cloudflare.com](https://dash.cloudflare.com).
+2. **Create a Turnstile site**: in the console go to **Turnstile → Add site**:
+   - Widget name: anything (e.g. `my-blog-comments`)
+   - Hostname: your domain — use `localhost` for local use, your `xxx.vercel.app` for the deployed site (separate multiple domains with commas). **Keys only work on whitelisted domains** — a missing domain errors with 110200 "domain is not allowed"
+3. **Grab the two keys**: after creation you get the **Site Key** (public, e.g. `0x4AAAAAA...`) and the **Secret Key** (private, shown in full only once — copy it immediately).
+4. **Fill them into the desktop app**: Zlog Settings → Comments → paste both keys → Save.
+5. **It takes effect**: local comments get the verification widget immediately; one-click Vercel deploys carry the keys over automatically, so the live site is protected the same way.
+
+**Notes**
+
+- Without keys, comments still work — just no captcha (no spam protection).
+- Cloudflare provides test keys: `1x000...` (always passes) / `2x000...` (always blocks) — for local debugging only, **never deploy them** (they silently disable the gate).
+- Changed domain? Update the Hostname list in the Turnstile site settings.
+
 ## FAQ
 
 **Q: The deploy says the token is invalid?**

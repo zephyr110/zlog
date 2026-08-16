@@ -35,6 +35,24 @@
 - **更新代码**：桌面端再点一次「部署」即可覆盖线上版本，环境变量自动复用。
 - **图片**：媒体上传由应用自动处理——配置了 GitHub 图床 Token 走 CDN 加速；没有则直接从数据库提供，功能完全不受影响。
 
+## 可选：开启评论防垃圾（Cloudflare Turnstile）
+
+评论默认直接可用（游客免登录）。要加人机验证防垃圾，需要 Cloudflare Turnstile 的两个 Key：
+
+1. **注册 Cloudflare**（免费）：打开 [dash.cloudflare.com](https://dash.cloudflare.com) 注册。
+2. **创建 Turnstile 站点**：控制台进入 **Turnstile → Add site**：
+   - Widget name 随意（如 `my-blog-comments`）
+   - Hostname 填你的域名——本地使用填 `localhost`，Vercel 部署填你的 `xxx.vercel.app`（多个域名用逗号分隔）。**密钥只对白名单域名生效**，未加白会报错 110200 "domain is not allowed"
+3. **拿到两个 Key**：创建后页面显示 **Site Key**（公开，形如 `0x4AAAAAA...`）与 **Secret Key**（私密，只在创建时完整显示一次，立即复制保存）。
+4. **填入桌面端**：Zlog「设置 → 评论设置」粘贴两个 Key → 保存。
+5. **生效**：本地评论立即显示人机验证；之后一键部署到 Vercel 时两个 Key 自动透传，线上防护与本地一致。
+
+**要点**
+
+- 没配置时评论照常可用，只是没有验证码（无防垃圾）。
+- Cloudflare 提供测试 key：`1x000...`（永远通过）/ `2x000...`（永远拒绝）——只用于本地调试，**不要部署到生产**（会让验证码形同虚设）。
+- 换域名后在 Turnstile 站点设置里更新 Hostname 列表即可。
+
 ## 常见问题
 
 **Q：部署提示 Token 无效？**

@@ -64,6 +64,17 @@ Zlog 是一款自带后台的博客系统：桌面应用内置完整的 Web 服�
 
 ---
 
+## 可选：开启评论防垃圾（Cloudflare Turnstile）
+
+评论默认直接可用（游客免登录）。要加人机验证防垃圾，需要 Cloudflare Turnstile 的两个 Key：
+
+1. **注册 Cloudflare**（免费）：打开 [dash.cloudflare.com](https://dash.cloudflare.com) 注册。
+2. **创建 Turnstile 站点**：控制台 **Turnstile → Add site**，Widget name 随意；**Hostname 填你的域名**（本地用 `localhost`，Vercel 部署填 `xxx.vercel.app`，多个逗号分隔）——密钥只对白名单域名生效（错误码 110200 = 域名未加白）。
+3. **拿到两个 Key**：**Site Key**（公开）与 **Secret Key**（私密，创建时只完整显示一次，立即复制）。
+4. **填入桌面端**：Zlog「设置 → 评论设置」粘贴两个 Key → 保存。本地评论立即显示人机验证；一键部署时自动透传，线上防护一致。
+
+> 没配置时评论照常可用，只是没有验证码。Cloudflare 测试 key（`1x000...` 永远通过 / `2x000...` 永远拒绝）只用于本地调试，**不要部署到生产**。
+
 ## 常见问题
 
 **Q：忘记后台密码怎么办？**
