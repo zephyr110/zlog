@@ -18,12 +18,19 @@ const nextConfig: NextConfig = {
       : {
         // Server/Vercel only — static export cannot emit redirects, so
         // apps/web/src/app/category/[name]/page.tsx handles that path.
+        // /admin has no root page (only /admin/login, /admin/dashboard …),
+        // so a bare /admin visit 404s — send visitors to the login page.
         async redirects() {
           return [
             {
               source: "/category/:name",
               destination: "/topics/:name",
               permanent: true,
+            },
+            {
+              source: "/admin",
+              destination: "/admin/login",
+              permanent: false,
             },
           ]
         },
