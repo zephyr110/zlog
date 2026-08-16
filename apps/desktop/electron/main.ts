@@ -17,6 +17,7 @@ import {
 import { VercelDeployer, VercelDeployError, missingSyncConfig } from "./vercel-deploy"
 import { ServerManager } from "./server-manager"
 import { buildServerEnv } from "./server-env"
+import { redactProxyUrl } from "./proxy-agent"
 import { parseManualHttpProxy, resolveDesktopHttpProxy } from "./system-proxy"
 import { isValidSyncUrl } from "./validate"
 import { isDesktopLocalUrl } from "./local-url"
@@ -401,12 +402,18 @@ async function main() {
       resolveChromium: () =>
         session.defaultSession.resolveProxy("https://api.vercel.com/"),
     })
-    // 诊断日志（部署网络问题定位）：代理解析结果 + 是否使用代理
+    // 二次 busy 检查：上面 await 期间可能有并发请求已通过第一次检查并
+    // 占位（TOCTOU）。本检查与下方赋值之间无 await，检查-赋值原子生效。
+    if (currentDeployer) {
+      return { ok: false, error: "部署正在进行中", kind: "busy" }
+    }
+    // 诊断日志（部署网络问题定位）：代理解析结果 + 是否使用代理。
+    // 代理可能带 user:pass，必须先脱敏再落盘。
     try {
       mkdirSync(logDir, { recursive: true })
       appendFileSync(
         join(logDir, "main.log"),
-        `${new Date().toISOString()} [deploy] httpsProxy=${httpsProxy ?? "null"} env=${process.env.HTTPS_PROXY ?? "null"}\n`
+        `${new Date().toISOString()} [deploy] httpsProxy=${redactProxyUrl(httpsProxy ?? "null")} env=${redactProxyUrl(process.env.HTTPS_PROXY ?? "null")}\n`
       )
     } catch {
       /* 日志失败不影响部署 */

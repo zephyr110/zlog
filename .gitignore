@@ -55,3 +55,6 @@ next-env.d.ts
 .superpowers/
 .vscode/
 .idea/
+
+# stray temp dirs (deploy flattening scratch)
+.tmp-*/

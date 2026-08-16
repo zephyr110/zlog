@@ -48,7 +48,9 @@ const POLL_INTERVAL_MS = 5_000
 const BUILD_TIMEOUT_MS = 10 * 60_000
 
 /** 部署时排除的路径片段（node_modules / 构建产物 / 文档 / 桌面端等）。
- *  按路径段匹配（split("/") 后的单个段），"desktop" 命中 apps/desktop。 */
+ *  按路径段匹配（split("/") 后的单个段），"desktop" 命中 apps/desktop。
+ *  env 变体（.env.local / .env.production / .env.local.example）按
+ *  ".env." 前缀兜底——段完全相等匹配不到点文件名。 */
 const EXCLUDED_SEGMENTS = [
   "node_modules",
   ".next",
@@ -71,11 +73,15 @@ export interface TarEntry {
   data: Buffer
 }
 
-/** 解析 ustar tar 二进制（已解压 gzip）。支持 pax 扩展头/longlink/目录。 */
+/** 解析 ustar tar 二进制（已解压 gzip）。支持 pax 扩展头/longlink/目录。
+ *  名称优先级：pax 'x' 的 path 键 > longlink（L/K）> ustar name+prefix。
+ *  长名称只在真正产出文件条目时消费——若被 pax/目录头提前吞掉，其后的
+ *  真实文件会拿到被截断的短名。 */
 export function parseTar(buf: Buffer): TarEntry[] {
   const entries: TarEntry[] = []
   let offset = 0
   let pendingLongName: string | null = null
+  let pendingPaxPath: string | null = null
   while (offset + 512 <= buf.length) {
     const header = buf.subarray(offset, offset + 512)
     if (header.every((b) => b === 0)) break
@@ -85,8 +91,6 @@ export function parseTar(buf: Buffer): TarEntry[] {
     if (!Number.isFinite(size) || size < 0) break // 非法 size：中止而非死循环
     const type = String.fromCharCode(header[156] || 48)
     const prefix = readTarString(header, 345, 155)
-    let fullPath = pendingLongName ?? (prefix ? `${prefix}/${name}` : name)
-    pendingLongName = null
     offset += 512
     const dataLen = Math.ceil(size / 512) * 512
     if (type === "L" || type === "K") {
@@ -99,21 +103,49 @@ export function parseTar(buf: Buffer): TarEntry[] {
       continue
     }
     if (type === "g" || type === "x") {
-      // pax 全局/扩展头（GitHub codeload tarball 以 pax_global_header 开头）：
-      // 跳过其数据，不产生条目
+      // pax 扩展头（codeload tarball 以 pax_global_header 'g' 开头）：
+      // 'x' 的 path 键覆盖下一条目名称；'g' 全局头仅跳过
+      if (type === "x") {
+        const paxPath = parsePaxPath(buf.subarray(offset, offset + size).toString("utf8"))
+        if (paxPath) pendingPaxPath = paxPath
+      }
       offset += dataLen
       continue
     }
     if (type === "5") {
-      // 目录：无数据
+      // 目录：无数据（不消费长名称——git archive 的目录名从不长截断）
       offset += dataLen
       continue
     }
+    const fullPath =
+      pendingPaxPath ?? pendingLongName ?? (prefix ? `${prefix}/${name}` : name)
+    pendingLongName = null
+    pendingPaxPath = null
     const data = buf.subarray(offset, offset + size)
     offset += dataLen
     entries.push({ path: fullPath, data: Buffer.from(data) })
   }
   return entries
+}
+
+/** 解析 pax 'x' 头数据中的 path 键。记录格式："<len> key=value\n"，
+ *  len 是整个记录（含 "<len> " 前缀）的总字节数，下一条记录从 len 处开始。 */
+function parsePaxPath(data: string): string | null {
+  let rest = data
+  while (rest) {
+    const sp = rest.indexOf(" ")
+    if (sp <= 0) break
+    const len = Number.parseInt(rest.slice(0, sp), 10)
+    if (!Number.isFinite(len) || len <= sp + 1 || len > rest.length) break
+    const rec = rest.slice(sp + 1, len)
+    const eq = rec.indexOf("=")
+    if (eq > 0 && rec.slice(0, eq) === "path") {
+      // 记录以 \n 结尾，slice 会把它带进值——连同 NUL 一并清掉
+      return rec.slice(eq + 1).replace(/[\0\r\n]+$/, "")
+    }
+    rest = rest.slice(len)
+  }
+  return null
 }
 
 /** 解压 gzip 后解析 tar；返回 { path, data }（路径已去顶层目录前缀）。
@@ -145,7 +177,13 @@ export function buildDeployFiles(entries: TarEntry[]): {
   const skipped: string[] = []
   for (const e of entries) {
     const segments = e.path.split("/")
-    if (segments.some((s) => EXCLUDED_SEGMENTS.includes(s))) continue
+    if (
+      segments.some(
+        (s) => EXCLUDED_SEGMENTS.includes(s) || s.startsWith(".env.")
+      )
+    ) {
+      continue
+    }
     // 只保留文本源码（忽略二进制/大文件——统计跳过项，避免线上静默缺文件）
     if (e.data.length > 1_000_000) {
       skipped.push(`${e.path} (${e.data.length} bytes)`)
@@ -195,9 +233,21 @@ export function flattenWorkspace(
       // 打平后 __dirname 即部署根（workspace 根）——next.config 里指向
       // workspace 根的 "../.." 会越界到 /vercel；同时用 resolveAlias 把
       // workspace 包直接指向源码，绕开 Turbopack 对 pnpm symlink 的
-      // 解析差异（实测 symlink 存在但 Module not found）
+      // 解析差异（实测 symlink 存在但 Module not found）。
+      // 宽松匹配（容忍引号/空格差异），未命中即报错：静默 no-op 会在
+      // Vercel 构建时以 "Module not found @zlog/*" 的形式爆炸，不如在
+      // 上传前直接说清。
+      const rootMatch = data.match(
+        /root:\s*path\.join\(\s*__dirname,\s*["']\.\.\/\.\.["']\s*\)/
+      )
+      if (!rootMatch) {
+        throw new VercelDeployError(
+          "next.config.ts 与部署兼容层不匹配（找不到 turbopack root 注入点）——请升级到新版本后重试",
+          "api"
+        )
+      }
       data = data.replace(
-        'root: path.join(__dirname, "../..")',
+        rootMatch[0],
         `root: __dirname,
       resolveAlias: {
         "@zlog/auth": "./packages/auth/src/index.ts",
@@ -206,10 +256,19 @@ export function flattenWorkspace(
       }`
       )
     } else if (lifted === "tsconfig.json") {
-      // tsc 类型检查不读 resolveAlias——tsconfig paths 同样别名到源码
+      // tsc 类型检查不读 resolveAlias——tsconfig paths 同样别名到源码。
+      // 同样做未命中检测（路径条目格式变了会静默丢失别名 → 云端 tsc 报
+      // Module not found）。
+      const pathsMatch = data.match(/"@\/\*":\s*\["\.\/src\/\*"\]/)
+      if (!pathsMatch) {
+        throw new VercelDeployError(
+          "tsconfig.json 与部署兼容层不匹配（找不到 paths 注入点）——请升级到新版本后重试",
+          "api"
+        )
+      }
       data = data.replace(
-        '"paths": {\n      "@/*": ["./src/*"]\n    }',
-        '"paths": {\n      "@/*": ["./src/*"],\n      "@zlog/auth": ["./packages/auth/src/index.ts"],\n      "@zlog/core": ["./packages/core/src/index.ts"],\n      "@zlog/database": ["./packages/database/src/index.ts"]\n    }'
+        pathsMatch[0],
+        `${pathsMatch[0]},\n      "@zlog/auth": ["./packages/auth/src/index.ts"],\n      "@zlog/core": ["./packages/core/src/index.ts"],\n      "@zlog/database": ["./packages/database/src/index.ts"]`
       )
     }
     flatMap.set(lifted, { file: lifted, data })
@@ -235,10 +294,14 @@ export function rekeyWebImporter(lockText: string): string {
   const lines = lockText.split("\n")
   const importersIdx = lines.findIndex((l) => l === "importers:")
   if (importersIdx < 0) return lockText
-  // 收集 importer 块（importers: 之后到下一个 0 缩进键）
+  // 收集 importer 块（importers: 之后到下一个 0 缩进键）。blockEnd 记录
+  // 块区域的实际终点——pnpm v9 lockfile 在 "importers:" 后有一个空行，
+  // 若用 "块行数之和" 推算终点会少算该空行，尾部 slice 起点提前一行，
+  // 把最后一块的末行重复拼进输出（实测复现）。
   interface Block { key: string; lines: string[] }
   const blocks: Block[] = []
   let cur: Block | null = null
+  let blockEnd = importersIdx + 1
   for (let i = importersIdx + 1; i < lines.length; i++) {
     const line = lines[i]
     if (line.startsWith("  ") && !line.startsWith("    ")) {
@@ -249,6 +312,7 @@ export function rekeyWebImporter(lockText: string): string {
     } else {
       break
     }
+    blockEnd = i + 1
   }
   if (cur) blocks.push(cur)
   const web = blocks.find((b) => b.key === "apps/web:")
@@ -270,7 +334,7 @@ export function rekeyWebImporter(lockText: string): string {
   return [
     ...lines.slice(0, importersIdx + 1),
     ...out,
-    ...lines.slice(importersIdx + 1 + blocks.reduce((n, b) => n + b.lines.length, 0)),
+    ...lines.slice(blockEnd),
   ].join(String.fromCharCode(10))
 }
 
@@ -409,6 +473,22 @@ export class VercelDeployer {
     this.controller.abort()
   }
 
+  /** 可被 cancel() 立即打断的睡眠：abort 时马上返回，由调用方后续的
+   *  ensureNotCancelled 上抛 canceled。 */
+  private sleepMs(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      const onAbort = () => {
+        clearTimeout(timer)
+        resolve()
+      }
+      const timer = setTimeout(() => {
+        this.controller.signal.removeEventListener("abort", onAbort)
+        resolve()
+      }, ms)
+      this.controller.signal.addEventListener("abort", onAbort, { once: true })
+    })
+  }
+
   private async request(
     path: string,
     init?: { method?: string; body?: unknown; timeoutMs?: number }
@@ -444,8 +524,19 @@ export class VercelDeployer {
         typeof err === "object" && err && "cause" in err
           ? String((err as { cause: unknown }).cause)
           : ""
+      // 区分超时与连接失败：AbortSignal.timeout 抛 TimeoutError，
+      // undici 自身超时抛 UND_ERR_*_TIMEOUT
+      const errCode =
+        typeof err === "object" && err !== null ? (err as { code?: string }).code : undefined
+      const isTimeout =
+        (err instanceof Error && err.name === "TimeoutError") ||
+        errCode === "UND_ERR_HEADERS_TIMEOUT" ||
+        errCode === "UND_ERR_CONNECT_TIMEOUT" ||
+        errCode === "UND_ERR_SOCKET_TIMEOUT"
       throw new VercelDeployError(
-        `无法连接 Vercel API：${err instanceof Error ? err.message : String(err)}${cause ? `（${cause.slice(0, 200)}）` : ""}`,
+        isTimeout
+          ? `请求 Vercel API 超时${cause ? `（${cause.slice(0, 200)}）` : ""}——请检查网络/代理后重试`
+          : `无法连接 Vercel API：${err instanceof Error ? err.message : String(err)}${cause ? `（${cause.slice(0, 200)}）` : ""}`,
         "network"
       )
     }
@@ -533,28 +624,50 @@ export class VercelDeployer {
     }
   }
 
-  /** 配置环境变量（逐条 upsert——重复部署同项目时覆盖旧值）。 */
+  /** 配置环境变量（upsert——重复部署同项目时覆盖旧值）。并行写入：
+   *  约 10 条变量串行最坏要 10×超时，并行后单次往返即可；共享取消信号
+   *  让 cancel() 中止全部在途请求。 */
   async setEnv(projectId: string): Promise<void> {
     this.onProgress({ phase: "env", message: "正在配置环境变量…" })
     const envList = buildEnvList(this.config)
-    for (const e of envList) {
-      this.ensureNotCancelled()
-      const res = await this.request(
-        `/v10/projects/${projectId}/env?upsert=true`,
-        {
-          method: "POST",
-          body: { key: e.key, value: e.value, target: e.target, type: "encrypted" },
+    await Promise.all(
+      envList.map(async (e) => {
+        this.ensureNotCancelled()
+        const res = await this.request(
+          `/v10/projects/${projectId}/env?upsert=true`,
+          {
+            method: "POST",
+            body: { key: e.key, value: e.value, target: e.target, type: "encrypted" },
+          }
+        )
+        if (res.status !== 200 && res.status !== 201) {
+          throw new VercelDeployError(`设置环境变量 ${e.key} 失败（HTTP ${res.status}）`, "api")
         }
-      )
-      if (res.status !== 200 && res.status !== 201) {
-        throw new VercelDeployError(`设置环境变量 ${e.key} 失败（HTTP ${res.status}）`, "api")
+      })
+    )
+  }
+
+  /** 拉取官方仓库 tarball，返回部署文件清单。网络抖动（fetch 抛错/5xx）
+   *  时最多重试 3 次、退避递增；404/解析错误等确定性问题不重试。 */
+  async fetchSource(version: string): Promise<{ file: string; data: string }[]> {
+    this.onProgress({ phase: "source", message: "正在获取博客代码…" })
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.fetchSourceOnce(version)
+      } catch (err) {
+        if (
+          !(err instanceof VercelDeployError) ||
+          err.kind !== "network" ||
+          attempt >= 3
+        ) {
+          throw err
+        }
+        await this.sleepMs(this.pollIntervalMs * attempt)
       }
     }
   }
 
-  /** 拉取官方仓库 tarball，返回部署文件清单。 */
-  async fetchSource(version: string): Promise<{ file: string; data: string }[]> {
-    this.onProgress({ phase: "source", message: "正在获取博客代码…" })
+  private async fetchSourceOnce(version: string): Promise<{ file: string; data: string }[]> {
     this.ensureNotCancelled()
     const signal = AbortSignal.any([this.controller.signal, AbortSignal.timeout(SOURCE_DOWNLOAD_TIMEOUT_MS)])
     try {
@@ -563,7 +676,7 @@ export class VercelDeployer {
         signal,
       } as never)
       if (!res.ok) {
-        // 404 通常是版本 tag 不存在（dev/未发布版本）——与网络问题区分
+        // 404 通常是版本 tag 不存在（dev/未发布版本）——确定性问题，不重试
         if (res.status === 404) {
           throw new VercelDeployError(
             `未找到与当前版本 v${version} 匹配的代码包——请升级到已发布版本后重试`,
@@ -643,11 +756,24 @@ export class VercelDeployer {
         throw new VercelDeployError("构建超时（10 分钟）——请稍后到 Vercel 控制台查看", "build")
       }
       // 先查状态再 sleep：快速完成的构建无需多等一个轮询间隔
-      const { status, body } = await this.request(`/v13/deployments/${deploymentId}`)
-      if (status !== 200) {
-        throw new VercelDeployError(`查询部署状态失败（HTTP ${status}）`, "api")
+      let readyState: string | undefined
+      let body: unknown = null
+      try {
+        const res = await this.request(`/v13/deployments/${deploymentId}`)
+        if (res.status !== 200) {
+          throw new VercelDeployError(`查询部署状态失败（HTTP ${res.status}）`, "api")
+        }
+        body = res.body
+        readyState = (res.body as { readyState?: string }).readyState
+      } catch (err) {
+        // 轮询是低价值请求：单次网络抖动不应中断整个部署——跳过本回合
+        // 继续等（取消仍会经 canceled 错误立即上抛）
+        if (err instanceof VercelDeployError && err.kind === "network") {
+          await this.sleepMs(this.pollIntervalMs)
+          continue
+        }
+        throw err
       }
-      const readyState = (body as { readyState?: string }).readyState
       if (readyState === "READY") break
       if (readyState === "ERROR" || readyState === "CANCELED") {
         const err = (body as { error?: { message?: string } }).error
@@ -656,7 +782,7 @@ export class VercelDeployer {
           "build"
         )
       }
-      await sleep(this.pollIntervalMs)
+      await this.sleepMs(this.pollIntervalMs)
     }
     this.ensureNotCancelled()
     // 优先用部署响应自带的 url（新项目 alias 可能尚未挂载）
@@ -697,6 +823,3 @@ function describeApiError(body: unknown): string {
   return "请检查输入后重试"
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}

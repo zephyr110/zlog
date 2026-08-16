@@ -1,11 +1,14 @@
 import { describe, it, expect } from "vitest"
 import { gzipSync } from "node:zlib"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import {
   buildDeployFiles,
   buildEnvList,
   missingSyncConfig,
   parseTar,
   parseTarGz,
+  rekeyWebImporter,
   VercelDeployer,
   VercelDeployError,
   type DeployProgress,
@@ -114,7 +117,53 @@ describe("parseTarGz", () => {
     const entries = parseTar(tar)
     expect(entries[0].path).toBe(longName)
   })
+
+  it("pax 'x' 的 path 键覆盖下一条目名称", () => {
+    const longPath = `zlog-main/${"b".repeat(110)}.ts`
+    const tar = makeTar([
+      tarDir("zlog-main/"),
+      tarPaxX(paxRecord("path", longPath)),
+      tarEntry("zlog-main/short.ts", Buffer.from("export const x = 1")),
+    ])
+    const entries = parseTar(tar)
+    expect(entries[0].path).toBe(longPath)
+  })
+
+  it("pax 'x' 优先于 longlink（先 L 后 x 时用 x 的名称）", () => {
+    // L 给一个名，x 给另一个——x 必须胜出，且 L 名不被 x 头吞掉
+    const viaLonglink = `zlog-main/${"c".repeat(110)}-via-longlink.ts`
+    const viaPax = `zlog-main/${"d".repeat(110)}-via-pax.ts`
+    const lHeader = tarHeader("././@PaxHeader", viaLonglink.length + 1)
+    lHeader[156] = 76 // 'L'
+    const lPadded = Buffer.alloc(Math.ceil((viaLonglink.length + 1) / 512) * 512)
+    Buffer.from(`${viaLonglink}\0`).copy(lPadded)
+    const tar = makeTar([
+      tarDir("zlog-main/"),
+      Buffer.concat([lHeader, lPadded]),
+      tarPaxX(paxRecord("path", viaPax)),
+      tarEntry("zlog-main/short.ts", Buffer.from("export const x = 1")),
+    ])
+    const entries = parseTar(tar)
+    expect(entries[0].path).toBe(viaPax)
+  })
 })
+
+/** pax 记录："<len> key=value\n"，len 是整个记录（含 "<len> " 前缀）字节数。 */
+function paxRecord(key: string, value: string): string {
+  const body = `${key}=${value}\n`
+  let record = `0 ${body}`
+  for (let i = 0; i < 2; i++) record = `${record.length} ${body}`
+  return record
+}
+
+/** pax 'x' 扩展头条目（header 名 ././@PaxHeader，type 'x'，数据 = 记录）。 */
+function tarPaxX(record: string): Buffer {
+  const header = tarHeader("././@PaxHeader", record.length)
+  header[156] = 120 // 'x'
+  const padded = Buffer.alloc(Math.ceil(record.length / 512) * 512)
+  Buffer.from(record).copy(padded)
+  return Buffer.concat([header, padded])
+}
 
 // ── buildDeployFiles ───────────────────────────────────────────────────
 
@@ -145,6 +194,70 @@ describe("buildDeployFiles", () => {
     expect(files.map((f) => f.file)).toEqual(["ok.txt"])
     expect(skipped).toHaveLength(2)
     expect(skipped[0]).toContain("a.png")
+  })
+
+  it("排除 .env.* 变体（段完全匹配不到的点文件名）", () => {
+    const { files } = buildDeployFiles([
+      { path: "apps/web/.env.local", data: Buffer.from("SECRET=1") },
+      { path: "apps/web/.env.production", data: Buffer.from("SECRET=2") },
+      { path: ".env.local.example", data: Buffer.from("example") },
+      { path: "apps/web/.gitignore", data: Buffer.from("x") },
+      { path: "ok.ts", data: Buffer.from("text") },
+    ])
+    // .gitignore 等普通点文件保留，env 变体全部排除
+    expect(files.map((f) => f.file)).toEqual(["ok.ts", ".gitignore"])
+  })
+})
+
+// ── rekeyWebImporter ───────────────────────────────────────────────────
+
+describe("rekeyWebImporter", () => {
+  const lockText = [
+    "lockfileVersion: '9.0'",
+    "",
+    "importers:",
+    "",
+    "  .:",
+    "    devDependencies:",
+    "      typescript: 5.9.2",
+    "",
+    "  apps/web:",
+    "    dependencies:",
+    "      next: 16.0.0",
+    "",
+    "packages:",
+    "  next@16.0.0:",
+    "    version: 16.0.0",
+    "",
+  ].join("\n")
+
+  it("真实格式（importers: 后有空行）重映射键且无重复行", () => {
+    const out = rekeyWebImporter(lockText)
+    const outLines = out.split("\n")
+    // 键重映射：apps/web → "."，原 "." 删除
+    expect(outLines).toContain("  .:")
+    expect(outLines).not.toContain("  apps/web:")
+    // 回归：off-by-one 曾把最后一块末行重复拼进尾部（空行也复现）
+    expect(outLines.filter((l) => l === "      next: 16.0.0")).toHaveLength(1)
+    // 原 "." 块（typescript）按设计被 web 块替换删除——不应残留
+    expect(outLines.filter((l) => l === "      typescript: 5.9.2")).toHaveLength(0)
+    // 尾部（packages: 之后）原样保留
+    expect(out).toContain("packages:")
+    expect(out).toContain("  next@16.0.0:")
+  })
+
+  it("无 apps/web importer 时原样返回", () => {
+    const text = "lockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    devDependencies:\n      x: 1.0.0\n"
+    expect(rekeyWebImporter(text)).toBe(text)
+  })
+
+  it("真实 pnpm-lock.yaml 重映射后 importers 尾部与 packages 区域逐字一致", () => {
+    const lock = readFileSync(join(__dirname, "../../../pnpm-lock.yaml"), "utf8")
+    const out = rekeyWebImporter(lock)
+    expect(out).not.toContain("\n  apps/web:")
+    expect(out).toContain("\n  .:")
+    // 尾部区域（packages: 之后）必须逐字等于原文件——off-by-one 会在此暴露
+    expect(out.slice(out.indexOf("packages:"))).toBe(lock.slice(lock.indexOf("packages:")))
   })
 })
 
@@ -248,7 +361,14 @@ describe("VercelDeployer", () => {
     const gz = realTarGz("zlog-1.0.0", [
       tarDir("zlog-1.0.0/"),
       tarEntry("zlog-1.0.0/package.json", Buffer.from('{"name":"zlog"}')),
-      tarEntry("zlog-1.0.0/apps/web/next.config.ts", Buffer.from("export default {}")),
+      // 真实形态的 next.config.ts（含 turbopack root 注入锚点——兼容层
+      // 重写成功与否直接决定云端构建能否解析 @zlog/*）
+      tarEntry(
+        "zlog-1.0.0/apps/web/next.config.ts",
+        Buffer.from(
+          'import path from "node:path"\nconst nextConfig = { turbopack: { root: path.join(__dirname, "../..") } }\nexport default nextConfig'
+        )
+      ),
       tarEntry("zlog-1.0.0/node_modules/x/index.js", Buffer.from("x")),
     ])
     const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -343,5 +463,87 @@ describe("VercelDeployer", () => {
       kind: "build",
     })
     await expect(deployer.run()).rejects.toThrow(/pnpm build failed/)
+  })
+
+  it("fetchSource 网络抖动时重试后成功", async () => {
+    const sourceUrl = "https://codeload.github.com/zephyr110/zlog/tar.gz/refs/tags/v1.0.0"
+    const gz = realTarGz("zlog-1.0.0", [
+      tarDir("zlog-1.0.0/"),
+      tarEntry("zlog-1.0.0/package.json", Buffer.from('{"name":"zlog"}')),
+    ])
+    let calls = 0
+    const fetchImpl = (async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url === sourceUrl) {
+        calls++
+        if (calls === 1) throw new TypeError("fetch failed: network down")
+        return new Response(new Uint8Array(gz), { status: 200 })
+      }
+      return new Response(JSON.stringify({}), { status: 200 })
+    }) as typeof fetch
+    const deployer = new VercelDeployer({
+      token: "t",
+      projectName: "p",
+      version: "1.0.0",
+      config: cfg,
+      onProgress,
+      fetchImpl,
+      pollIntervalMs: 5,
+    })
+    const files = await deployer.fetchSource("1.0.0")
+    expect(calls).toBe(2)
+    expect(files.some((f) => f.file === "package.json")).toBe(true)
+  })
+
+  it("fetchSource 404（版本不存在）不重试", async () => {
+    let calls = 0
+    const fetchImpl = (async (input: string | URL | Request) => {
+      calls++
+      if (String(input).includes("codeload")) {
+        return new Response("Not Found", { status: 404 })
+      }
+      return new Response(JSON.stringify({}), { status: 200 })
+    }) as typeof fetch
+    const deployer = new VercelDeployer({
+      token: "t",
+      projectName: "p",
+      version: "9.9.9",
+      config: cfg,
+      onProgress,
+      fetchImpl,
+      pollIntervalMs: 5,
+    })
+    await expect(deployer.fetchSource("9.9.9")).rejects.toMatchObject({ kind: "api" })
+    expect(calls).toBe(1)
+  })
+
+  it("setEnv 并行写入：所有 env 请求同时发出而非串行", async () => {
+    const envFired: string[] = []
+    const release: (() => void)[] = []
+    const fetchImpl = (async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.includes("/v10/projects/prj/env?upsert=true")) {
+        envFired.push(url)
+        // 挂起直到测试释放——串行实现下后续请求不会发出
+        await new Promise<void>((r) => release.push(r))
+        return new Response(JSON.stringify({}), { status: 200 })
+      }
+      return new Response(JSON.stringify({}), { status: 200 })
+    }) as typeof fetch
+    const deployer = new VercelDeployer({
+      token: "t",
+      projectName: "p",
+      version: "1.0.0",
+      config: { ...cfg, syncUrl: "libsql://x", syncToken: "tok" },
+      onProgress,
+      fetchImpl,
+      pollIntervalMs: 5,
+    })
+    const p = deployer.setEnv("prj")
+    await new Promise((r) => setTimeout(r, 20))
+    // 5 条必需 env 全部在途（串行实现此刻只发了 1 条）
+    expect(envFired).toHaveLength(5)
+    release.forEach((r) => r())
+    await p
   })
 })

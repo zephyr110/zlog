@@ -312,6 +312,9 @@ function applyLang() {
   // 直接调用：renderUpdateState 内部自行 getElementById，不能引用
   // 文件后段声明的 updateBtn（TDZ——applyLang 先于 about 区块执行）
   renderUpdateState()
+  // 部署面板状态是 JS 维护的动态文案（不带 data-i18n）：同样按当前
+  // 状态机重渲染（renderDeployState 内部自取元素，规避同样的 TDZ）
+  renderDeployState()
   // 语言 select 的显示值跟随字典（内部取元素，避免 TDZ）
   const langValue = document.getElementById("langSelectValue")
   if (langValue) langValue.textContent = t(`lang.${currentPref}`)
@@ -344,6 +347,15 @@ let updateBusy = false // 检查/下载进行中（按钮禁用）
 let updateDest = null // 下载完成后的本地路径
 let updateUiState = "idle" // 派生 UI 状态（renderUpdateState 的唯一输入）
 let updatePercent = 0 // 下载进度（downloading 状态用）
+// 部署面板 UI 状态（renderDeployState 的唯一输入）也在此声明：applyLang
+// 会调用 renderDeployState 让部署面板跟随语言重渲染，const 声明若在文件
+// 后段会触发 TDZ（applyLang 先于后段逻辑执行）
+const deployUi = {
+  busy: false,
+  statusText: "",
+  statusError: false,
+  resultUrl: null, // string | null
+}
 
 function renderUpdateState() {
   const updateBtn = document.getElementById("updateBtn")
@@ -792,6 +804,8 @@ refreshStatus()
 //   → done | failed；进度由主进程推送（deploy:progress）。
 // 所有 UI 更新集中在 renderDeployState：状态（busy/phase/status/result）
 // 与 DOM 分离，语言切换（applyLang 场景）与进度事件都能一致地重渲染。
+// deployUi 状态本身声明在文件上部（applyLang 之前），元素引用走内部
+// getElementById（applyLang 先于本区块执行，直接引用模块级 const 会 TDZ）。
 const deployToken = document.getElementById("deployToken")
 const deployProjectName = document.getElementById("deployProjectName")
 const deployBtn = document.getElementById("deployBtn")
@@ -810,24 +824,29 @@ const DEPLOY_PHASE_TEXT = {
   building: () => t("deploy.building"),
 }
 
-/** 部署面板 UI 状态（renderDeployState 的唯一输入）。 */
-const deployUi = {
-  busy: false,
-  statusText: "",
-  statusError: false,
-  resultUrl: null, // string | null
+/** 部署面板元素自取（renderDeployState 专用；缺任一元素视为面板不存在）。 */
+function deployPanelEls() {
+  const btn = document.getElementById("deployBtn")
+  const cancelBtn = document.getElementById("deployCancelBtn")
+  const status = document.getElementById("deployStatus")
+  const result = document.getElementById("deployResult")
+  const urlLink = document.getElementById("deployUrlLink")
+  if (!btn || !cancelBtn || !status || !result || !urlLink) return null
+  return { btn, cancelBtn, status, result, urlLink }
 }
 
 function renderDeployState() {
-  deployBtn.disabled = deployUi.busy
-  deployCancelBtn.style.display = deployUi.busy ? "inline-flex" : "none"
-  deployResult.style.display = deployUi.resultUrl ? "flex" : "none"
+  const els = deployPanelEls()
+  if (!els) return
+  els.btn.disabled = deployUi.busy
+  els.cancelBtn.style.display = deployUi.busy ? "inline-flex" : "none"
+  els.result.style.display = deployUi.resultUrl ? "flex" : "none"
   if (deployUi.resultUrl) {
-    deployUrlLink.textContent = deployUi.resultUrl
-    deployUrlLink.href = deployUi.resultUrl
+    els.urlLink.textContent = deployUi.resultUrl
+    els.urlLink.href = deployUi.resultUrl
   }
-  deployStatus.textContent = deployUi.statusText
-  deployStatus.classList.toggle("error", deployUi.statusError)
+  els.status.textContent = deployUi.statusText
+  els.status.classList.toggle("error", deployUi.statusError)
 }
 
 function setDeployStatus(text, isError = false) {
