@@ -88,6 +88,12 @@ CI 执行 `pnpm export`（`NEXT_EXPORT=true`），在**构建时**查询 Turso�
 | Linux（AppImage） | [`Zlog-<版本>-x86_64.AppImage`](https://github.com/zephyr110/zlog/releases/latest/download/Zlog-1.0.2-x86_64.AppImage) |
 | Linux（deb） | [`Zlog-<版本>-amd64.deb`](https://github.com/zephyr110/zlog/releases/latest/download/Zlog-1.0.2-amd64.deb) |
 
+**支持的环境**
+
+- **macOS 12+** — Intel（`x64`）与 Apple Silicon（`arm64`）两种 DMG
+- **Windows 10/11** — x64 安装包（`.exe`）
+- **Linux x64** — AppImage（兼容大多数发行版）与 `.deb`（Debian/Ubuntu 系）
+
 把整个博客——阅读与写作——作为桌面应用运行。应用内置本地 standalone 服务器和本地 SQLite 数据库；配置了 sync URL 后，本地副本会与你的 Turso 数据库保持双向同步（离线时的写入会在联网后同步回来）。
 
 - 构建：`pnpm --filter @zlog/desktop package`（按平台分别打包）

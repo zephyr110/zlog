@@ -122,6 +122,12 @@ Download the latest installer from [GitHub Releases](https://github.com/zephyr11
 | Linux (AppImage) | [`Zlog-<version>-x86_64.AppImage`](https://github.com/zephyr110/zlog/releases/latest/download/Zlog-1.0.2-x86_64.AppImage) |
 | Linux (deb) | [`Zlog-<version>-amd64.deb`](https://github.com/zephyr110/zlog/releases/latest/download/Zlog-1.0.2-amd64.deb) |
 
+**Supported environments**
+
+- **macOS 12+** — Intel (`x64`) and Apple Silicon (`arm64`) DMGs
+- **Windows 10/11** — x64 NSIS installer (`.exe`)
+- **Linux x64** — AppImage (most distributions) and `.deb` (Debian/Ubuntu family)
+
 Run the whole blog — reading and writing — as a desktop application. The
 app bundles a local standalone server and a local SQLite database; when a
 sync URL is configured it keeps the local copy in two-way sync with your
