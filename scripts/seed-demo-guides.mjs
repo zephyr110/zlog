@@ -1,4 +1,4 @@
-/** 一次性脚本：把中英双语部署指南作为文章插入演示环境 Turso 库。
+/** 一次性脚本：把中英双语部署指南系列插入演示环境 Turso 库。
  *  用法：TURSO_DEMO_TOKEN=<token> node scripts/seed-demo-guides.mjs
  *  幂等：已存在的 slug 会先删除再插入（重复运行安全）。 */
 import { readFileSync } from "node:fs"
@@ -24,22 +24,61 @@ function stats(content) {
 const today =
   process.env.TURSO_DEMO_DATE ?? new Date().toISOString().slice(0, 10)
 
+// 与正式站一致的系列文章（docs/guides/series/）
 const guides = [
   {
     slug: "zlog-deployment-guide",
-    title: "Zlog 部署指南：本地、Turso 同步与一键发布 Vercel",
+    title: "Zlog 部署指南（一）：三种方式怎么选",
     date: today,
-    tags: JSON.stringify(["指南", "部署", "Zlog"]),
-    description: "从本地使用到云端同步、再到一键部署 Vercel 发布公网，三种场景的完整图文步骤。",
-    file: "docs/guides/zlog-deployment-guide.md",
+    tags: JSON.stringify(["Zlog", "指南", "部署"]),
+    description:
+      "本地使用、Turso 云端同步、一键发布 Vercel——三种方式怎么选？一张对比表 + 决策树，5 分钟上手。",
+    file: "docs/guides/series/zlog-deployment-guide.md",
+  },
+  {
+    slug: "zlog-deployment-guide-sync",
+    title: "Zlog 部署指南（二）：Turso 云端同步",
+    date: today,
+    tags: JSON.stringify(["Zlog", "指南", "Turso"]),
+    description:
+      "把博客数据同步到 Turso 云端库：注册建库、桌面端填入连接串、验证同步，数据安全与多端一致。",
+    file: "docs/guides/series/zlog-deployment-guide-sync.md",
+  },
+  {
+    slug: "zlog-deployment-guide-vercel",
+    title: "Zlog 部署指南（三）：一键部署到 Vercel，发布公网",
+    date: today,
+    tags: JSON.stringify(["Zlog", "指南", "Vercel"]),
+    description:
+      "注册 Vercel、生成 Token、桌面端一键部署——无需 Git 和命令行，2-5 分钟把博客发布成公开网站。",
+    file: "docs/guides/series/zlog-deployment-guide-vercel.md",
   },
   {
     slug: "zlog-deployment-guide-en",
-    title: "Zlog Deployment Guide: Local, Turso Sync & One-Click Vercel",
+    title: "Zlog Deployment Guide (1/3): Which Mode Should You Choose?",
     date: today,
-    tags: JSON.stringify(["guide", "deploy", "Zlog"]),
-    description: "Full walkthrough for three scenarios: local use, Turso cloud sync, and one-click public deployment to Vercel.",
-    file: "docs/guides/zlog-deployment-guide.en.md",
+    tags: JSON.stringify(["Zlog", "guide", "deploy"]),
+    description:
+      "Local use, Turso cloud sync, or one-click Vercel publish? A comparison table and a decision tree to get started in 5 minutes.",
+    file: "docs/guides/series/zlog-deployment-guide.en.md",
+  },
+  {
+    slug: "zlog-deployment-guide-sync-en",
+    title: "Zlog Deployment Guide (2/3): Turso Cloud Sync",
+    date: today,
+    tags: JSON.stringify(["Zlog", "guide", "Turso"]),
+    description:
+      "Sync your blog to a Turso cloud database: sign up, create a DB, paste the connection URL into the desktop app, and verify.",
+    file: "docs/guides/series/zlog-deployment-guide-sync.en.md",
+  },
+  {
+    slug: "zlog-deployment-guide-vercel-en",
+    title: "Zlog Deployment Guide (3/3): One-Click Deploy to Vercel",
+    date: today,
+    tags: JSON.stringify(["Zlog", "guide", "Vercel"]),
+    description:
+      "Sign up for Vercel, create a token, and one-click deploy from the desktop app — no Git or terminal, public in 2–5 minutes.",
+    file: "docs/guides/series/zlog-deployment-guide-vercel.en.md",
   },
 ]
 
