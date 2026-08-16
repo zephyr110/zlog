@@ -47,6 +47,27 @@ const UPLOAD_TIMEOUT_MS = 90_000
 const SOURCE_DOWNLOAD_TIMEOUT_MS = 120_000
 /** public/ 资产二进制单文件上限。 */
 const PUBLIC_ASSET_MAX_BYTES = 4 * 1024 * 1024
+/** public/ 下按扩展名判定的二进制资源（NUL 启发式会漏掉不含 NUL 的
+ *  小文件——PNG 压缩流几乎必含 NUL，但 woff/ico 等不一定）。 */
+const BINARY_EXTENSIONS = [
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".avif",
+  ".ico",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".otf",
+  ".eot",
+  ".pdf",
+  ".mp3",
+  ".mp4",
+  ".webm",
+  ".zip",
+]
 /** buildDeployFiles 产出的二进制文件标记（data 前缀）。deploy() 识别该
  *  前缀后还原原始字节走 /v2/now/files sha 上传——实测 data 前缀本身在
  *  Vercel 不生效（会当 UTF-8 文本写入，字节损坏）。 */
@@ -194,8 +215,12 @@ export function buildDeployFiles(entries: TarEntry[]): {
     // public/ 下的资源（logo、favicon、字体等）是站点的必需资产——二进制
     // 以 base64 data URL 标记传递（BINARY_DATA_PREFIX），deploy() 识别后
     // 还原原始字节走 /v2/now/files sha 上传。超过上限仍跳过（部署体量控制）。
+    // 判定 = NUL 启发式 ∪ 扩展名白名单（无 NUL 的二进制落文本路径会
+    // mojibake 后当 UTF-8 上传，静默损坏）。
     const inPublic = segments.includes("public")
-    const isBinary = e.data.includes(0) // 含 NUL 即二进制（文本源码不会有）
+    const ext = e.path.includes(".") ? e.path.slice(e.path.lastIndexOf(".")).toLowerCase() : ""
+    const isBinary =
+      e.data.includes(0) || BINARY_EXTENSIONS.includes(ext)
     if (inPublic && isBinary) {
       if (e.data.length > PUBLIC_ASSET_MAX_BYTES) {
         skipped.push(`${e.path} (${e.data.length} bytes)`)
@@ -235,13 +260,17 @@ export function splitDeployFiles(files: { file: string; data: string }[]): {
   const binaryFiles: { file: string; buffer: Buffer }[] = []
   for (const f of files) {
     if (f.data.startsWith(BINARY_DATA_PREFIX)) {
-      binaryFiles.push({
-        file: f.file,
-        buffer: Buffer.from(f.data.slice(BINARY_DATA_PREFIX.length), "base64"),
-      })
-    } else {
-      textFiles.push(f)
+      const encoded = f.data.slice(BINARY_DATA_PREFIX.length)
+      const buffer = Buffer.from(encoded, "base64")
+      // 往返校验：宽容 base64 解析对截断/垃圾输入静默产出错误字节，
+      // 重新编码后与原始串不一致即判为文本文件（防止文本恰好以该前缀
+      // 开头时被误判成二进制、以损坏字节上传）。
+      if (buffer.toString("base64") === encoded) {
+        binaryFiles.push({ file: f.file, buffer })
+        continue
+      }
     }
+    textFiles.push(f)
   }
   return { textFiles, binaryFiles }
 }
@@ -758,55 +787,95 @@ export class VercelDeployer {
   }
 
   /** 二进制文件经 /v2/now/files 原始字节流上传（x-now-digest = sha1），
-   *  返回 { file, sha } 引用。并行上传 + 共享取消信号。 */
+   *  返回 { file, sha } 引用。并行上传 + 共享取消信号；网络类失败重试
+   *  一次（404 等确定性失败不重试）。 */
   private async uploadBinaryFiles(
     binaryFiles: { file: string; buffer: Buffer }[]
   ): Promise<{ file: string; sha: string }[]> {
     return Promise.all(
       binaryFiles.map(async ({ file, buffer }) => {
-        this.ensureNotCancelled()
         const digest = createHash("sha1").update(buffer).digest("hex")
-        const signal = AbortSignal.any([
-          this.controller.signal,
-          AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
-        ])
-        let res: Awaited<ReturnType<typeof this.fetchImpl>>
-        try {
-          res = await this.fetchImpl(`${API_BASE}/v2/now/files`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${this.token}`,
-              "Content-Type": "application/octet-stream",
-              "x-now-digest": digest,
-            },
-            body: buffer,
-            dispatcher: this.dispatcher as never,
-            signal,
-          } as never)
-        } catch (err) {
-          if (this.cancelled || this.controller.signal.aborted) {
-            throw new VercelDeployError("部署已取消", "canceled")
+        for (let attempt = 1; ; attempt++) {
+          this.ensureNotCancelled()
+          const signal = AbortSignal.any([
+            this.controller.signal,
+            AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+          ])
+          // 整个请求（含读响应体）都在 try 内：取消/超时在 body 读取期间
+          // 触发时 undici 抛裸 AbortError——必须转成 VercelDeployError
+          try {
+            const res = await this.fetchImpl(`${API_BASE}/v2/now/files`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${this.token}`,
+                "Content-Type": "application/octet-stream",
+                "x-now-digest": digest,
+              },
+              body: buffer,
+              dispatcher: this.dispatcher as never,
+              signal,
+            } as never)
+            // 取消优先于状态码报告（与 request() 约定一致）
+            if (this.cancelled || this.controller.signal.aborted) {
+              throw new VercelDeployError("部署已取消", "canceled")
+            }
+            if (!res.ok) {
+              throw new VercelDeployError(
+                `上传二进制文件 ${file} 失败（HTTP ${res.status}）`,
+                "api"
+              )
+            }
+            const text = await res.text()
+            let body: unknown = null
+            try {
+              body = text ? JSON.parse(text) : null
+            } catch {
+              body = text
+            }
+            // 响应 {"urls":["https://…/<sha>"]}——sha 即 URL 尾段。防御性
+            // 校验：类型、40 位 hex、与本地 digest 一致（响应格式漂移时
+            // 当场报错，而不是把错误值当引用交给 create）
+            const urls = (body as { urls?: unknown[] })?.urls
+            const raw = typeof urls?.[0] === "string" ? (urls[0] as string).split("/").pop() : undefined
+            if (typeof raw !== "string" || !/^[0-9a-f]{40}$/.test(raw) || raw !== digest) {
+              throw new VercelDeployError(
+                `上传二进制文件 ${file} 响应异常（sha 与上传内容不符）`,
+                "api"
+              )
+            }
+            return { file, sha: raw }
+          } catch (err) {
+            // 统一归一化为 VercelDeployError（原始异常与内部错误同路径），
+            // 再统一判定重试——fetch 抛的裸 TypeError 同样获得重试机会
+            let deployErr: VercelDeployError
+            if (err instanceof VercelDeployError) {
+              deployErr = err
+            } else if (this.cancelled || this.controller.signal.aborted) {
+              deployErr = new VercelDeployError("部署已取消", "canceled")
+            } else {
+              // 区分超时与连接失败（与 request() 同一套判定）
+              const errCode =
+                typeof err === "object" && err !== null
+                  ? (err as { code?: string }).code
+                  : undefined
+              const isTimeout =
+                (err instanceof Error && err.name === "TimeoutError") ||
+                errCode === "UND_ERR_HEADERS_TIMEOUT" ||
+                errCode === "UND_ERR_CONNECT_TIMEOUT" ||
+                errCode === "UND_ERR_SOCKET_TIMEOUT"
+              deployErr = new VercelDeployError(
+                isTimeout
+                  ? `上传二进制文件 ${file} 超时——请检查网络/代理后重试`
+                  : `上传二进制文件 ${file} 失败：${err instanceof Error ? err.message : String(err)}`,
+                "network"
+              )
+            }
+            if (deployErr.kind !== "network" || attempt >= 2) throw deployErr
+            // 网络抖动：退避后重试一次（cancel 会在下次循环的
+            // ensureNotCancelled 立即上抛）
+            await this.sleepMs(this.pollIntervalMs)
           }
-          throw new VercelDeployError(
-            `上传二进制文件 ${file} 失败：${err instanceof Error ? err.message : String(err)}`,
-            "network"
-          )
         }
-        if (!res.ok) {
-          throw new VercelDeployError(`上传二进制文件 ${file} 失败（HTTP ${res.status}）`, "api")
-        }
-        const text = await res.text()
-        let body: unknown = null
-        try {
-          body = text ? JSON.parse(text) : null
-        } catch {
-          body = text
-        }
-        // 响应 {"urls":["https://…/<sha>"]}——sha 即 URL 尾段
-        const urls = (body as { urls?: string[] })?.urls
-        const sha = urls?.[0]?.split("/").pop()
-        if (!sha) throw new VercelDeployError(`上传二进制文件 ${file} 响应缺少 sha`, "api")
-        return { file, sha }
       })
     )
   }
