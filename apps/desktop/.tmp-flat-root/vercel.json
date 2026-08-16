@@ -1,0 +1,22 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "rm -rf apps/web/.next/cache && pnpm build",
+  "redirects": [
+    {
+      "source": "/category/:name",
+      "destination": "/topics/:name",
+      "permanent": true
+    }
+  ],
+  "headers": [
+    {
+      "source": "/((?!_next/|api/|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|js|css|woff2?|json|txt|xml)).*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, s-maxage=60, stale-while-revalidate=300"
+        }
+      ]
+    }
+  ]
+}

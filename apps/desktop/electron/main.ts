@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron"
 import { randomBytes } from "node:crypto"
+import { appendFileSync, mkdirSync } from "node:fs"
 import bcrypt from "bcryptjs"
 import { join, resolve, sep } from "node:path"
 import { ConfigStore, type DesktopConfig } from "./config-store"
@@ -400,6 +401,16 @@ async function main() {
       resolveChromium: () =>
         session.defaultSession.resolveProxy("https://api.vercel.com/"),
     })
+    // 诊断日志（部署网络问题定位）：代理解析结果 + 是否使用代理
+    try {
+      mkdirSync(logDir, { recursive: true })
+      appendFileSync(
+        join(logDir, "main.log"),
+        `${new Date().toISOString()} [deploy] httpsProxy=${httpsProxy ?? "null"} env=${process.env.HTTPS_PROXY ?? "null"}\n`
+      )
+    } catch {
+      /* 日志失败不影响部署 */
+    }
     const deployer = new VercelDeployer({
       token,
       projectName,

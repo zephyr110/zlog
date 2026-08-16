@@ -130,8 +130,8 @@ describe("buildDeployFiles", () => {
     ]
     const { files, skipped } = buildDeployFiles(entries)
     expect(files.map((f) => f.file).sort()).toEqual([
-      "apps/web/src/app/page.tsx",
       "package.json",
+      "src/app/page.tsx",
     ])
     expect(skipped).toHaveLength(0)
   })
@@ -216,11 +216,15 @@ describe("VercelDeployer", () => {
 
   it("完整流程：校验 → 建项目 → env → 部署 → 轮询到 READY 返回 URL", async () => {
     const apiRoutes = fakeFetch({
-      "https://api.vercel.com/v9/user": { status: 200, body: { id: "u1" } },
+      "https://api.vercel.com/v2/user": { status: 200, body: { id: "u1" } },
       "https://api.vercel.com/v9/projects/zlog-blog": { status: 404, body: {} },
       "https://api.vercel.com/v13/projects": {
         status: 200,
         body: { id: "prj_1" },
+      },
+      "https://api.vercel.com/v9/projects/prj_1": {
+        status: 200,
+        body: { id: "prj_1", alias: ["zlog-blog.vercel.app"] },
       },
       "https://api.vercel.com/v10/projects/prj_1/env?upsert=true": {
         status: 200,
@@ -270,7 +274,7 @@ describe("VercelDeployer", () => {
 
   it("token 无效（401）→ VercelDeployError kind=token", async () => {
     const fetchImpl = fakeFetch({
-      "https://api.vercel.com/v9/user": { status: 401, body: { error: {} } },
+      "https://api.vercel.com/v2/user": { status: 401, body: { error: {} } },
     })
     const deployer = new VercelDeployer({
       token: "bad",
@@ -285,7 +289,7 @@ describe("VercelDeployer", () => {
 
   it("项目名冲突（409）→ kind=conflict", async () => {
     const fetchImpl = fakeFetch({
-      "https://api.vercel.com/v9/user": { status: 200, body: { id: "u" } },
+      "https://api.vercel.com/v2/user": { status: 200, body: { id: "u" } },
       "https://api.vercel.com/v9/projects/p": { status: 404, body: {} },
       "https://api.vercel.com/v13/projects": { status: 409, body: {} },
     })
@@ -302,8 +306,9 @@ describe("VercelDeployer", () => {
 
   it("构建失败（ERROR）→ kind=build 且带构建错误信息", async () => {
     const apiRoutes = fakeFetch({
-      "https://api.vercel.com/v9/user": { status: 200, body: { id: "u" } },
-      "https://api.vercel.com/v9/projects/p": { status: 200, body: { id: "prj" } },
+      "https://api.vercel.com/v2/user": { status: 200, body: { id: "u" } },
+      "https://api.vercel.com/v9/projects/p": { status: 200, body: { id: "prj", alias: ["p.vercel.app"] } },
+      "https://api.vercel.com/v9/projects/prj": { status: 200, body: { id: "prj", alias: ["p.vercel.app"] } },
       "https://api.vercel.com/v10/projects/prj/env?upsert=true": { status: 200, body: {} },
       "https://api.vercel.com/v13/deployments": {
         status: 200,

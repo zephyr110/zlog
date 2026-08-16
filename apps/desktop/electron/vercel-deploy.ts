@@ -60,6 +60,7 @@ const EXCLUDED_SEGMENTS = [
   "dist",
   "release",
   "desktop",
+  "test",
   ".env",
 ]
 
@@ -158,7 +159,119 @@ export function buildDeployFiles(entries: TarEntry[]): {
     }
     files.push({ file: e.path, data: text })
   }
-  return { files, skipped }
+  return flattenWorkspace(files, skipped)
+}
+
+/**
+ * 打平为单项目部署结构（Vercel upload deployment 对 rootDirectory 的
+ * workspace 子目录支持不佳——实测 install 要求 lockfile 在 cwd、next
+ * 检测要求 package.json 在检测目录）：
+ * - apps/web/** 提升为部署根（package.json / next.config.ts / src 等）
+ * - packages/database、packages/core 保留（workspace 成员）
+ * - pnpm-lock.yaml 的 importer 键 "apps/web" 改为 "."（部署根 = 原 apps/web）
+ * 部署后构建在部署根跑：lockfile/package.json/next 全部在 cwd，标准单
+ * 项目结构，无 workspace 子目录问题。
+ */
+export function flattenWorkspace(
+  filtered: { file: string; data: string }[],
+  skipped: string[]
+): { files: { file: string; data: string }[]; skipped: string[] } {
+  // 用 Map 去重：先放非 apps/web 文件（根配置 + packages/**），
+  // apps/web 提升件随后覆盖同名根文件（package.json / tsconfig 等）
+  const flatMap = new Map<string, { file: string; data: string }>()
+  for (const f of filtered) {
+    if (f.file.startsWith("apps/web/")) continue
+    flatMap.set(f.file, f)
+  }
+  for (const f of filtered) {
+    if (!f.file.startsWith("apps/web/")) continue
+    // 键与值对象的 file 都要去前缀（后续按 file 字段写文件/上传）
+    const lifted = f.file.slice("apps/web/".length)
+    let data = f.data
+    // 打平后 __dirname 即部署根（workspace 根）——next.config 里指向
+    // workspace 根的 "../.." 会越界到 /vercel，导致 Turbopack 解析
+    // 不到 @zlog/*（Module not found）
+    if (lifted === "next.config.ts") {
+      // 打平后 __dirname 即部署根（workspace 根）——next.config 里指向
+      // workspace 根的 "../.." 会越界到 /vercel；同时用 resolveAlias 把
+      // workspace 包直接指向源码，绕开 Turbopack 对 pnpm symlink 的
+      // 解析差异（实测 symlink 存在但 Module not found）
+      data = data.replace(
+        'root: path.join(__dirname, "../..")',
+        `root: __dirname,
+      resolveAlias: {
+        "@zlog/auth": "./packages/auth/src/index.ts",
+        "@zlog/core": "./packages/core/src/index.ts",
+        "@zlog/database": "./packages/database/src/index.ts",
+      }`
+      )
+    } else if (lifted === "tsconfig.json") {
+      // tsc 类型检查不读 resolveAlias——tsconfig paths 同样别名到源码
+      data = data.replace(
+        '"paths": {\n      "@/*": ["./src/*"]\n    }',
+        '"paths": {\n      "@/*": ["./src/*"],\n      "@zlog/auth": ["./packages/auth/src/index.ts"],\n      "@zlog/core": ["./packages/core/src/index.ts"],\n      "@zlog/database": ["./packages/database/src/index.ts"]\n    }'
+      )
+    }
+    flatMap.set(lifted, { file: lifted, data })
+  }
+  const flat = [...flatMap.values()]
+  // importer 键适配：部署根的 package.json（原 apps/web）对应 lockfile 的
+  // "." importer。原 lockfile 已有 "."（zlog 根）——块级重建：删除原
+  // "." importer，把 apps/web importer 改键为 "."
+  const lock = flat.find((f) => f.file === "pnpm-lock.yaml")
+  if (lock) {
+    lock.data = rekeyWebImporter(lock.data)
+  }
+  return { files: flat, skipped }
+}
+
+/**
+ * 把 pnpm-lock.yaml 的 importer 从 workspace 结构适配为打平结构：
+ * - 删除原 "." importer（zlog 根——部署不需要其依赖）
+ * - apps/web importer 改键为 "."（部署根 = 原 apps/web）
+ * 纯行处理（2 空格缩进 = importer 键，4+ 空格 = 键下内容，0 缩进 = 顶级键）。
+ */
+export function rekeyWebImporter(lockText: string): string {
+  const lines = lockText.split("\n")
+  const importersIdx = lines.findIndex((l) => l === "importers:")
+  if (importersIdx < 0) return lockText
+  // 收集 importer 块（importers: 之后到下一个 0 缩进键）
+  interface Block { key: string; lines: string[] }
+  const blocks: Block[] = []
+  let cur: Block | null = null
+  for (let i = importersIdx + 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (line.startsWith("  ") && !line.startsWith("    ")) {
+      if (cur) blocks.push(cur)
+      cur = { key: line.trim(), lines: [line] }
+    } else if (line.startsWith("    ") || line === "") {
+      if (cur) cur.lines.push(line)
+    } else {
+      break
+    }
+  }
+  if (cur) blocks.push(cur)
+  const web = blocks.find((b) => b.key === "apps/web:")
+  const root = blocks.find((b) => b.key === "'.':" || b.key === ".:")
+  if (!web || !root) return lockText
+  // 重建：web 块（键改 '.'）替换 root 块的位置，删除原 web 块
+  // 键行必须是 2 空格缩进的裸键 `.:`——pnpm 11 对引号键 `'.':` 的
+  // frozen 校验不匹配（实测 "specifiers don't match"）
+  const webLines = ["  .:", ...web.lines.slice(1)]
+  const webBlock: Block = { key: "'.':", lines: webLines }
+  const out: string[] = []
+  for (const b of blocks) {
+    if (b === root) {
+      out.push(...webBlock.lines)
+    } else if (b !== web) {
+      out.push(...b.lines)
+    }
+  }
+  return [
+    ...lines.slice(0, importersIdx + 1),
+    ...out,
+    ...lines.slice(importersIdx + 1 + blocks.reduce((n, b) => n + b.lines.length, 0)),
+  ].join(String.fromCharCode(10))
 }
 
 // ── 纯函数：环境变量清单 ───────────────────────────────────────────────
@@ -327,8 +440,12 @@ export class VercelDeployer {
       if (this.cancelled || this.controller.signal.aborted) {
         throw new VercelDeployError("部署已取消", "canceled")
       }
+      const cause =
+        typeof err === "object" && err && "cause" in err
+          ? String((err as { cause: unknown }).cause)
+          : ""
       throw new VercelDeployError(
-        `无法连接 Vercel API：${err instanceof Error ? err.message : String(err)}`,
+        `无法连接 Vercel API：${err instanceof Error ? err.message : String(err)}${cause ? `（${cause.slice(0, 200)}）` : ""}`,
         "network"
       )
     }
@@ -341,7 +458,8 @@ export class VercelDeployer {
   /** 校验 token 并返回用户信息。 */
   async validateToken(): Promise<void> {
     this.onProgress({ phase: "validating", message: "正在校验 Token…" })
-    const { status } = await this.request("/v9/user")
+    // 注意：user 端点是 /v2/user——/v9/user 返回 400 "Invalid API version"
+    const { status } = await this.request("/v2/user")
     if (status === 401 || status === 403) {
       throw new VercelDeployError(
         "Token 无效或权限不足——请到 Vercel 控制台 Settings → Tokens 重新生成",
@@ -389,6 +507,30 @@ export class VercelDeployer {
     const id = (created.body as { id?: string }).id
     if (!id) throw new VercelDeployError("Vercel 创建项目响应缺少 id", "api")
     return id
+  }
+
+  /**
+   * 持久化项目构建配置。仅靠部署请求的 projectSettings 时，Vercel 的
+   * 框架检测在已存在项目上读项目级设置（rootDirectory 缺失 → 在仓库根
+   * 找 next → "No Next.js version detected"）。
+   */
+  async configureProject(projectId: string): Promise<void> {
+    this.ensureNotCancelled()
+    const res = await this.request(`/v9/projects/${projectId}`, {
+      method: "PATCH",
+      body: {
+        framework: "nextjs",
+        // 打平结构：部署根即项目根——清掉可能残留的 rootDirectory
+        rootDirectory: null,
+        buildCommand:
+          "corepack enable && corepack prepare pnpm@11.14.0 --activate && pnpm build",
+        installCommand:
+          "corepack enable && corepack prepare pnpm@11.14.0 --activate && pnpm install --frozen-lockfile",
+      },
+    })
+    if (res.status !== 200) {
+      throw new VercelDeployError(`配置项目失败（HTTP ${res.status}）`, "api")
+    }
   }
 
   /** 配置环境变量（逐条 upsert——重复部署同项目时覆盖旧值）。 */
@@ -465,10 +607,20 @@ export class VercelDeployer {
       body: {
         name: this.projectName,
         files,
+        // 显式 production target：不传时 Vercel 按 preview 部署，构建注入
+        // preview env（未设置）→ 运行时缺 TURSO_DATABASE_URL 等
+        target: "production",
         projectSettings: {
           framework: "nextjs",
-          rootDirectory: "apps/web",
-          buildCommand: "pnpm build",
+          // 不 cd ../..：Vercel 把 rootDirectory 当虚拟根，向上 cd 会越界
+          // 到 /（ERR_PNPM_NO_PKG_MANIFEST）。命令在 rootDirectory 跑；
+          // corepack 固定 pnpm@11（Vercel 检测 lockfile v9 默认用 pnpm 10，
+          // 但显式 11.14 与本地一致）；pnpm-lock.yaml 已由 buildDeployFiles
+          // 复制到 apps/web，frozen-lockfile 与 next 检测都能找到它
+          buildCommand:
+            "corepack enable && corepack prepare pnpm@11.14.0 --activate && pnpm build",
+          installCommand:
+            "corepack enable && corepack prepare pnpm@11.14.0 --activate && pnpm install --frozen-lockfile",
         },
       },
       // 整个源码树内联 JSON——远超普通 API 请求体，放宽超时
@@ -530,6 +682,7 @@ export class VercelDeployer {
   async run(): Promise<string> {
     await this.validateToken()
     const projectId = await this.ensureProject()
+    await this.configureProject(projectId)
     await this.setEnv(projectId)
     const files = await this.fetchSource(this.version)
     return this.deploy(files, projectId)

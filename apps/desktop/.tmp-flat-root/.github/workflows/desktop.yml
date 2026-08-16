@@ -1,0 +1,85 @@
+name: desktop
+
+on:
+  push:
+    tags:
+      # 桌面端版本号取 tag（如 v1.2.3）；语义化 tag 推送即触发三平台构建。
+      # 只匹配 v 前缀 + 数字开头（v[0-9]*，glob 不支持完整 SemVer），
+      # 非 SemVer tag（如 vfoo、desktop-v0.1.0-ci）不触发（规范见 CLAUDE.md）
+      - "v[0-9]*"
+  workflow_dispatch: {}
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @zlog/web check
+      - run: pnpm --filter @zlog/desktop test
+      - run: pnpm --filter @zlog/desktop build
+      - run: pnpm --filter @zlog/desktop build:standalone
+      - run: xvfb-run -a pnpm --filter @zlog/desktop test:smoke
+
+  build:
+    needs: smoke
+    strategy:
+      fail-fast: false
+      matrix:
+        # macOS 双架构：macos-latest（arm64）出 arm64 dmg；macos-15-intel
+        # 出 x64 dmg。macos-13（旧 Intel runner）已于 2025-12 退役；
+        # macos-15-intel 是 GitHub 提供的最后一个 Intel 镜像（2027-08 到期，
+        # 之后 GitHub Actions 不再有 x86_64 runner）。原生模块（sharp/
+        # @libsql）随 runner 架构安装（npmRebuild: false），无法交叉产出。
+        os: [macos-latest, macos-15-intel, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Sync version from tag
+        if: startsWith(github.ref, 'refs/tags/')
+        # electron-builder 的版本号取自 package.json；把 tag（v1.2.3 → 1.2.3）
+        # 同步进去，产物名即为 Zlog-1.2.3-arm64.dmg / Zlog-Setup-1.2.3.exe
+        run: node -e "const fs=require('fs');const p='apps/desktop/package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.version=process.env.GITHUB_REF_NAME.replace(/^v/,'');fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')"
+      - run: pnpm --filter @zlog/desktop package
+      - uses: actions/upload-artifact@v5
+        with:
+          name: zlog-desktop-${{ matrix.os }}
+          path: apps/desktop/release/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: zlog-desktop-*
+          merge-multiple: true
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          # 只挂安装器产物（显式扩展名，命名确定后不再用 Zlog* 通配，
+          # 避免产物改名时静默漏挂）；asar:false 的全量包有数百个内部
+          # 文件，逐个上传会触发 GitHub 次级限流（Task 12 实测 403）
+          files: |
+            artifacts/**/Zlog-*.dmg
+            artifacts/**/Zlog-*.zip
+            artifacts/**/Zlog-Setup*.exe
+            artifacts/**/Zlog-*.AppImage
+            artifacts/**/Zlog-*.deb
+            artifacts/**/*.blockmap
+          draft: true
