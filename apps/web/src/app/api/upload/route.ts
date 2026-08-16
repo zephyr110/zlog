@@ -97,8 +97,11 @@ export async function GET(request: NextRequest) {
       images: records.map((record) => ({
         name: record.name,
         // githubSha null = Turso-only（GitHub 投递不可用时的降级上传）——
-        // 用 /api/media/[name] 兜底出图，而不是指向 jsdelivr 的 404
-        url: record.githubSha ? cdnUrl(record.name) : `/api/media/${record.name}`,
+        // 用 /api/media/[name] 兜底出图，而不是指向 jsdelivr 的 404。
+        // name 虽经 sanitizeFilename，仍防御性编码（历史行无保证）
+        url: record.githubSha
+          ? cdnUrl(record.name)
+          : `/api/media/${encodeURIComponent(record.name)}`,
         createdAt: record.createdAt,
       })),
       total,
@@ -223,21 +226,34 @@ export async function POST(request: NextRequest) {
     //    authoritative store and /api/media/[name] serves the bytes
     //    directly. A failed push does NOT roll back the DB row; the image
     //    remains fully functional, just without the CDN front.
+    // delivery 只在「推送成功且 github_sha 回填成功」时为 true——回填失败时
+    // DB 里 githubSha 保持 null，必须走 /api/media 路径（否则 GET 列表与
+    // 上传响应 URL 形态漂移，且 DELETE 的 githubSha-null 短路会留下
+    // GitHub 孤儿文件）。
     let delivery = false
+    let pushed = false
     try {
       const { uploadToGithub } = await import("@/lib/github-image")
       const { sha } = await uploadToGithub(filename, optimized)
-      // Best-effort sha backfill: if this fails, deletes still work via the
-      // Contents API lookup fallback in deleteFromGithub.
-      await setMediaSha(filename, sha).catch((error) => {
-        console.error("Failed to backfill github_sha:", error)
-      })
+      pushed = true
+      await setMediaSha(filename, sha)
       delivery = true
     } catch (error) {
-      console.warn(
-        "GitHub upload unavailable — serving from Turso (/api/media):",
-        error
-      )
+      if (pushed) {
+        // uploadToGithub 已成功但回填失败：GitHub 上有文件而 DB 无 sha——
+        // 尽力回滚推送，避免 DELETE 短路留下的孤儿（回滚失败则残留，
+        // 仅此窗口，概率极低）
+        console.error("Failed to backfill github_sha — rolling back push:", error)
+        const { deleteFromGithub } = await import("@/lib/github-image")
+        await deleteFromGithub(filename).catch((rollbackError) => {
+          console.error("GitHub rollback failed:", rollbackError)
+        })
+      } else {
+        console.warn(
+          "GitHub upload unavailable — serving from Turso (/api/media):",
+          error
+        )
+      }
     }
 
     if (delivery) {
@@ -299,6 +315,8 @@ export async function DELETE(request: NextRequest) {
 
     // Then remove from GitHub; a 404 there is already-gone (idempotent).
     // githubSha null = Turso-only 降级上传（从未推送）——直接跳过 GitHub。
+    // 该不变量由 POST 保证：delivery 只在「推送成功且 sha 回填成功」时
+    // 成立，回填失败会回滚推送（见 POST 的 pushed 分支）。
     if (record.githubSha === null) {
       return NextResponse.json({ success: true })
     }

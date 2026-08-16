@@ -599,6 +599,7 @@ describe("VercelDeployer", () => {
 
   it("deploy 二进制文件走 /v2/now/files sha 引用（data 前缀不直接进 create）", async () => {
     const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02])
+    const digest = createHash("sha1").update(png).digest("hex")
     let uploadedBody: Buffer | null = null
     let uploadedDigest = ""
     let createBody: { files?: unknown[] } = {}
@@ -609,7 +610,7 @@ describe("VercelDeployer", () => {
         uploadedDigest = String((init?.headers as Record<string, string>)["x-now-digest"])
         return new Response(
           JSON.stringify({
-            urls: ["https://dmmcy.cloudfront.net/abc123sha"],
+            urls: [`https://dmmcy.cloudfront.net/${digest}`],
           }),
           { status: 200 }
         )
@@ -641,12 +642,80 @@ describe("VercelDeployer", () => {
     )
     // 上传的原始字节与 sha1 digest 正确
     expect(uploadedBody?.equals(png)).toBe(true)
-    expect(uploadedDigest).toBe(createHash("sha1").update(png).digest("hex"))
+    expect(uploadedDigest).toBe(digest)
     // create 的 files 数组：文本用 data，二进制用 sha 引用
     expect(createBody.files).toEqual([
       { file: "package.json", data: "{}" },
-      { file: "public/logo.png", sha: "abc123sha" },
+      { file: "public/logo.png", sha: digest },
     ])
     expect(url).toBe("p.vercel.app")
+  })
+
+  it("uploadBinaryFiles 网络失败重试一次后成功", async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02])
+    const digest = createHash("sha1").update(png).digest("hex")
+    let uploadCalls = 0
+    const fetchImpl = (async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url === "https://api.vercel.com/v2/now/files") {
+        uploadCalls++
+        if (uploadCalls === 1) throw new TypeError("fetch failed: network down")
+        return new Response(
+          JSON.stringify({ urls: [`https://dmmcy.cloudfront.net/${digest}`] }),
+          { status: 200 }
+        )
+      }
+      if (url === "https://api.vercel.com/v13/deployments") {
+        return new Response(JSON.stringify({ id: "dpl", url: "p.vercel.app" }), { status: 200 })
+      }
+      if (url === "https://api.vercel.com/v13/deployments/dpl") {
+        return new Response(JSON.stringify({ readyState: "READY" }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ error: { message: "not found" } }), { status: 404 })
+    }) as typeof fetch
+    const deployer = new VercelDeployer({
+      token: "t",
+      projectName: "p",
+      version: "1.0.0",
+      config: cfg,
+      onProgress,
+      fetchImpl,
+      pollIntervalMs: 5,
+    })
+    const shaFiles = await deployer.deploy(
+      [{ file: "public/logo.png", data: `${BINARY_DATA_PREFIX}${png.toString("base64")}` }],
+      "prj"
+    )
+    void shaFiles
+    expect(uploadCalls).toBe(2)
+  })
+
+  it("splitDeployFiles 前缀但非法 base64 → 按文本处理（不静默损坏）", () => {
+    const { textFiles, binaryFiles } = splitDeployFiles([
+      // 文本恰好以 BINARY_DATA_PREFIX 开头 + 非 base64 内容
+      { file: "public/note.txt", data: `${BINARY_DATA_PREFIX}not base64!!` },
+      { file: "ok.ts", data: "export const x = 1" },
+    ])
+    expect(binaryFiles).toHaveLength(0)
+    expect(textFiles.map((f) => f.file)).toEqual(["public/note.txt", "ok.ts"])
+  })
+
+  it("public/ 无 NUL 的二进制（扩展名白名单）也走 base64 标记", () => {
+    // 精心构造不含任何 0x00 字节的"二进制"woff——NUL 启发式会漏
+    const woff = Buffer.from(
+      Array.from({ length: 64 }, (_, i) => (i % 256 === 0 ? 1 : i)).flatMap((b) => [b])
+    )
+    expect(woff.includes(0)).toBe(false)
+    const { files } = buildDeployFiles([
+      { path: "apps/web/public/font.woff2", data: woff },
+    ])
+    const f = files.find((x) => x.file === "public/font.woff2")
+    expect(f?.data.startsWith(BINARY_DATA_PREFIX)).toBe(true)
+    // 往返字节一致
+    const restored = Buffer.from(
+      f!.data.slice(BINARY_DATA_PREFIX.length),
+      "base64"
+    )
+    expect(restored.equals(woff)).toBe(true)
   })
 })
