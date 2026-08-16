@@ -431,6 +431,12 @@ function renderUpdateState() {
       updateStatus.textContent = t("about.checkHint")
       updateStatus.classList.remove("error")
   }
+  // 按钮级 spinner：检查/下载进行中显示（各分支的 textContent 赋值会
+  // 清掉 spinner span，故必须在 switch 之后统一挂载）
+  setButtonSpinner(
+    updateBtn,
+    updateUiState === "checking" || updateUiState === "downloading"
+  )
 }
 
 // ── 模式差异 ──────────────────────────────────────────────────────────
@@ -862,6 +868,8 @@ function renderDeployState() {
   const els = deployPanelEls()
   if (!els) return
   els.btn.disabled = deployUi.busy
+  // 按钮级 spinner：部署进行中（验证→上传→云端构建）按钮内显示
+  setButtonSpinner(els.btn, deployUi.busy)
   els.cancelBtn.style.display = deployUi.busy ? "inline-flex" : "none"
   els.result.style.display = deployUi.resultUrl ? "flex" : "none"
   if (deployUi.resultUrl) {
