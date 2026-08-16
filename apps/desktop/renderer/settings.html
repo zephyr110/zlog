@@ -772,6 +772,10 @@
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
         <span data-i18n="nav.analytics">流量分析</span>
       </button>
+      <button class="nav-item" data-panel="comments">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M9 10h.01"/><path d="M12 10h.01"/><path d="M15 10h.01"/></svg>
+        <span data-i18n="nav.comments">评论设置</span>
+      </button>
       <button class="nav-item" data-panel="data">
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
         <span data-i18n="nav.data">数据目录</span>
@@ -1029,6 +1033,30 @@
           <input id="httpsProxy" aria-labelledby="proxyHeading" data-i18n-placeholder="analytics.proxyPh" placeholder="http:// 或 socks5://主机:端口" />
           <p class="hint" data-i18n="analytics.proxyHint">用于拉取 Vercel Analytics 与 Google Analytics 4。留空则自动读取系统/VPN 的 HTTP 或 SOCKS 代理。SOCKS 端口请填 socks5://，不要写成 http://</p>
         </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 面板：评论设置 -->
+    <section class="panel" id="panel-comments">
+      <div class="group">
+        <h2 class="block-title" data-i18n="comments.title">评论防垃圾（Cloudflare Turnstile）</h2>
+        <div class="block">
+        <div class="field">
+          <label for="turnstileSiteKey" data-i18n="comments.siteKey">Site Key（公开）</label>
+          <input id="turnstileSiteKey" data-i18n-placeholder="comments.siteKeyPh" placeholder="0x4AAAAAA…" />
+        </div>
+        <div class="field">
+          <label for="turnstileSecretKey" data-i18n="comments.secretKey">Secret Key（私密）</label>
+          <div class="secret">
+            <input id="turnstileSecretKey" type="password" data-i18n-placeholder="comments.secretKeyPh" placeholder="0x4AAAAAA…" />
+            <button type="button" class="secret-toggle" aria-controls="turnstileSecretKey" aria-pressed="false" aria-label="显示">
+              <svg class="icon secret-eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="icon secret-eye-off" viewBox="0 0 24 24" hidden aria-hidden="true"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+            </button>
+          </div>
+        </div>
+        <p class="hint" data-i18n="comments.hint">在 Cloudflare Turnstile 控制台创建一个站点后获得两个 Key。配置后：本地评论启用人机验证；一键部署到 Vercel 时自动透传，线上评论防护一致。留空则评论不显示验证码（无防垃圾）</p>
         </div>
       </div>
     </section>

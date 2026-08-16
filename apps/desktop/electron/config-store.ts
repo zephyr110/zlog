@@ -17,6 +17,10 @@ export interface DesktopConfig {
   gaPropertyId?: string
   gaClientEmail?: string
   gaPrivateKey?: string
+  /** 评论防垃圾（Cloudflare Turnstile）：site key 公开、secret key 私密。
+   *  有值时注入服务器 env（本地评论防垃圾 + Vercel 部署透传）。 */
+  turnstileSiteKey?: string
+  turnstileSecretKey?: string
   /** 选填 HTTP / SOCKS5 代理。有值则覆盖自动检测，供 Vercel / GA4 拉取。 */
   httpsProxy?: string
   /** 一键部署（Vercel upload deployment）：API token 与上次部署结果。 */

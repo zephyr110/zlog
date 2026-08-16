@@ -27,7 +27,7 @@
 - **媒体库** — 自动 WebP 压缩，Turso 存储 + GitHub/jsdelivr CDN 双写
 - **自定义 Logo 与 Favicon** — 在站点设置中上传自己的 Logo，Favicon 自动跟随
 - **双语与主题** — 中/英切换，浅色/深色/跟随系统
-- **自建评论** — 游客免登录评论；Cloudflare Turnstile + 限流 + 内容过滤防垃圾；admin 后台含未读徽标收件箱
+- **自建评论** — 游客免登录评论；Cloudflare Turnstile + 限流 + 内容过滤防垃圾；admin 后台含未读徽标收件箱。Turnstile 双 Key 在桌面端「设置 → 评论设置」配置，一键部署时自动透传
 - **流量分析** — 后台仪表盘可选双数据源（Vercel / 本地 `pnpm dev`）：默认 **Vercel Analytics**，亦可切换 **GA4** Data API；配置 `NEXT_PUBLIC_GA_MEASUREMENT_ID` 时前台加载 GA4 gtag
 - **提交前检查** — Husky 在 commit 前执行 `pnpm check`（ESLint + `tsc --noEmit`）
 

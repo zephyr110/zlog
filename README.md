@@ -27,7 +27,7 @@ Live demo (visitor playground): [zlog-test.vercel.app](https://zlog-test.vercel.
 - **Media library** — auto WebP compression, Turso storage + GitHub/jsdelivr CDN dual-write
 - **Custom logo & favicon** — upload your own logo in Site Settings; the favicon follows it automatically
 - **Bilingual & themable** — zh/en switching, light/dark/system themes
-- **Self-hosted comments** — guest comments with no login required; Cloudflare Turnstile + rate limits + content filters against spam; unread-badge inbox in the admin panel
+- **Self-hosted comments** — guest comments with no login required; Cloudflare Turnstile + rate limits + content filters against spam; unread-badge inbox in the admin panel. Turnstile keys are configured in the desktop app Settings → Comments and are carried into Vercel deploys automatically
 - **Traffic analytics** — optional dual sources on the admin dashboard (Vercel / local `pnpm dev`): **Vercel Analytics** (default) and **GA4** Data API, with a site-wide GA4 gtag when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is set
 - **Pre-commit checks** — Husky runs `pnpm check` (ESLint + `tsc --noEmit`) before each commit
 

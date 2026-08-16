@@ -69,6 +69,9 @@ Zlog is a blog system with a built-in admin panel: the desktop app ships a compl
 **Q: Forgot the admin password?**
 A: Regenerate a recovery key in Settings → Account, or re-initialize the local config.
 
+**Q: How do I enable comment spam protection?**
+A: Paste the Cloudflare Turnstile Site Key and Secret Key in the desktop app Settings → Comments (create a site in the Turnstile console to get both). Local comments are verified immediately, and one-click deploys pass the keys through automatically.
+
 **Q: How do I update the deployed site?**
 A: Click "Deploy" again in the desktop app — it overwrites the live version and reuses environment variables.
 

@@ -46,6 +46,9 @@ A: Upload ~1 minute, cloud build 2–5 minutes. You can cancel mid-way.
 **Q: Can I change the password on the live admin?**
 A: Yes, identical to local. Forgot it? Reset via Settings → Account in the desktop app.
 
+**Q: How do I enable comment spam protection?**
+A: In the desktop app, open Settings → Comments and paste the Cloudflare Turnstile Site Key and Secret Key (create a site in the [Turnstile console](https://dash.cloudflare.com/?to=/:account/turnstile) to get both). Local comments get human verification immediately, and one-click deploys carry the keys over automatically — the live site is protected the same way.
+
 **Q: Want your own domain?**
 A: Vercel console → project → **Settings → Domains**, add your domain and follow the DNS prompts — live within minutes.
 

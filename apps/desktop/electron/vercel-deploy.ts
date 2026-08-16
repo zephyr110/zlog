@@ -471,6 +471,21 @@ export function buildEnvList(cfg: DesktopConfig): DeployEnv[] {
   if (cfg.gaPrivateKey) {
     env.push({ key: "GA_PRIVATE_KEY", value: cfg.gaPrivateKey, target: ["production"] })
   }
+  // 评论防垃圾：配置了 Turnstile 则随部署透传（本地与线上评论防护一致）
+  if (cfg.turnstileSiteKey) {
+    env.push({
+      key: "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
+      value: cfg.turnstileSiteKey,
+      target: ["production"],
+    })
+  }
+  if (cfg.turnstileSecretKey) {
+    env.push({
+      key: "TURNSTILE_SECRET_KEY",
+      value: cfg.turnstileSecretKey,
+      target: ["production"],
+    })
+  }
   return env
 }
 

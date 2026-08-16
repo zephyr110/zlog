@@ -50,6 +50,7 @@ describe("settings i18n coverage", () => {
     for (const key of [
       "nav.sync",
       "nav.analytics",
+      "nav.comments",
       "nav.publish",
       "nav.data",
       "nav.lang",
@@ -64,13 +65,14 @@ describe("settings i18n coverage", () => {
   it("侧栏顺序：线上部署在同步设置之后", () => {
     const nav = html.match(/<nav class="sidebar-nav">([\s\S]*?)<\/nav>/)![1]
     const panels = [...nav.matchAll(/data-panel="([^"]+)"/g)].map((m) => m[1])
-    expect(panels).toEqual(["sync", "publish", "analytics", "data", "lang", "about"])
+    expect(panels).toEqual(["sync", "publish", "analytics", "comments", "data", "lang", "about"])
   })
 
   it("各面板内容区用浅底 .block 分组，流量拆成 Vercel / GA", () => {
     for (const id of [
       "panel-sync",
       "panel-analytics",
+      "panel-comments",
       "panel-publish",
       "panel-data",
       "panel-lang",
@@ -80,7 +82,7 @@ describe("settings i18n coverage", () => {
     }
     expect(html).toContain('data-i18n="analytics.vercelTitle"')
     expect(html).toContain('data-i18n="analytics.gaTitle"')
-    expect(html.match(/id="panel-analytics"[\s\S]*?id="panel-data"/)![0].match(/class="block"/g)?.length).toBe(3)
+    expect(html.match(/id="panel-analytics"[\s\S]*?id="panel-data"/)![0].match(/class="block"/g)?.length).toBe(4)
     expect(html).toContain('id="httpsProxy"')
     expect(html).toContain('data-i18n="analytics.proxyTitle"')
     expect(html).toContain('data-i18n="analytics.proxyHint"')

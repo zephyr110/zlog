@@ -58,6 +58,14 @@ const I18N = {
     "analytics.gaEmail": "服务账号邮箱",
     "analytics.gaKey": "服务账号私钥",
     "analytics.hint": "服务账号需在该媒体资源中授予「查看者」权限；详细步骤见 README 的部署章节",
+    "nav.comments": "评论设置",
+    "comments.title": "评论防垃圾",
+    "comments.subtitle": "Cloudflare Turnstile 人机验证",
+    "comments.siteKey": "Site Key（公开）",
+    "comments.secretKey": "Secret Key（私密）",
+    "comments.siteKeyPh": "0x4AAAAAA…",
+    "comments.secretKeyPh": "0x4AAAAAA…",
+    "comments.hint": "在 Cloudflare Turnstile 控制台创建站点后获得两个 Key。配置后本地评论启用人机验证；一键部署到 Vercel 时自动透传，线上防护一致。留空则评论不显示验证码",
     "analytics.proxyTitle": "网络代理",
     "analytics.proxyPh": "http:// 或 socks5://主机:端口",
     "analytics.proxyHint": "用于拉取 Vercel Analytics 与 Google Analytics 4。留空则自动读取系统/VPN 的 HTTP 或 SOCKS 代理。SOCKS 端口请填 socks5://，不要写成 http://",
@@ -195,6 +203,14 @@ const I18N = {
     "analytics.gaEmail": "Service account email",
     "analytics.gaKey": "Service account private key",
     "analytics.hint": "Grant the service account Viewer access on this property; see the README deployment section for steps",
+    "nav.comments": "Comments",
+    "comments.title": "Comment spam protection",
+    "comments.subtitle": "Cloudflare Turnstile verification",
+    "comments.siteKey": "Site Key (public)",
+    "comments.secretKey": "Secret Key (private)",
+    "comments.siteKeyPh": "0x4AAAAAA…",
+    "comments.secretKeyPh": "0x4AAAAAA…",
+    "comments.hint": "Create a site in the Cloudflare Turnstile console to get both keys. When set, local comments get human verification, and one-click Vercel deploys carry them over automatically. Leave empty to skip the captcha",
     "analytics.proxyTitle": "Proxy",
     "analytics.proxyPh": "http:// or socks5://host:port",
     "analytics.proxyHint": "Used to fetch Vercel Analytics and Google Analytics 4. Leave empty to read the system/VPN HTTP or SOCKS proxy. Use socks5:// for a SOCKS port; do not write it as http://",
@@ -447,6 +463,8 @@ if (isFirstRun) {
     set("gaPropertyId", cfg.gaPropertyId)
     set("gaClientEmail", cfg.gaClientEmail)
     set("gaPrivateKey", cfg.gaPrivateKey)
+    set("turnstileSiteKey", cfg.turnstileSiteKey)
+    set("turnstileSecretKey", cfg.turnstileSecretKey)
     set("httpsProxy", cfg.httpsProxy)
   })
 }
@@ -455,6 +473,7 @@ if (isFirstRun) {
 const PANEL_META = {
   sync: { titleKey: "sync.title", subtitleKey: "sync.subtitle" },
   analytics: { titleKey: "analytics.title", subtitleKey: "analytics.subtitle" },
+  comments: { titleKey: "comments.title", subtitleKey: "comments.subtitle" },
   data: { titleKey: "data.title", subtitleKey: "data.subtitle" },
   lang: { titleKey: "lang.title", subtitleKey: "lang.subtitle" },
   publish: { titleKey: "publish.title", subtitleKey: "publish.subtitle" },
@@ -635,6 +654,8 @@ async function doSave() {
     gaPropertyId: document.getElementById("gaPropertyId").value.trim(),
     gaClientEmail: document.getElementById("gaClientEmail").value.trim(),
     gaPrivateKey: document.getElementById("gaPrivateKey").value.trim(),
+    turnstileSiteKey: document.getElementById("turnstileSiteKey").value.trim(),
+    turnstileSecretKey: document.getElementById("turnstileSecretKey").value.trim(),
     httpsProxy: document.getElementById("httpsProxy").value.trim(),
   }
   const username = document.getElementById("username")

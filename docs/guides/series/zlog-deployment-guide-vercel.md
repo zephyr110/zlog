@@ -46,6 +46,9 @@ A：上传约 1 分钟，云端构建约 2-5 分钟。中途可点「取消」�
 **Q：线上后台能改密码吗？**
 A：可以，与本地体验一致。忘了密码就在桌面端「设置 → 账号」重置。
 
+**Q：如何开启评论防垃圾？**
+A：桌面端「设置 → 评论设置」里填入 Cloudflare Turnstile 的 Site Key 与 Secret Key（在 [Turnstile 控制台](https://dash.cloudflare.com/?to=/:account/turnstile) 创建一个站点即可获得）。配置后本地评论即启用人机验证；一键部署时这两个 Key 会自动透传，线上评论防护与本地一致。
+
 **Q：想要自己的域名？**
 A：Vercel 控制台项目页 → **Settings → Domains**，添加你的域名并按提示配置 DNS，几分钟生效。
 

@@ -49,6 +49,9 @@ export function buildServerEnv(
   if (cfg.gaPropertyId) env.GA_PROPERTY_ID = cfg.gaPropertyId
   if (cfg.gaClientEmail) env.GA_CLIENT_EMAIL = cfg.gaClientEmail
   if (cfg.gaPrivateKey) env.GA_PRIVATE_KEY = cfg.gaPrivateKey
+  // 评论防垃圾（Cloudflare Turnstile）：site key 前端加载、secret key 后端校验
+  if (cfg.turnstileSiteKey) env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = cfg.turnstileSiteKey
+  if (cfg.turnstileSecretKey) env.TURNSTILE_SECRET_KEY = cfg.turnstileSecretKey
   const proxy = httpsProxy?.trim()
   if (proxy) {
     if (isSocksProxyUrl(proxy)) {
