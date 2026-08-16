@@ -44,7 +44,7 @@ function sourceTarballUrl(version: string): string {
 const REQUEST_TIMEOUT_MS = 15_000
 /** 上传部署（整个源码树内联 JSON）比普通 API 调用大得多——放宽超时。 */
 const UPLOAD_TIMEOUT_MS = 90_000
-const SOURCE_DOWNLOAD_TIMEOUT_MS = 60_000
+const SOURCE_DOWNLOAD_TIMEOUT_MS = 120_000
 /** public/ 资产二进制单文件上限。 */
 const PUBLIC_ASSET_MAX_BYTES = 4 * 1024 * 1024
 /** buildDeployFiles 产出的二进制文件标记（data 前缀）。deploy() 识别该
