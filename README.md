@@ -124,6 +124,24 @@ Turso database (offline writes sync back when you are online).
 - Data & logs: user data directory (`zlog.db`, `zlog-config.json`,
   `logs/`). Back up the directory to back up the blog.
 
+### macOS first install (unsigned builds)
+
+Release builds are ad-hoc signed but not notarized (no Apple Developer
+account), so Gatekeeper shows a warning on first launch:
+
+1. Download the `.dmg` from Releases and drag `Zlog.app` into
+   `Applications`.
+2. First open: **right-click the app → Open → Open** (confirm once;
+   macOS remembers the approval afterwards). Alternatively run
+   `xattr -dr com.apple.quarantine /Applications/Zlog.app` in Terminal.
+3. If you see "Zlog can no longer be opened" after replacing an older
+   installed version, run `xattr -cr /Applications/Zlog.app` and open it
+   again — the signature is ad-hoc, so LaunchServices caches the old
+   registration until the extended attributes are cleared.
+
+Fully silent installs (double-click, no prompts) require signing with an
+Apple Developer ID certificate and notarization.
+
 > Unsigned builds: macOS Gatekeeper and Windows SmartScreen will warn —
 > right-click → Open on macOS, "More info → Run anyway" on Windows.
 

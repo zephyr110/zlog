@@ -23,6 +23,9 @@ extraResources:
     filter:
       - "**/*"
 asar: false
+# 无开发者证书时对 .app 做 ad-hoc 签名（dmg/zip 生成前）——消除
+# "not signed at all" 导致的 Gatekeeper/LaunchServices 异常（见脚本注释）
+afterPack: ./scripts/after-pack.cjs
 mac:
   category: public.app-category.weblog
   # 版本号来自 tag（CI 同步进 package.json），arch 为 x64/arm64

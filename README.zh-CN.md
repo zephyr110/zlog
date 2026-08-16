@@ -85,7 +85,15 @@ CI 执行 `pnpm export`（`NEXT_EXPORT=true`），在**构建时**查询 Turso�
 - 首次启动：创建你的管理员账号；可选地在向导中粘贴 Turso 数据库 URL + token 以启用同步。
 - 数据与日志：用户数据目录（`zlog.db`、`zlog-config.json`、`logs/`）。备份该目录即备份博客。
 
-> 免签名构建：macOS Gatekeeper 与 Windows SmartScreen 会提示警告——macOS 右键 → 打开，Windows「更多信息 → 仍要运行」。
+### macOS 首次安装（免公证构建）
+
+发布包为 ad-hoc 签名（未公证，无 Apple 开发者账号），Gatekeeper 首次启动会提示：
+
+1. 从 Releases 下载 `.dmg`，把 `Zlog.app` 拖入「应用程序」。
+2. 首次打开：**右键应用 → 打开 → 再点「打开」**（确认一次后 macOS 会记住放行）；或在终端执行 `xattr -dr com.apple.quarantine /Applications/Zlog.app`。
+3. 若替换旧版本安装后提示「应用程序已不能再打开」，执行 `xattr -cr /Applications/Zlog.app` 后重新打开——签名是 ad-hoc 的，LaunchServices 会缓存旧的注册状态，清除扩展属性后即恢复正常。
+
+完全无提示安装（双击即开）需要 Apple Developer ID 证书签名 + 公证。Windows SmartScreen 提示时选「更多信息 → 仍要运行」。
 
 ## Web 端与桌面端并用（账号模型）
 
