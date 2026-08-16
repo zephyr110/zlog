@@ -690,6 +690,41 @@ describe("VercelDeployer", () => {
     expect(uploadCalls).toBe(2)
   })
 
+  it("uploadBinaryFiles 文件已存在（空响应去重）→ 用本地 digest 作 sha", async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02])
+    const digest = createHash("sha1").update(png).digest("hex")
+    let createBody: { files?: unknown[] } = {}
+    const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      if (url === "https://api.vercel.com/v2/now/files") {
+        // Vercel 内容寻址去重：文件已存在 → 空响应
+        return new Response("{}", { status: 200 })
+      }
+      if (url === "https://api.vercel.com/v13/deployments") {
+        createBody = JSON.parse(String(init?.body))
+        return new Response(JSON.stringify({ id: "dpl", url: "p.vercel.app" }), { status: 200 })
+      }
+      if (url === "https://api.vercel.com/v13/deployments/dpl") {
+        return new Response(JSON.stringify({ readyState: "READY" }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ error: { message: "not found" } }), { status: 404 })
+    }) as typeof fetch
+    const deployer = new VercelDeployer({
+      token: "t",
+      projectName: "p",
+      version: "1.0.0",
+      config: cfg,
+      onProgress,
+      fetchImpl,
+      pollIntervalMs: 5,
+    })
+    await deployer.deploy(
+      [{ file: "public/logo.png", data: `${BINARY_DATA_PREFIX}${png.toString("base64")}` }],
+      "prj"
+    )
+    expect(createBody.files).toEqual([{ file: "public/logo.png", sha: digest }])
+  })
+
   it("splitDeployFiles 前缀但非法 base64 → 按文本处理（不静默损坏）", () => {
     const { textFiles, binaryFiles } = splitDeployFiles([
       // 文本恰好以 BINARY_DATA_PREFIX 开头 + 非 base64 内容

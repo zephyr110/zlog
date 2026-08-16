@@ -832,18 +832,35 @@ export class VercelDeployer {
             } catch {
               body = text
             }
-            // 响应 {"urls":["https://…/<sha>"]}——sha 即 URL 尾段。防御性
-            // 校验：类型、40 位 hex、与本地 digest 一致（响应格式漂移时
-            // 当场报错，而不是把错误值当引用交给 create）
+            // 响应 {"urls":["https://…/<sha>"]}——sha 即 URL 尾段（40 位
+            // hex，等于本地 digest）。Vercel 按内容寻址去重：文件已存在
+            // 时返回空响应 {}——此时 sha 就是本地 digest（实测部署文件
+            // 树的 uid 即内容 sha1 hex）。
             const urls = (body as { urls?: unknown[] })?.urls
-            const raw = typeof urls?.[0] === "string" ? (urls[0] as string).split("/").pop() : undefined
-            if (typeof raw !== "string" || !/^[0-9a-f]{40}$/.test(raw) || raw !== digest) {
+            const raw =
+              Array.isArray(urls) && typeof urls[0] === "string"
+                ? (urls[0] as string).split("/").pop()
+                : undefined
+            let sha: string
+            if (typeof raw === "string" && /^[0-9a-f]{40}$/.test(raw)) {
+              // 有响应值但格式合法——必须与内容一致（格式漂移时当场
+              // 报错，而不是把错误引用交给 create）
+              if (raw !== digest) {
+                throw new VercelDeployError(
+                  `上传二进制文件 ${file} 响应异常（sha 与上传内容不符）`,
+                  "api"
+                )
+              }
+              sha = raw
+            } else if (!urls || urls.length === 0) {
+              sha = digest // 已存在（去重）——内容寻址，digest 即引用
+            } else {
               throw new VercelDeployError(
-                `上传二进制文件 ${file} 响应异常（sha 与上传内容不符）`,
+                `上传二进制文件 ${file} 响应异常（sha 格式不符）`,
                 "api"
               )
             }
-            return { file, sha: raw }
+            return { file, sha }
           } catch (err) {
             // 统一归一化为 VercelDeployError（原始异常与内部错误同路径），
             // 再统一判定重试——fetch 抛的裸 TypeError 同样获得重试机会
