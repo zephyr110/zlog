@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireAuth } from "@/lib/api-auth"
+import { isDemoMode } from "@/lib/demo-mode"
 import { verifyLogin, hashPassword, recordFailedAttempt } from "@zlog/auth"
 import { setUserPassword, clearLoginFailures } from "@zlog/database"
 
@@ -19,6 +20,14 @@ const changePasswordSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // 演示环境：拦截一切改密请求（放在认证之前，最严格）
+    if (isDemoMode()) {
+      return NextResponse.json(
+        { error: "Password changes are disabled in the demo environment" },
+        { status: 403 }
+      )
+    }
+
     const user = await requireAuth(request)
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

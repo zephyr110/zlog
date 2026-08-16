@@ -8,6 +8,8 @@
 
 静态镜像（GitHub Pages）：[zephyr110.github.io](https://zephyr110.github.io)
 
+访客演示站（体验完整功能）：[zlog-test.vercel.app](https://zlog-test.vercel.app) — 浏览博客，并在 `/admin` 用 `admin-test` / `admin123456` 登录后台（演示环境禁止修改密码、分析数据为模拟数据；登录表单已自动填写账号密码）
+
 ![home_dark](https://cdn.jsdelivr.net/gh/zephyr110/blog-img/1786200886932-zephyr110.vercel.app___1_.png)
 
 ![alt text](https://cdn.jsdelivr.net/gh/zephyr110/blog-img/1786337581535-zephyr110.vercel.app_admin_dashboard_macbook_pro_1.png)
@@ -72,7 +74,7 @@ CI 执行 `pnpm export`（`NEXT_EXPORT=true`），在**构建时**查询 Turso�
 
 写作请用本地 `pnpm dev` 或 Vercel 上的 `/admin`；Pages 是由 CI 刷新的静态镜像。
 
-详细图示与清单见[部署指南](https://zephyr110.vercel.app/posts/zlog-deployment-guide)。
+详细图示与清单见[部署指南](https://zlog-test.vercel.app/posts/zlog-deployment-guide)（英文版：[zlog-deployment-guide-en](https://zlog-test.vercel.app/posts/zlog-deployment-guide-en)）。
 
 ## 桌面应用（macOS / Windows / Linux）
 
@@ -118,7 +120,7 @@ pnpm dev          # 博客 :3000，后台 /admin/login
 - **Vercel Analytics**（UI 默认数据源）：`VERCEL_API_TOKEN`、`VERCEL_ANALYTICS_PROJECT_ID`，可选 `VERCEL_ANALYTICS_TEAM_ID`
 - **GA4**：`NEXT_PUBLIC_GA_MEASUREMENT_ID`（前台 gtag），以及服务端 `GA_PROPERTY_ID` / `GA_CLIENT_EMAIL` / `GA_PRIVATE_KEY`。需在 GCP 项目启用 **Google Analytics Data API**，并把服务账号加为 GA4 媒体资源的 **查看者**
 
-详见 `apps/web/.env.local.example` 与[部署指南](https://zephyr110.vercel.app/posts/zlog-deployment-guide)。
+详见 `apps/web/.env.local.example` 与[部署指南](https://zlog-test.vercel.app/posts/zlog-deployment-guide)（英文版：[zlog-deployment-guide-en](https://zlog-test.vercel.app/posts/zlog-deployment-guide-en)）。
 
 不依赖环境变量创建/重置管理员：
 

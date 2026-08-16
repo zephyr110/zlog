@@ -8,6 +8,8 @@ Live (Vercel): [zephyr110.vercel.app](https://zephyr110.vercel.app)
 
 Static mirror (GitHub Pages): [zephyr110.github.io](https://zephyr110.github.io)
 
+Live demo (visitor playground): [zlog-test.vercel.app](https://zlog-test.vercel.app) — browse the blog and sign in to the admin at `/admin` with `admin-test` / `admin123456` (password changes are blocked and analytics are mocked in the demo; credentials are pre-filled on the login form)
+
 ![home_dark](https://cdn.jsdelivr.net/gh/zephyr110/blog-img/1786200886932-zephyr110.vercel.app___1_.png)
 
 ![alt text](https://cdn.jsdelivr.net/gh/zephyr110/blog-img/1786337581535-zephyr110.vercel.app_admin_dashboard_macbook_pro_1.png)
@@ -75,8 +77,8 @@ Writing then happens in two places, both syncing to the same Turso DB:
   SQLite file becomes an embedded replica of Turso — writes sync
   automatically.
 
-See the [deployment guide](https://zephyr110.vercel.app/posts/zlog-deployment-guide)
-for diagrams and checklists.
+See the [deployment guide](https://zlog-test.vercel.app/posts/zlog-deployment-guide)
+for diagrams and checklists (English: [zlog-deployment-guide-en](https://zlog-test.vercel.app/posts/zlog-deployment-guide-en)).
 
 ### 1. Vercel (SSR + admin)
 
@@ -106,7 +108,7 @@ CI runs `pnpm export` (`NEXT_EXPORT=true`), queries Turso **at build time**, and
 
 Writing happens on local `pnpm dev` or on the Vercel `/admin`; the Pages site is a static mirror refreshed by CI.
 
-See the [deployment guide](https://zephyr110.vercel.app/posts/zlog-deployment-guide) for diagrams and checklists.
+See the [deployment guide](https://zlog-test.vercel.app/posts/zlog-deployment-guide) for diagrams and checklists (English: [zlog-deployment-guide-en](https://zlog-test.vercel.app/posts/zlog-deployment-guide-en)).
 
 ## Desktop App (macOS / Windows / Linux)
 

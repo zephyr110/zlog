@@ -6,6 +6,7 @@ const zh = {
 
 loginTitle: "登录",
 loginDesc: "使用管理员账号进入后台",
+demoHint: "演示环境：账号密码已自动填写，直接点击登录即可",
 username: "用户名",
 password: "密码",
 showPassword: "显示密码",
@@ -313,6 +314,7 @@ const en = {
 
 loginTitle: "Sign in",
 loginDesc: "Use your admin account to continue",
+demoHint: "Demo environment: credentials are pre-filled — just click sign in",
 username: "Username",
 password: "Password",
 showPassword: "Show password",

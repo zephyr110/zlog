@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
+import { mockAnalyticsReport } from "@/lib/demo-analytics"
+import { isDemoMode } from "@/lib/demo-mode"
 import {
   AnalyticsFetchError,
   fetchAnalyticsReport,
@@ -23,6 +25,14 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const source = parseAnalyticsSource(url.searchParams.get("source"))
   const range = parseAnalyticsRange(url.searchParams.get("range"))
+
+  // 演示环境：两个来源都返回 mock 数据（访客体验完整 Traffic 面板）
+  if (isDemoMode()) {
+    return NextResponse.json(mockAnalyticsReport(source, range), {
+      headers: { "Cache-Control": "private, max-age=60" },
+    })
+  }
+
   const available = {
     ga: isGaConfigured(),
     vercel: isVercelAnalyticsConfigured(),

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useSiteConfig } from "@/components/layout/site-config-provider"
+import { DEMO_ACCOUNT, isDemoMode } from "@/lib/demo-mode"
 import { siteLogoSrc } from "@/lib/site-config"
 import { SiteLogo } from "@/components/layout/site-logo"
 import { useT } from "@/components/layout/trans"
@@ -100,9 +101,10 @@ export default function AdminLoginPage() {
   const { t } = useT()
   const site = useSiteConfig()
   const logoSrc = siteLogoSrc(site)
+  const demo = isDemoMode()
   const [mode, setMode] = useState<LoginMode>("login")
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
+  const [username, setUsername] = useState(demo ? DEMO_ACCOUNT.username : "")
+  const [password, setPassword] = useState(demo ? DEMO_ACCOUNT.password : "")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [shake, setShake] = useState(false)
@@ -250,7 +252,7 @@ export default function AdminLoginPage() {
           </Link>
           <h1 className="mt-4 whitespace-nowrap text-sm font-normal text-muted-foreground">
             {mode === "login"
-              ? (t("admin.loginDesc"))
+              ? (demo ? t("admin.demoHint") : t("admin.loginDesc"))
               : (t("admin.resetPassword"))}
           </h1>
         </div>
