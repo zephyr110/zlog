@@ -2,20 +2,23 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import {
+  ServerManager,
+  envWithoutInheritedProxy,
+  type ForkServer,
+  type ServerChild,
+} from "../electron/server-manager"
 
-const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }))
-vi.mock("node:child_process", () => ({ spawn: spawnMock }))
-
-import { ServerManager, envWithoutInheritedProxy } from "../electron/server-manager"
-
-function fakeChild() {
+function fakeChild(): ServerChild & { emit: (ev: string, ...args: unknown[]) => void } {
   const events: Record<string, Function[]> = {}
   return {
-    stdout: { on: vi.fn((ev, cb) => cb?.("stdout-data")) },
-    stderr: { on: vi.fn() },
-    kill: vi.fn(),
-    on: (ev: string, cb: Function) => { events[ev] = [...(events[ev] || []), cb] },
-    emit: (ev: string, ...args: unknown[]) => (events[ev] || []).forEach((cb) => cb(...args)),
+    stdout: { on: vi.fn((ev, cb) => cb?.("stdout-data")) } as unknown as ServerChild["stdout"],
+    stderr: { on: vi.fn() } as unknown as ServerChild["stderr"],
+    kill: vi.fn(() => true),
+    on: (ev, cb) => {
+      events[ev] = [...(events[ev] || []), cb]
+    },
+    emit: (ev, ...args) => (events[ev] || []).forEach((cb) => cb(...args)),
   }
 }
 
@@ -38,9 +41,10 @@ describe("envWithoutInheritedProxy", () => {
 
 describe("ServerManager", () => {
   let dir: string
+  let forkMock: ReturnType<typeof vi.fn<ForkServer>>
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "zlog-srv-"))
-    spawnMock.mockReset()
+    forkMock = vi.fn()
   })
   // createWriteStream 的 fs.open 是异步的：删除目录可能撞上 open 落地，
   // 触发 ENOTEMPTY（或删除后到达的 open 抛未捕获 ENOENT）—— 短暂重试
@@ -59,30 +63,41 @@ describe("ServerManager", () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  it("start 以 ELECTRON_RUN_AS_NODE 拉起服务器并绑定 127.0.0.1", async () => {
+  it("start 以 utilityProcess 风格 fork 拉起服务器并绑定 127.0.0.1（不设 ELECTRON_RUN_AS_NODE）", async () => {
     const child = fakeChild()
-    spawnMock.mockReturnValue(child)
+    forkMock.mockReturnValue(child)
     const onExit = vi.fn()
-    const mgr = new ServerManager("/fake/server.js", dir, onExit, async () => {})
+    const mgr = new ServerManager(
+      "/fake/server.js",
+      dir,
+      onExit,
+      async () => {},
+      forkMock
+    )
     await mgr.start({ TURSO_DATABASE_URL: "file:test.db", SESSION_SECRET: "s" })
-    expect(spawnMock).toHaveBeenCalledTimes(1)
-    const [bin, args, opts] = spawnMock.mock.calls[0]
-    expect(bin).toBe(process.execPath)
-    expect(args).toEqual(["/fake/server.js"])
-    expect(opts.env.ELECTRON_RUN_AS_NODE).toBe("1")
-    expect(opts.env.HOSTNAME).toBe("127.0.0.1")
-    expect(opts.env.HTTPS_PROXY).toBeUndefined()
-    expect(opts.env.https_proxy).toBeUndefined()
-    expect(opts.env.ALL_PROXY).toBeUndefined()
-    expect(Number(opts.env.PORT)).toBeGreaterThan(0)
+    expect(forkMock).toHaveBeenCalledTimes(1)
+    const [modulePath, env] = forkMock.mock.calls[0]
+    expect(modulePath).toBe("/fake/server.js")
+    expect(env.ELECTRON_RUN_AS_NODE).toBeUndefined()
+    expect(env.HOSTNAME).toBe("127.0.0.1")
+    expect(env.HTTPS_PROXY).toBeUndefined()
+    expect(env.https_proxy).toBeUndefined()
+    expect(env.ALL_PROXY).toBeUndefined()
+    expect(Number(env.PORT)).toBeGreaterThan(0)
     expect(mgr.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/)
   })
 
   it("服务器退出触发 onExit 回调", async () => {
     const child = fakeChild()
-    spawnMock.mockReturnValue(child)
+    forkMock.mockReturnValue(child)
     const onExit = vi.fn()
-    const mgr = new ServerManager("/fake/server.js", dir, onExit, async () => {})
+    const mgr = new ServerManager(
+      "/fake/server.js",
+      dir,
+      onExit,
+      async () => {},
+      forkMock
+    )
     await mgr.start({ TURSO_DATABASE_URL: "file:test.db", SESSION_SECRET: "s" })
     child.emit("exit", 1)
     expect(onExit).toHaveBeenCalledWith(1)
@@ -90,11 +105,17 @@ describe("ServerManager", () => {
 
   it("健康检查失败时终止刚拉起的子进程、拒绝 start 且不触发 onExit", async () => {
     const child = fakeChild()
-    spawnMock.mockReturnValue(child)
+    forkMock.mockReturnValue(child)
     const onExit = vi.fn()
-    const mgr = new ServerManager("/fake/server.js", dir, onExit, async () => {
-      throw new Error("health check timeout")
-    })
+    const mgr = new ServerManager(
+      "/fake/server.js",
+      dir,
+      onExit,
+      async () => {
+        throw new Error("health check timeout")
+      },
+      forkMock
+    )
     await expect(
       mgr.start({ TURSO_DATABASE_URL: "file:test.db", SESSION_SECRET: "s" })
     ).rejects.toThrow("health check timeout")
@@ -104,8 +125,14 @@ describe("ServerManager", () => {
 
   it("stop 终止子进程", async () => {
     const child = fakeChild()
-    spawnMock.mockReturnValue(child)
-    const mgr = new ServerManager("/fake/server.js", dir, vi.fn(), async () => {})
+    forkMock.mockReturnValue(child)
+    const mgr = new ServerManager(
+      "/fake/server.js",
+      dir,
+      vi.fn(),
+      async () => {},
+      forkMock
+    )
     await mgr.start({ TURSO_DATABASE_URL: "file:test.db", SESSION_SECRET: "s" })
     mgr.stop()
     expect(child.kill).toHaveBeenCalled()
@@ -114,9 +141,15 @@ describe("ServerManager", () => {
   it("旧子进程延迟的 exit 不清掉新子进程引用，stop 仍能终止新子进程", async () => {
     const child1 = fakeChild()
     const child2 = fakeChild()
-    spawnMock.mockReturnValueOnce(child1).mockReturnValueOnce(child2)
+    forkMock.mockReturnValueOnce(child1).mockReturnValueOnce(child2)
     const onExit = vi.fn()
-    const mgr = new ServerManager("/fake/server.js", dir, onExit, async () => {})
+    const mgr = new ServerManager(
+      "/fake/server.js",
+      dir,
+      onExit,
+      async () => {},
+      forkMock
+    )
     await mgr.start({ TURSO_DATABASE_URL: "file:test.db", SESSION_SECRET: "s" })
     mgr.stop()
     await mgr.start({ TURSO_DATABASE_URL: "file:test.db", SESSION_SECRET: "s" })

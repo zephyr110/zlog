@@ -1,4 +1,3 @@
-import { spawn, type ChildProcess } from "node:child_process"
 import { createWriteStream, mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { createServer } from "node:net"
@@ -22,9 +21,41 @@ export function envWithoutInheritedProxy(
   return out
 }
 
+/**
+ * Next 服务子进程最小接口（utilityProcess 与测试 fake 共用）。
+ * 不用 child_process.spawn(process.execPath)：macOS 会把第二个 Electron
+ * 二进制当成独立 GUI 应用，Dock 多出一个名为 "exec" 的图标。
+ */
+export type ServerChild = {
+  stdout: { on: (event: "data", listener: (chunk: Buffer) => void) => unknown } | null
+  stderr: { on: (event: "data", listener: (chunk: Buffer) => void) => unknown } | null
+  kill: () => boolean | void
+  on: (event: "exit", listener: (code: number) => void) => void
+}
+
+export type ForkServer = (
+  modulePath: string,
+  env: NodeJS.ProcessEnv
+) => ServerChild
+
+/** 默认用 Chromium Services / Helper 拉起 Node，不进 Dock。 */
+export function defaultForkServer(
+  modulePath: string,
+  env: NodeJS.ProcessEnv
+): ServerChild {
+  // 延迟 require：单测注入 fork 时不必加载 electron
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { utilityProcess } = require("electron") as typeof import("electron")
+  return utilityProcess.fork(modulePath, [], {
+    env,
+    stdio: "pipe",
+    serviceName: "zlog-web-server",
+  })
+}
+
 /** 管理 Next standalone 服务器子进程（数据库唯一持有者）。 */
 export class ServerManager {
-  private child: ChildProcess | null = null
+  private child: ServerChild | null = null
   private currentPort = 0
   private logStream: ReturnType<typeof createWriteStream> | null = null
 
@@ -33,7 +64,12 @@ export class ServerManager {
     private readonly logDir: string,
     private readonly onExit: (code: number | null) => void,
     /** 测试注入点：健康检查函数。 */
-    private readonly waitHealthy: (port: number, timeoutMs: number) => Promise<void> = waitHealthyDefault
+    private readonly waitHealthy: (
+      port: number,
+      timeoutMs: number
+    ) => Promise<void> = waitHealthyDefault,
+    /** 测试注入点：拉起子进程（默认 utilityProcess.fork）。 */
+    private readonly forkServer: ForkServer = defaultForkServer
   ) {}
 
   /** 探测一个空闲端口（释放后交给子进程使用；竞态窗口可接受）。 */
@@ -57,16 +93,12 @@ export class ServerManager {
     // open 或写入会触发 'error'（ENOENT）—— 不监听会变成未捕获异常
     // （CI Linux 实测：测试删目录后 open 落地导致 vitest 报 unhandled error）
     this.logStream.on("error", () => {})
-    this.child = spawn(process.execPath, [this.serverJsPath], {
-      env: {
-        ...envWithoutInheritedProxy(process.env),
-        ...env,
-        ELECTRON_RUN_AS_NODE: "1",
-        PORT: String(this.currentPort),
-        HOSTNAME: "127.0.0.1",
-        NEXT_TELEMETRY_DISABLED: "1",
-      },
-      stdio: ["ignore", "pipe", "pipe"],
+    this.child = this.forkServer(this.serverJsPath, {
+      ...envWithoutInheritedProxy(process.env),
+      ...env,
+      PORT: String(this.currentPort),
+      HOSTNAME: "127.0.0.1",
+      NEXT_TELEMETRY_DISABLED: "1",
     })
     this.child.stdout?.on("data", (d: Buffer) => this.logStream?.write(d))
     this.child.stderr?.on("data", (d: Buffer) => this.logStream?.write(d))

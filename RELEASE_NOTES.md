@@ -1,5 +1,11 @@
 # Zlog Desktop — Release Notes
 
+## v1.0.9
+
+- Fix macOS Dock showing a second "exec" icon: run the embedded Next
+  server via `utilityProcess.fork` (Helper) instead of
+  `spawn(process.execPath)` + `ELECTRON_RUN_AS_NODE`.
+
 ## v1.0.8
 
 - Fix flaky settings smoke test: `waitForURL` compared a URL object to a
