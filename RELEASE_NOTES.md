@@ -1,5 +1,10 @@
 # Zlog Desktop — Release Notes
 
+## v1.0.8
+
+- Fix flaky settings smoke test: `waitForURL` compared a URL object to a
+  string (always true), so evaluate raced the post-save server restart.
+
 ## v1.0.7
 
 - Fix update check treating draft-only GitHub Releases (404) as a network
