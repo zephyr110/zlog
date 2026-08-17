@@ -752,7 +752,10 @@ export function TrafficAnalytics() {
           {/* 全部/自定义 的覆盖范围与回填进度（预设无覆盖提示，语义自明）。 */}
           {state.status === "ok" &&
             (range === "all" || range === "custom") && (
-              <p className="text-xs text-muted-foreground">
+              <p
+                key={`note:${range}:${state.data.customRange.start}:${state.data.customRange.end}`}
+                className="animate-in fade-in duration-300 text-xs text-muted-foreground"
+              >
                 {t("admin.analyticsEffectiveRange")(
                   state.data.customRange.start,
                   state.data.customRange.end
@@ -842,9 +845,15 @@ export function TrafficAnalytics() {
       </div>
 
       {state.status === "loading" ? (
-        <TrafficSkeleton />
+        <div className="animate-in fade-in duration-200">
+          <TrafficSkeleton />
+        </div>
       ) : state.status === "ok" ? (
-        <>
+        // key 随筛选条件变化：source/range/自定义区间切换时整块淡入上滑
+        <div
+          key={`${source}:${range}:${custom.start}:${custom.end}`}
+          className="flex flex-col gap-5 md:gap-6 animate-in fade-in slide-in-from-bottom-1 duration-300"
+        >
           <div className="grid grid-cols-2 gap-3 sm:gap-5">
             <Card>
               <CardHeader>
@@ -914,7 +923,7 @@ export function TrafficAnalytics() {
               usersLabel={t("admin.analyticsUsers")}
             />
           </div>
-        </>
+        </div>
       ) : emptyCopy ? (
         <EmptyState
           className="rounded-xl bg-card py-12 ring-1 ring-foreground/10"
