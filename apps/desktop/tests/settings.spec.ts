@@ -91,20 +91,36 @@ test("settings mode: prefill, preserve analytics on save, button resets, nav sur
     // 4) 保存触发了服务器重启（新端口）；站内 target=_blank 链接仍应用内
     //    导航（C2 回归：用重启后的新端口验证）
     const preSaveUrl = blog!.url()
-    await blog!.waitForURL((u) => u !== preSaveUrl, { timeout: 30_000 })
-    // URL 变化时导航可能仍在进行——等页面加载完再注入测试链接
-    await blog!.waitForLoadState("domcontentloaded", { timeout: 30_000 })
+    await blog!.waitForURL(
+      (u) => u !== preSaveUrl && /^http:\/\/127\.0\.0\.1:\d+\/?$/.test(u.href),
+      { timeout: 30_000 }
+    )
+    // Next 冷启动后偶发二次导航（hydration / soft redirect）会毁掉刚
+    // 拿到的 execution context；等 body 可见后再带重试注入测试链接。
+    await expect(blog!.locator("body")).toBeVisible({ timeout: 30_000 })
     const blogUrl = blog!.url().replace(/\/$/, "")
-    await blog!.evaluate((b) => {
-      const a = document.createElement("a")
-      a.href = b + "/feed.xml"
-      a.target = "_blank"
-      a.id = "postSaveLink"
-      a.textContent = "TEST"
-      a.style.position = "fixed"
-      a.style.zIndex = "9999"
-      document.body.appendChild(a)
-    }, blogUrl)
+    const injectDeadline = Date.now() + 15_000
+    for (;;) {
+      try {
+        await blog!.evaluate((b) => {
+          const a = document.createElement("a")
+          a.href = b + "/feed.xml"
+          a.target = "_blank"
+          a.id = "postSaveLink"
+          a.textContent = "TEST"
+          a.style.position = "fixed"
+          a.style.zIndex = "9999"
+          document.body.appendChild(a)
+        }, blogUrl)
+        break
+      } catch (err) {
+        const msg = String(err)
+        if (!msg.includes("Execution context was destroyed") || Date.now() >= injectDeadline) {
+          throw err
+        }
+        await expect(blog!.locator("body")).toBeVisible({ timeout: 10_000 })
+      }
+    }
     const winsBefore = app.windows().length
     await blog!.click("#postSaveLink")
     await blog!.waitForTimeout(2000)

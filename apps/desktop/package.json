@@ -1,6 +1,6 @@
 {
   "name": "@zlog/desktop",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "private": true,
   "homepage": "https://github.com/zephyr110/zlog",
   "type": "commonjs",
