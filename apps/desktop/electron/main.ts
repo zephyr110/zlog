@@ -89,6 +89,7 @@ async function main() {
     onOpen: () => showMainWindow(),
     onSettings: () => openSettingsWindow(),
     onSyncNow: () => void requestSyncNow(),
+    onCheckUpdate: () => void checkUpdatesFromTray(),
     onQuit: () => app.quit(),
   }
   const tray = createTray(trayActions, currentLang)
@@ -202,9 +203,11 @@ async function main() {
     ;(app as unknown as { isQuitting: boolean }).isQuitting = true
   }
 
-  function openSettingsWindow() {
+  function openSettingsWindow(panel?: string) {
     // 单实例：托盘/重复点击只聚焦已有窗口，不叠开多个设置窗口
     // （多窗口会让 settingsWindow ref 互相覆盖，语言切换广播丢目标）
+    const query: Record<string, string> = { mode: "settings" }
+    if (panel) query.panel = panel
     if (settingsWindow && !settingsWindow.isDestroyed()) {
       // macOS 上 app 未激活（托盘常驻菜单栏）时仅 focus() 不生效：
       // 需 show + restore + app.focus({steal:true}) 才能置前
@@ -212,6 +215,14 @@ async function main() {
       settingsWindow.show()
       settingsWindow.focus()
       app.focus({ steal: true })
+      // 已打开时切到目标面板（关于 / 检查更新入口）
+      if (panel) {
+        try {
+          settingsWindow.webContents.send("settings:show-panel", panel)
+        } catch {
+          // 忽略：窗口正在关闭时 send 可能失败
+        }
+      }
       return
     }
     // 720 宽：左侧栏 208px + 内容区；侧栏固定，内容区内部滚动
@@ -231,7 +242,7 @@ async function main() {
     })
     openExternalLinksInBrowser(win)
     void win.loadFile(join(__dirname, "..", "renderer", "settings.html"), {
-      query: { mode: "settings" },
+      query,
     })
   }
 
@@ -478,9 +489,9 @@ async function main() {
     return { ok: true }
   })
 
-  // ── 更新检查与下载（关于面板） ───────────────────────────────────
+  // ── 更新检查与下载（关于面板 + 托盘） ──────────────────────────────
   // GitHub API 走 net.fetch（Chromium 栈，跟随系统代理）。
-  ipcMain.handle("update:check", async (): Promise<UpdateCheckResult> => {
+  async function performUpdateCheck(): Promise<UpdateCheckResult> {
     const current = app.getVersion()
     try {
       const release = await fetchLatestRelease()
@@ -501,7 +512,134 @@ async function main() {
     } catch {
       return { ok: false, hasUpdate: false, current, error: "network" }
     }
-  })
+  }
+
+  const TRAY_UPDATE_COPY: Record<
+    ResolvedLang,
+    {
+      title: string
+      upToDate: (v: string) => string
+      found: (latest: string, current: string) => string
+      noAsset: (latest: string) => string
+      failed: string
+      noRelease: string
+      download: string
+      openSettings: string
+      later: string
+      ok: string
+      downloadFailed: string
+      downloaded: (v: string) => string
+      openPackage: string
+    }
+  > = {
+    zh: {
+      title: "检查更新",
+      upToDate: (v) => `已是最新版本（v${v}）`,
+      found: (latest, current) => `发现新版本 v${latest}（当前 v${current}）`,
+      noAsset: (latest) => `发现新版本 v${latest}，但当前平台暂无安装包`,
+      failed: "检查更新失败，请检查网络后重试",
+      noRelease: "暂无已发布的更新",
+      download: "下载安装包",
+      openSettings: "打开设置",
+      later: "稍后",
+      ok: "好的",
+      downloadFailed: "下载失败，请稍后重试或到设置 → 关于中再试",
+      downloaded: (v) => `v${v} 已下载完成`,
+      openPackage: "打开安装包",
+    },
+    en: {
+      title: "Check for Updates",
+      upToDate: (v) => `You're up to date (v${v})`,
+      found: (latest, current) => `Version v${latest} is available (you have v${current})`,
+      noAsset: (latest) => `Version v${latest} is available, but no installer for this platform`,
+      failed: "Update check failed — check your network and retry",
+      noRelease: "No published release yet",
+      download: "Download",
+      openSettings: "Open Settings",
+      later: "Later",
+      ok: "OK",
+      downloadFailed: "Download failed — try again later or use Settings → About",
+      downloaded: (v) => `v${v} downloaded`,
+      openPackage: "Open Installer",
+    },
+  }
+
+  let trayUpdateBusy = false
+  async function checkUpdatesFromTray(): Promise<void> {
+    if (trayUpdateBusy) return
+    trayUpdateBusy = true
+    const copy = TRAY_UPDATE_COPY[currentLang]
+    try {
+      const res = await performUpdateCheck()
+      if (!res.ok) {
+        await dialog.showMessageBox({
+          type: "error",
+          title: copy.title,
+          message: res.error === "not_found" ? copy.noRelease : copy.failed,
+          buttons: [copy.ok],
+        })
+        return
+      }
+      if (!res.hasUpdate) {
+        await dialog.showMessageBox({
+          type: "info",
+          title: copy.title,
+          message: copy.upToDate(res.current),
+          buttons: [copy.ok],
+        })
+        return
+      }
+      if (!res.downloadUrl || !res.latest) {
+        await dialog.showMessageBox({
+          type: "info",
+          title: copy.title,
+          message: copy.noAsset(res.latest ?? "?"),
+          buttons: [copy.ok],
+        })
+        return
+      }
+      const { response } = await dialog.showMessageBox({
+        type: "info",
+        title: copy.title,
+        message: copy.found(res.latest, res.current),
+        buttons: [copy.download, copy.openSettings, copy.later],
+        defaultId: 0,
+        cancelId: 2,
+      })
+      if (response === 1) {
+        openSettingsWindow("about")
+        return
+      }
+      if (response !== 0) return
+      try {
+        const dest = join(
+          updatesDir(),
+          new URL(res.downloadUrl).pathname.split("/").pop() || "update"
+        )
+        await downloadUpdate(res.downloadUrl, dest, () => {})
+        const done = await dialog.showMessageBox({
+          type: "info",
+          title: copy.title,
+          message: copy.downloaded(res.latest),
+          buttons: [copy.openPackage, copy.later],
+          defaultId: 0,
+          cancelId: 1,
+        })
+        if (done.response === 0) openDownloadedUpdate(dest)
+      } catch {
+        await dialog.showMessageBox({
+          type: "error",
+          title: copy.title,
+          message: copy.downloadFailed,
+          buttons: [copy.ok],
+        })
+      }
+    } finally {
+      trayUpdateBusy = false
+    }
+  }
+
+  ipcMain.handle("update:check", () => performUpdateCheck())
   ipcMain.handle("update:download", async (_e, url: unknown) => {
     if (typeof url !== "string" || !url.startsWith("https://")) {
       return { ok: false, error: "invalid url" }

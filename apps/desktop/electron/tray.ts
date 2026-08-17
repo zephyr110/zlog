@@ -7,12 +7,28 @@ export interface TrayActions {
   onOpen: () => void
   onSettings: () => void
   onSyncNow: () => void
+  onCheckUpdate: () => void
   onQuit: () => void
 }
 
-const TRAY_LABELS: Record<ResolvedLang, { open: string; settings: string; sync: string; quit: string }> = {
-  zh: { open: "打开", settings: "设置", sync: "立即同步", quit: "退出" },
-  en: { open: "Open", settings: "Settings", sync: "Sync Now", quit: "Quit" },
+const TRAY_LABELS: Record<
+  ResolvedLang,
+  { open: string; settings: string; sync: string; checkUpdate: string; quit: string }
+> = {
+  zh: {
+    open: "打开",
+    settings: "设置",
+    sync: "立即同步",
+    checkUpdate: "检查更新",
+    quit: "退出",
+  },
+  en: {
+    open: "Open",
+    settings: "Settings",
+    sync: "Sync Now",
+    checkUpdate: "Check for Updates",
+    quit: "Quit",
+  },
 }
 
 const SYNC_SUFFIX: Record<ResolvedLang, { synced: string; error: string }> = {
@@ -77,12 +93,19 @@ function macTrayTemplate(): Electron.NativeImage | null {
   }
 }
 
+/** 菜单顺序：打开 → 设置 → 立即同步 → 检查更新 → 分隔 → 退出。 */
+export function trayMenuLabels(lang: ResolvedLang): string[] {
+  const labels = TRAY_LABELS[lang]
+  return [labels.open, labels.settings, labels.sync, labels.checkUpdate, labels.quit]
+}
+
 function buildMenu(lang: ResolvedLang, actions: TrayActions): Menu {
   const labels = TRAY_LABELS[lang]
   return Menu.buildFromTemplate([
     { label: labels.open, click: actions.onOpen },
     { label: labels.settings, click: actions.onSettings },
     { label: labels.sync, click: actions.onSyncNow },
+    { label: labels.checkUpdate, click: actions.onCheckUpdate },
     { type: "separator" },
     { label: labels.quit, click: actions.onQuit },
   ])

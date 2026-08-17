@@ -97,6 +97,8 @@ describe("settings i18n coverage", () => {
     expect(en).toContain("about.checkUnavailable")
     expect(js).toContain('res?.error === "not_found"')
     expect(js).toContain('res?.error === "network"')
+    expect(js).toContain('get("panel")')
+    expect(js).toContain("onShowPanel")
     expect(js).toContain("zlogApi?.loadConfig")
     expect(html).not.toContain("about-group")
     expect(html).not.toContain("data-card")

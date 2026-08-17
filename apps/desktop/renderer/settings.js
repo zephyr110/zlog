@@ -525,6 +525,14 @@ if (!isFirstRun) {
       if (btn.dataset.panel === "about" && !updateChecked) void checkForUpdates()
     })
   }
+  // 托盘「检查更新 → 打开设置」或 ?panel= 深链：切到对应侧栏面板
+  function showPanel(panel) {
+    const btn = document.querySelector(`.nav-item[data-panel="${panel}"]`)
+    if (btn instanceof HTMLElement) btn.click()
+  }
+  const initialPanel = new URLSearchParams(location.search).get("panel")
+  if (initialPanel) showPanel(initialPanel)
+  zlogApi?.onShowPanel?.(showPanel)
 }
 
 // ── 语言（三态：跟随系统/中文/English，shadcn 风格自定义 select） ──
