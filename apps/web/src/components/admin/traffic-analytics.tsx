@@ -565,6 +565,51 @@ function ClientAttrsPanel({
   )
 }
 
+/** 筛选工具的出现/隐藏过渡（挂载淡入、动画结束后卸载淡出）。
+ *  CSS 无法给卸载做动画——元素常驻，用 grid-rows+opacity 双向过渡，
+ *  隐藏动画结束才真正卸载（子组件状态随之重置，如 picker 的 popover）。 */
+function FadeSlide({ show, children }: { show: boolean; children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(show)
+  const [shown, setShown] = useState(show)
+  const [prevShow, setPrevShow] = useState(show)
+
+  // 渲染期同步状态（React "adjusting state when props change" 官方模式）：
+  // show 翻转瞬间确定挂载态与收起态（setState-in-effect 不可用），
+  // 随后 effect 里 rAF 展开，过渡才有起点。
+  if (prevShow !== show) {
+    setPrevShow(show)
+    if (show) {
+      setMounted(true)
+    }
+    setShown(false)
+  }
+
+  useEffect(() => {
+    if (show) {
+      const raf = requestAnimationFrame(() => setShown(true))
+      return () => cancelAnimationFrame(raf)
+    }
+  }, [show])
+
+  if (!mounted) return null
+  return (
+    <div
+      className={cn(
+        // 移动端占整行（触发按钮 w-full），≥sm 恢复内容宽度。
+        "grid w-full min-w-0 transition-[grid-template-rows,opacity] duration-200 ease-out sm:w-auto",
+        shown ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+      )}
+      onTransitionEnd={(e) => {
+        if (!show && e.propertyName === "opacity") setMounted(false)
+      }}
+      aria-hidden={!show}
+      {...(!show ? { inert: true } : {})}
+    >
+      <div className="min-h-0 overflow-hidden">{children}</div>
+    </div>
+  )
+}
+
 export function TrafficAnalytics() {
   const { t, locale } = useT()
   const [source, setSource] = useState<AnalyticsSource>("vercel")
@@ -785,7 +830,7 @@ export function TrafficAnalytics() {
             <SelectTrigger
               size="sm"
               aria-label={t("admin.analyticsSource") as string}
-              className="w-56"
+              className="w-full sm:w-56"
             >
               <SelectValue>{sourceLabel(source)}</SelectValue>
             </SelectTrigger>
@@ -798,7 +843,7 @@ export function TrafficAnalytics() {
             </SelectContent>
           </Select>
           <div
-            className="flex items-center gap-1 rounded-lg bg-muted/60 p-1"
+            className="grid w-full grid-cols-5 gap-1 rounded-lg bg-muted/60 p-1 sm:flex sm:w-auto sm:items-center"
             role="group"
             aria-label={t("admin.analyticsDateRange")}
           >
@@ -818,7 +863,7 @@ export function TrafficAnalytics() {
                   setState({ status: "loading" })
                 }}
                 className={cn(
-                  "cursor-pointer rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-2.5",
+                  "min-w-0 cursor-pointer rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-2.5",
                   range === r
                     ? "bg-background text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -828,8 +873,9 @@ export function TrafficAnalytics() {
               </button>
             ))}
           </div>
-          {/* 自定义模式下的日期段选择器；早于归档范围的日期不可选。 */}
-          {range === "custom" && (
+          {/* 自定义模式下的日期段选择器；早于归档范围的日期不可选。
+              出现/隐藏都有过渡动画（FadeSlide 卸载动画结束才真正卸载）。 */}
+          <FadeSlide show={range === "custom"}>
             <DateRangePicker
               from={custom.start}
               to={custom.end}
@@ -839,8 +885,9 @@ export function TrafficAnalytics() {
               locale={locale === "en" ? "en" : "zh"}
               disabledBefore={availableFrom ?? undefined}
               disabledAfter={todayKey()}
+              triggerClassName="w-full justify-center sm:w-auto sm:justify-start"
             />
-          )}
+          </FadeSlide>
         </div>
       </div>
 

@@ -7,6 +7,7 @@ import { type DateRange } from "react-day-picker"
 
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import { cn } from "@/lib/utils"
 import { formatLocalDate } from "@/lib/date"
 
@@ -26,6 +27,7 @@ export function DateRangePicker({
   locale,
   disabledBefore,
   disabledAfter,
+  triggerClassName,
 }: {
   /** Local "YYYY-MM-DD", "" when unset. */
   from: string
@@ -40,8 +42,13 @@ export function DateRangePicker({
   disabledBefore?: string
   /** "YYYY-MM-DD" — days strictly after this are greyed out (future). */
   disabledAfter?: string
+  /** Extra classes for the trigger button — e.g. full-width + centered
+   *  on mobile when the picker sits on its own toolbar row. */
+  triggerClassName?: string
 }) {
   const [open, setOpen] = useState(false)
+  // 双月日历在窄屏会横向溢出——移动端单月显示，≥sm 才并排两月。
+  const isMobile = useMediaQuery("(max-width: 639px)")
   // Stable identity across re-renders — rebuilding the DateRange per
   // render forces react-day-picker to recompute every day cell whenever
   // the parent re-renders (drag state, upload progress, view toggles).
@@ -70,7 +77,10 @@ export function DateRangePicker({
           <button
             type="button"
             aria-label={ariaLabel}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2 text-xs transition-colors hover:bg-muted/50"
+            className={cn(
+              "flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2 text-xs transition-colors hover:bg-muted/50",
+              triggerClassName
+            )}
           >
             <CalendarIcon
               size={12}
@@ -90,11 +100,15 @@ export function DateRangePicker({
       />
       {/* align="end": the trigger lives in the header's right-side action
           slot — a two-month popover would overflow the viewport's right
-          edge if left-aligned. */}
-      <PopoverContent align="end" sideOffset={4} className="w-auto p-0">
+          edge if left-aligned. max-w 兜底窄屏/缩放缩放边界。 */}
+      <PopoverContent
+        align="end"
+        sideOffset={4}
+        className="max-w-[calc(100vw-1rem)] w-auto p-0"
+      >
         <Calendar
           mode="range"
-          numberOfMonths={2}
+          numberOfMonths={isMobile ? 1 : 2}
           selected={selected}
           disabled={disabled}
           onSelect={(range) => {
