@@ -1,5 +1,10 @@
 # Zlog Desktop — Release Notes
 
+## v1.0.11
+
+- Tray menu: add "Check for Updates" after Sync Now, with download / open
+  Settings (About) dialogs.
+
 ## v1.0.10
 
 - Fix in-app update download failing immediately: create `userData/updates`
