@@ -286,7 +286,9 @@ export function SiteInfoForm({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-10">
+      // className 透传：dialog 场景传 h-full 让 spinner 在内容区
+      // 水平垂直居中；页面场景保持默认的居中 + py-10 留白。
+      <div className={cn("flex items-center justify-center py-10", className)}>
         <Spinner size="md" />
       </div>
     )

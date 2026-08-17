@@ -140,8 +140,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5 [scrollbar-gutter:stable]">
             {open ? (
               <>
-                <div hidden={panel !== "site"}>
-                  <SiteInfoForm idPrefix="dlg-site" />
+                {/* h-full 高度链：加载时 spinner 在右侧内容区水平垂直居中 */}
+                <div hidden={panel !== "site"} className="h-full">
+                  <SiteInfoForm idPrefix="dlg-site" className="h-full" />
                 </div>
                 <div hidden={panel !== "account"} className="max-w-sm space-y-5">
                   <section>
