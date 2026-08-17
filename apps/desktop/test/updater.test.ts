@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest"
-import { compareVersions, pickAssetUrl, classifyLatestHttpStatus } from "../electron/updater"
+import { compareVersions, pickAssetUrl, classifyLatestHttpStatus, ensureParentDir } from "../electron/updater"
+import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 describe("compareVersions", () => {
   it("基础数字比较", () => {
@@ -90,5 +93,21 @@ describe("classifyLatestHttpStatus", () => {
   it("其他非 2xx 映射为 http", () => {
     expect(classifyLatestHttpStatus(403)).toBe("http")
     expect(classifyLatestHttpStatus(500)).toBe("http")
+  })
+})
+
+describe("ensureParentDir", () => {
+  it("递归创建不存在的父目录，避免下载落盘 ENOENT", () => {
+    const root = mkdtempSync(join(tmpdir(), "zlog-upd-"))
+    try {
+      const dest = join(root, "updates", "Zlog-1.0.9-arm64.dmg")
+      expect(existsSync(join(root, "updates"))).toBe(false)
+      ensureParentDir(dest)
+      expect(existsSync(join(root, "updates"))).toBe(true)
+      writeFileSync(dest, "ok")
+      expect(existsSync(dest)).toBe(true)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

@@ -1,5 +1,10 @@
 # Zlog Desktop — Release Notes
 
+## v1.0.10
+
+- Fix in-app update download failing immediately: create `userData/updates`
+  before writing the installer (missing dir caused ENOENT).
+
 ## v1.0.9
 
 - Fix macOS Dock showing a second "exec" icon: run the embedded Next

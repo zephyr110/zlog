@@ -1,6 +1,6 @@
-import { createWriteStream } from "node:fs"
+import { createWriteStream, mkdirSync, unlinkSync } from "node:fs"
 import { spawn } from "node:child_process"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { app, net, shell } from "electron"
 
 /**
@@ -123,6 +123,11 @@ export async function fetchLatestRelease(): Promise<FetchLatestResult> {
 /** 同路径进行中下载（防重：重开设置窗口后重复下载同一安装包会双流写坏文件）。 */
 const activeDownloads = new Set<string>()
 
+/** 确保落盘路径的父目录存在（userData/updates 不会随安装自动创建）。 */
+export function ensureParentDir(filePath: string): void {
+  mkdirSync(dirname(filePath), { recursive: true })
+}
+
 /**
  * 流式下载 release 资产到 dest，按字节推进度（0-100）。
  * 仅接受 GitHub 域（github.com / objects.githubusercontent.com），
@@ -146,27 +151,33 @@ export async function downloadUpdate(
     }
     const res = await net.fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
     if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
+    ensureParentDir(dest)
     const total = Number(res.headers.get("content-length") ?? 0)
     let received = 0
     const ws = createWriteStream(dest)
     // error 监听必须在写入循环开始前挂上：流错误（ENOSPC/EISDIR 等）是
     // 异步事件，循环期间无监听会让 Node 抛 uncaughtException 拖垮主进程
     const writeError = new Promise<never>((_, reject) => ws.on("error", reject))
-    const reader = res.body.getReader()
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      received += value.byteLength
-      ws.write(Buffer.from(value))
-      if (total > 0) onProgress(Math.min(99, Math.round((received / total) * 100)))
-    }
     try {
+      const reader = res.body.getReader()
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        received += value.byteLength
+        ws.write(Buffer.from(value))
+        if (total > 0) onProgress(Math.min(99, Math.round((received / total) * 100)))
+      }
       await Promise.race([
         new Promise<void>((resolve) => ws.end(() => resolve())),
         writeError,
       ])
     } catch (err) {
       ws.destroy()
+      try {
+        unlinkSync(dest)
+      } catch {
+        // 部分文件可能尚未创建
+      }
       throw err
     }
     onProgress(100)
