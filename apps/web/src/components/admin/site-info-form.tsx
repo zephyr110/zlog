@@ -287,8 +287,15 @@ export function SiteInfoForm({
   if (loading) {
     return (
       // className 透传：dialog 场景传 h-full 让 spinner 在内容区
-      // 水平垂直居中；页面场景保持默认的居中 + py-10 留白。
-      <div className={cn("flex items-center justify-center py-10", className)}>
+      // 水平垂直居中。min-h-[10rem] 替代 py-10：页面场景给居中留白，
+      // 且与 h-full 叠加时不会把 spinner 几何中心挤出容器（padding
+      // 会把内容盒缩小 5rem，spinner 偏下）。
+      <div
+        className={cn(
+          "flex min-h-[10rem] items-center justify-center",
+          className
+        )}
+      >
         <Spinner size="md" />
       </div>
     )

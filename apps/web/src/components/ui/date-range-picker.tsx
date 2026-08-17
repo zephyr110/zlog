@@ -47,8 +47,11 @@ export function DateRangePicker({
   triggerClassName?: string
 }) {
   const [open, setOpen] = useState(false)
-  // 双月日历在窄屏会横向溢出——移动端单月显示，≥sm 才并排两月。
-  const isMobile = useMediaQuery("(max-width: 639px)")
+  // 双月日历（约 500px 宽）在窄屏会横向溢出。断点对齐 app 的 md 惯例
+  // (max-width: 767px，见 admin-sidebar/layout)：media 页移动筛选
+  // popover（288px 容器）在 <768px 视口出现，该区间内必须单月；
+  // ≥768px 桌面布局才放得下双月。
+  const isMobile = useMediaQuery("(max-width: 767px)")
   // Stable identity across re-renders — rebuilding the DateRange per
   // render forces react-day-picker to recompute every day cell whenever
   // the parent re-renders (drag state, upload progress, view toggles).
@@ -106,7 +109,10 @@ export function DateRangePicker({
         sideOffset={4}
         className="max-w-[calc(100vw-1rem)] w-auto p-0"
       >
+        {/* key 随月数变化：react-day-picker 不支持 numberOfMonths 原地
+            动态切换（resize 跨断点时导航月份会跳变），重挂载最稳。 */}
         <Calendar
+          key={`months:${isMobile ? 1 : 2}`}
           mode="range"
           numberOfMonths={isMobile ? 1 : 2}
           selected={selected}

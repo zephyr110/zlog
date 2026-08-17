@@ -591,6 +591,15 @@ function FadeSlide({ show, children }: { show: boolean; children: React.ReactNod
     }
   }, [show])
 
+  // 卸载兜底：transitionend 在过渡被中断（transitioncancel）或 show
+  // 在展开 rAF 前就翻回时不触发，250ms 超时强制卸载防泄漏；正常
+  // 路径 200ms 过渡先结束并卸载，effect cleanup 清除定时器。
+  useEffect(() => {
+    if (show) return
+    const timer = setTimeout(() => setMounted(false), 250)
+    return () => clearTimeout(timer)
+  }, [show])
+
   if (!mounted) return null
   return (
     <div
@@ -603,7 +612,7 @@ function FadeSlide({ show, children }: { show: boolean; children: React.ReactNod
         if (!show && e.propertyName === "opacity") setMounted(false)
       }}
       aria-hidden={!show}
-      {...(!show ? { inert: true } : {})}
+      inert={!show}
     >
       <div className="min-h-0 overflow-hidden">{children}</div>
     </div>
@@ -630,6 +639,10 @@ export function TrafficAnalytics() {
     let cancelled = false
 
     async function load() {
+      // 与 chips/Select 路径一致：picker 微调区间时同样切 skeleton，
+      // 避免慢请求（GA 15-40s）期间静默展示过期区间的旧数据。
+      // （chips 点击处已先置过 loading，重复 set 同值无副作用。）
+      setState({ status: "loading" })
       try {
         // The server-side GA chain (OAuth + batch, proxy then direct)
         // can take 15-40s — far beyond the default 15s apiFetch timeout,
@@ -843,7 +856,9 @@ export function TrafficAnalytics() {
             </SelectContent>
           </Select>
           <div
-            className="grid w-full grid-cols-5 gap-1 rounded-lg bg-muted/60 p-1 sm:flex sm:w-auto sm:items-center"
+            // 移动端 flex-1 等分（不写死列数，RANGES 增减自然适配），
+            // ≥sm 恢复内容宽度；nowrap 防窄屏标签折行破坏行高。
+            className="flex w-full flex-wrap gap-1 rounded-lg bg-muted/60 p-1 sm:w-auto sm:flex-nowrap sm:items-center"
             role="group"
             aria-label={t("admin.analyticsDateRange")}
           >
@@ -855,15 +870,17 @@ export function TrafficAnalytics() {
                 onClick={() => {
                   if (r === range) return
                   setRange(r)
-                  if (r === "custom" && !custom.start) {
-                    // 首次进入自定义：默认最近 30 天，打开即可微调。
+                  if (r === "custom" && (!custom.start || !custom.end)) {
+                    // 首次进入自定义，或残留半选区间（只选了起/止）：
+                    // 补全默认最近 30 天，避免 effect 因区间不完整早退
+                    // 而永远停在 skeleton。
                     const end = todayKey()
                     setCustom({ start: minusDays(end, 29), end })
                   }
                   setState({ status: "loading" })
                 }}
                 className={cn(
-                  "min-w-0 cursor-pointer rounded-md px-2 py-1 text-xs font-medium transition-colors sm:px-2.5",
+                  "min-w-0 flex-1 cursor-pointer rounded-md px-1.5 py-1 text-xs font-medium whitespace-nowrap transition-colors sm:flex-none sm:px-2.5",
                   range === r
                     ? "bg-background text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -896,9 +913,11 @@ export function TrafficAnalytics() {
           <TrafficSkeleton />
         </div>
       ) : state.status === "ok" ? (
-        // key 随筛选条件变化：source/range/自定义区间切换时整块淡入上滑
+        // key 只含 source/range：筛选类别切换时整块淡入上滑。
+        // 自定义区间微调不能进 key——picker 每次点选（含半选）都会改
+        // custom，整块重挂载会让旧数据闪动并重置图表/面板内部状态。
         <div
-          key={`${source}:${range}:${custom.start}:${custom.end}`}
+          key={`${source}:${range}`}
           className="flex flex-col gap-5 md:gap-6 animate-in fade-in slide-in-from-bottom-1 duration-300"
         >
           <div className="grid grid-cols-2 gap-3 sm:gap-5">
