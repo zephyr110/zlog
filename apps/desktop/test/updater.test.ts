@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { compareVersions, pickAssetUrl } from "../electron/updater"
+import { compareVersions, pickAssetUrl, classifyLatestHttpStatus } from "../electron/updater"
 
 describe("compareVersions", () => {
   it("基础数字比较", () => {
@@ -79,5 +79,16 @@ describe("pickAssetUrl", () => {
   it("平台无资产时返回 null", () => {
     expect(pickAssetUrl([{ name: "Zlog-1.1.0-arm64.zip", browser_download_url: "x" }], "linux", "x64")).toBeNull()
     expect(pickAssetUrl([], "darwin", "arm64")).toBeNull()
+  })
+})
+
+describe("classifyLatestHttpStatus", () => {
+  it("404（无正式版 / 仅 draft）映射为 not_found，避免误报网络失败", () => {
+    expect(classifyLatestHttpStatus(404)).toBe("not_found")
+  })
+
+  it("其他非 2xx 映射为 http", () => {
+    expect(classifyLatestHttpStatus(403)).toBe("http")
+    expect(classifyLatestHttpStatus(500)).toBe("http")
   })
 })

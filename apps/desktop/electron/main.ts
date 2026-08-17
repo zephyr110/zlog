@@ -484,7 +484,9 @@ async function main() {
     const current = app.getVersion()
     try {
       const release = await fetchLatestRelease()
-      if (!release) return { ok: false, hasUpdate: false, current, error: "fetch" }
+      if (!release.ok) {
+        return { ok: false, hasUpdate: false, current, error: release.reason }
+      }
       const latest = release.tag.replace(/^v/, "")
       const hasUpdate = compareVersions(latest, current) > 0
       return {
@@ -496,8 +498,8 @@ async function main() {
           ? (pickAssetUrl(release.assets, process.platform, process.arch) ?? undefined)
           : undefined,
       }
-    } catch (err) {
-      return { ok: false, hasUpdate: false, current, error: String(err) }
+    } catch {
+      return { ok: false, hasUpdate: false, current, error: "network" }
     }
   })
   ipcMain.handle("update:download", async (_e, url: unknown) => {

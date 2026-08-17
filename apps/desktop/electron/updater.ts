@@ -90,12 +90,19 @@ export function pickAssetUrl(
   return match?.browser_download_url ?? null
 }
 
-/** 拉取 GitHub latest release（不含 prerelease/draft）。 */
-export async function fetchLatestRelease(): Promise<{
-  tag: string
-  htmlUrl: string
-  assets: ReleaseAsset[]
-} | null> {
+/** 将 GitHub /releases/latest 的 HTTP 状态映射为可展示的失败原因。 */
+export function classifyLatestHttpStatus(status: number): "not_found" | "http" {
+  return status === 404 ? "not_found" : "http"
+}
+
+/** 拉取结果：404（无正式版 / 仅 draft）与网络/HTTP 失败需分开提示。 */
+export type FetchLatestResult =
+  | { ok: true; tag: string; htmlUrl: string; assets: ReleaseAsset[] }
+  | { ok: false; reason: "not_found" | "http" | "invalid" }
+
+/** 拉取 GitHub latest release（不含 prerelease/draft）。
+ *  CI 默认挂 draft，人工发布后此接口才有数据；仅有 draft 时 API 返回 404。 */
+export async function fetchLatestRelease(): Promise<FetchLatestResult> {
   const res = await net.fetch("https://api.github.com/repos/zephyr110/zlog/releases/latest", {
     headers: {
       Accept: "application/vnd.github+json",
@@ -103,14 +110,14 @@ export async function fetchLatestRelease(): Promise<{
     },
     signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
   })
-  if (!res.ok) return null
+  if (!res.ok) return { ok: false, reason: classifyLatestHttpStatus(res.status) }
   const data = (await res.json()) as {
     tag_name?: string
     html_url?: string
     assets?: ReleaseAsset[]
   }
-  if (!data.tag_name || !Array.isArray(data.assets)) return null
-  return { tag: data.tag_name, htmlUrl: data.html_url ?? "", assets: data.assets }
+  if (!data.tag_name || !Array.isArray(data.assets)) return { ok: false, reason: "invalid" }
+  return { ok: true, tag: data.tag_name, htmlUrl: data.html_url ?? "", assets: data.assets }
 }
 
 /** 同路径进行中下载（防重：重开设置窗口后重复下载同一安装包会双流写坏文件）。 */

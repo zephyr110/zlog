@@ -72,7 +72,6 @@ const I18N = {
     "data.location": "位置",
     "data.backupHint": "本地数据库、配置与日志。备份该目录即备份整个博客",
     "data.open": "打开",
-    "lang.label": "界面语言",
     "lang.system": "跟随系统",
     "lang.zh": "中文",
     "lang.en": "English",
@@ -128,6 +127,8 @@ const I18N = {
     "about.downloaded": "下载完成",
     "about.openPackage": "打开安装包",
     "about.checkFailed": "检查更新失败，请检查网络后重试",
+    "about.noRelease": "暂无已发布的更新（草稿 Release 不会出现在检查结果中）",
+    "about.checkUnavailable": "暂时无法获取更新信息，请稍后重试",
     "about.downloadFailed": "下载失败，请重试",
     "about.noAsset": "当前平台暂无对应安装包",
     "about.repository": "代码仓库",
@@ -219,7 +220,6 @@ const I18N = {
     "data.location": "Location",
     "data.backupHint": "Local database, config, and logs. Back up this folder to back up the whole blog",
     "data.open": "Open",
-    "lang.label": "Interface Language",
     "lang.system": "Follow System",
     "lang.zh": "中文",
     "lang.en": "English",
@@ -275,6 +275,8 @@ const I18N = {
     "about.downloaded": "Download complete",
     "about.openPackage": "Open Installer",
     "about.checkFailed": "Update check failed — check your network and retry",
+    "about.noRelease": "No published release yet (drafts are hidden from update checks)",
+    "about.checkUnavailable": "Could not fetch update info — please try again later",
     "about.downloadFailed": "Download failed, please retry",
     "about.noAsset": "No installer for this platform yet",
     "about.repository": "Repository",
@@ -335,9 +337,11 @@ function applyLang() {
   // 部署面板状态是 JS 维护的动态文案（不带 data-i18n）：同样按当前
   // 状态机重渲染（renderDeployState 内部自取元素，规避同样的 TDZ）
   renderDeployState()
-  // 语言 select 的显示值跟随字典（内部取元素，避免 TDZ）
+  // 语言 select 的显示值 / aria-label 跟随字典（内部取元素，避免 TDZ）
   const langValue = document.getElementById("langSelectValue")
   if (langValue) langValue.textContent = t(`lang.${currentPref}`)
+  const langBtn = document.getElementById("langSelectBtn")
+  if (langBtn) langBtn.setAttribute("aria-label", t("lang.title"))
   const popup = document.getElementById("langPopup")
   if (popup) {
     for (const item of popup.querySelectorAll(".select-item")) {
@@ -421,6 +425,18 @@ function renderUpdateState() {
       updateBtn.textContent = t("about.checkUpdate")
       updateBtn.disabled = false
       updateStatus.textContent = t("about.checkFailed")
+      updateStatus.classList.add("error")
+      break
+    case "noRelease":
+      updateBtn.textContent = t("about.checkUpdate")
+      updateBtn.disabled = false
+      updateStatus.textContent = t("about.noRelease")
+      updateStatus.classList.add("error")
+      break
+    case "checkUnavailable":
+      updateBtn.textContent = t("about.checkUpdate")
+      updateBtn.disabled = false
+      updateStatus.textContent = t("about.checkUnavailable")
       updateStatus.classList.add("error")
       break
     case "downloadFailed":
@@ -760,7 +776,13 @@ async function checkForUpdates() {
   updateBusy = false
   updateChecked = true // 失败也算检查过：避免每次切回面板都重发请求
   if (!res || !res.ok) {
-    updateUiState = "checkFailed"
+    // not_found：仅有 draft / 无正式版；network：超时或断连；其余 HTTP/报文异常
+    updateUiState =
+      res?.error === "not_found"
+        ? "noRelease"
+        : res?.error === "network" || !res
+          ? "checkFailed"
+          : "checkUnavailable"
     renderUpdateState()
     return
   }

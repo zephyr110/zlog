@@ -1,5 +1,13 @@
 # Zlog Desktop — Release Notes
 
+## v1.0.7
+
+- Fix update check treating draft-only GitHub Releases (404) as a network
+  failure; surface distinct messages for no published release vs network vs
+  other API errors.
+- Settings: drop redundant language panel heading; keep select aria-label in sync
+  with the UI language.
+
 ## v1.0.0
 
 First stable release (unsigned).

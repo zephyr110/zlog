@@ -25,7 +25,7 @@
 1. bump 版本（apps/desktop/package.json）
 2. 提交并推送 main（部署 GitHub Pages）
 3. `git tag -a vX.Y.Z... -m "release ..."` 后 `git push origin vX.Y.Z...` → 触发 desktop.yml 构建安装包
-4. 产物挂 draft release，人工确认后发布
+4. 产物挂 draft release，人工确认后发布（**须发布正式版**：桌面端「检查更新」读 `/releases/latest`，仅 draft 时公开 API 返回 404）
 
 ## CI 触发边界
 
