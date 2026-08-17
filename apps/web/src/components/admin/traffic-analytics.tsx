@@ -38,15 +38,18 @@ import {
 import { useT } from "@/components/layout/trans"
 import { apiFetch } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
 import {
   analyticsTimeoutI18nKeys,
+  minusDays,
+  todayKey,
   type AnalyticsRange,
   type AnalyticsReport,
   type AnalyticsSource,
   type AnalyticsTimeoutHint,
 } from "@/lib/analytics-shared"
 
-const RANGES: AnalyticsRange[] = ["today", "7d", "30d"]
+const RANGES: AnalyticsRange[] = ["today", "7d", "30d", "all", "custom"]
 const SOURCES: AnalyticsSource[] = ["vercel", "ga"]
 
 type ErrorKind = "timeout" | "permission" | "unavailable"
@@ -563,9 +566,16 @@ function ClientAttrsPanel({
 }
 
 export function TrafficAnalytics() {
-  const { t } = useT()
+  const { t, locale } = useT()
   const [source, setSource] = useState<AnalyticsSource>("vercel")
   const [range, setRange] = useState<AnalyticsRange>("7d")
+  /** 自定义区间（range === "custom" 时随请求发送 from/to）。 */
+  const [custom, setCustom] = useState<{ start: string; end: string }>({
+    start: "",
+    end: "",
+  })
+  /** 最早可选日期（服务端归档范围）；pick 更早的日期会被禁用。 */
+  const [availableFrom, setAvailableFrom] = useState<string | null>(null)
   const [state, setState] = useState<FetchState>({ status: "loading" })
   // Only auto-pick the other backend once (default Vercel → GA). Later
   // manual switches to an unconfigured source should show the empty state.
@@ -580,10 +590,14 @@ export function TrafficAnalytics() {
         // can take 15-40s — far beyond the default 15s apiFetch timeout,
         // which would abort slow-but-successful reports and misreport
         // them as a network timeout.
-        const res = await apiFetch(
-          `/api/admin/analytics?source=${source}&range=${range}`,
-          { timeout: 60_000 }
-        )
+        const params = new URLSearchParams({ source, range })
+        if (range === "custom" && custom.start && custom.end) {
+          params.set("from", custom.start)
+          params.set("to", custom.end)
+        }
+        const res = await apiFetch(`/api/admin/analytics?${params.toString()}`, {
+          timeout: 60_000,
+        })
         if (cancelled) return
         if (res.status === 503) {
           // Prefer Vercel when present, but if the default source isn’t
@@ -638,7 +652,10 @@ export function TrafficAnalytics() {
           return
         }
         const data = (await res.json()) as AnalyticsReport
-        if (!cancelled) setState({ status: "ok", data })
+        if (!cancelled) {
+          setAvailableFrom(data.availableFrom)
+          setState({ status: "ok", data })
+        }
       } catch (err) {
         // Only genuine aborts are a timeout; a thrown parse/network error
         // is a server or transport failure, not a timeout.
@@ -651,16 +668,20 @@ export function TrafficAnalytics() {
       }
     }
 
+    // 自定义区间只有起止都选定时才请求（picker 单点选择是半成品）。
+    if (range === "custom" && (!custom.start || !custom.end)) return
     void load()
     return () => {
       cancelled = true
     }
-  }, [source, range])
+  }, [source, range, custom.start, custom.end])
 
   const rangeLabel = (r: AnalyticsRange) => {
     if (r === "today") return t("admin.analyticsRangeToday")
     if (r === "7d") return t("admin.analyticsRange7d")
-    return t("admin.analyticsRange30d")
+    if (r === "30d") return t("admin.analyticsRange30d")
+    if (r === "all") return t("admin.analyticsRangeAll")
+    return t("admin.analyticsRangeCustom")
   }
 
   const sourceLabel = (s: AnalyticsSource) =>
@@ -724,9 +745,30 @@ export function TrafficAnalytics() {
   return (
     <section className="flex flex-col gap-5 md:gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold tracking-tight">
-          {t("admin.traffic")}
-        </h2>
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="text-xl font-semibold tracking-tight">
+            {t("admin.traffic")}
+          </h2>
+          {/* 全部/自定义 的覆盖范围与回填进度（预设无覆盖提示，语义自明）。 */}
+          {state.status === "ok" &&
+            (range === "all" || range === "custom") && (
+              <p className="text-xs text-muted-foreground">
+                {t("admin.analyticsEffectiveRange")(
+                  state.data.customRange.start,
+                  state.data.customRange.end
+                )}
+                {state.data.source === "ga" &&
+                  state.data.missingMonths.length > 0 && (
+                    <>
+                      {" · "}
+                      {t("admin.analyticsBackfilling")(
+                        state.data.missingMonths.length
+                      )}
+                    </>
+                  )}
+              </p>
+            )}
+        </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
           <Select
             value={source}
@@ -765,6 +807,11 @@ export function TrafficAnalytics() {
                 onClick={() => {
                   if (r === range) return
                   setRange(r)
+                  if (r === "custom" && !custom.start) {
+                    // 首次进入自定义：默认最近 30 天，打开即可微调。
+                    const end = todayKey()
+                    setCustom({ start: minusDays(end, 29), end })
+                  }
                   setState({ status: "loading" })
                 }}
                 className={cn(
@@ -778,6 +825,19 @@ export function TrafficAnalytics() {
               </button>
             ))}
           </div>
+          {/* 自定义模式下的日期段选择器；早于归档范围的日期不可选。 */}
+          {range === "custom" && (
+            <DateRangePicker
+              from={custom.start}
+              to={custom.end}
+              onChange={(r) => setCustom({ start: r.from, end: r.to })}
+              ariaLabel={t("admin.analyticsDateRange") as string}
+              placeholder={t("admin.analyticsRangePick") as string}
+              locale={locale === "en" ? "en" : "zh"}
+              disabledBefore={availableFrom ?? undefined}
+              disabledAfter={todayKey()}
+            />
+          )}
         </div>
       </div>
 

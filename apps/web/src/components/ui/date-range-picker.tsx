@@ -24,6 +24,8 @@ export function DateRangePicker({
   ariaLabel,
   placeholder,
   locale,
+  disabledBefore,
+  disabledAfter,
 }: {
   /** Local "YYYY-MM-DD", "" when unset. */
   from: string
@@ -33,6 +35,11 @@ export function DateRangePicker({
   /** Shown when no range is selected. */
   placeholder: string
   locale: "zh" | "en"
+  /** "YYYY-MM-DD" — days strictly before this are greyed out (data
+   *  doesn't exist earlier). */
+  disabledBefore?: string
+  /** "YYYY-MM-DD" — days strictly after this are greyed out (future). */
+  disabledAfter?: string
 }) {
   const [open, setOpen] = useState(false)
   // Stable identity across re-renders — rebuilding the DateRange per
@@ -48,6 +55,13 @@ export function DateRangePicker({
         : undefined,
     [from, to]
   )
+  // Stable matcher identity — same reason as `selected`.
+  const disabled = useMemo(() => {
+    const matchers = []
+    if (disabledBefore) matchers.push({ before: new Date(`${disabledBefore}T00:00:00`) })
+    if (disabledAfter) matchers.push({ after: new Date(`${disabledAfter}T00:00:00`) })
+    return matchers
+  }, [disabledBefore, disabledAfter])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -82,6 +96,7 @@ export function DateRangePicker({
           mode="range"
           numberOfMonths={2}
           selected={selected}
+          disabled={disabled}
           onSelect={(range) => {
             onChange({
               from: range?.from ? formatLocalDate(range.from) : "",

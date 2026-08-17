@@ -1,4 +1,11 @@
-import type { AnalyticsRange, AnalyticsReport } from "./analytics-shared"
+import {
+  daysBetween,
+  minusDays,
+  todayKey,
+  type AnalyticsCustomRange,
+  type AnalyticsRange,
+  type AnalyticsReport,
+} from "./analytics-shared"
 
 /**
  * 演示环境的 mock 分析数据：让访客在后台 Traffic 面板看到完整功能
@@ -8,18 +15,32 @@ import type { AnalyticsRange, AnalyticsReport } from "./analytics-shared"
  */
 export function mockAnalyticsReport(
   source: "ga" | "vercel",
-  range: AnalyticsRange
+  range: AnalyticsRange,
+  custom: AnalyticsCustomRange | null = null
 ): AnalyticsReport {
   // 日化量随窗口递减（today 单日基准，7d/30d 日均略降），避免
   // today 看起来比 30d 日均还高的失真。
   const daily = range === "today" ? 38 : range === "7d" ? 32 : 26
-  const days = range === "today" ? 1 : range === "7d" ? 7 : 30
+  const now = todayKey()
+  const presetDays = range === "today" ? 1 : range === "7d" ? 7 : 30
+  const effective =
+    range === "all" || range === "custom"
+      ? custom ?? { start: minusDays(now, 29), end: now }
+      : { start: minusDays(now, presetDays - 1), end: now }
+  // all/custom 按实际窗口天数缩放（mock 没有归档，日期即覆盖范围）。
+  const days =
+    range === "all" || range === "custom"
+      ? daysBetween(effective.start, effective.end)
+      : presetDays
   const users = Math.round(daily * days)
   const views = Math.round(daily * 3.4 * days)
   return {
     configured: true,
     source,
     range,
+    customRange: effective,
+    availableFrom: null,
+    missingMonths: [],
     totals: { activeUsers: users, screenPageViews: views },
     topPages: [
       { path: "/", views: Math.round(views * 0.34) },

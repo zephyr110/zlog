@@ -60,3 +60,10 @@ export { slugify, computeReadingStats } from "@zlog/core"
 export type { Post, PostSummary } from "@zlog/core"
 export type { UserRecord } from "./users"
 export { runSync, scheduleSync, getSyncStatus, isSyncConfigured } from "./sync"
+export {
+  upsertMonthlyAnalytics,
+  listArchivedMonths,
+  earliestArchivedMonth,
+  aggregateMonthlyAnalytics,
+} from "./analytics"
+export type { AnalyticsDimensionRows } from "./analytics"
