@@ -309,9 +309,10 @@ export function SiteInfoForm({
       <div className="space-y-2">
         <Label>{t("admin.siteLogo")}</Label>
         <div className="flex items-center gap-4">
-          {/* Full-bleed rounded tile, same recipe as the chip — and opaque,
-              so a dark-mode inverted transparent PNG rasterizes onto it,
-              not onto the dialog background. */}
+          {/* Full-bleed rounded tile — opaque so a dark-mode inverted
+              transparent PNG rasterizes onto it, not onto the dialog
+              background. With the built-in mark SiteLogo renders its own
+              black/white brand tile that covers this muted one. */}
           <div className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted">
             <SiteLogo
               src={previewSrc}

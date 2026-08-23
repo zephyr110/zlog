@@ -116,14 +116,19 @@ export function SiteLogo({
 
   // The tile IS the logo display — the mark fills it edge-to-edge with no
   // padding (a padded tile leaves gaps around small uploaded images), and
-  // transparent mark corners show the muted tile behind them — never the
-  // page background (the black-triangle fix).
+  // transparent mark corners show the tile behind them — never the page
+  // background (the black-triangle fix). The shipped mark uses the brand
+  // tile (black in light theme, white in dark, like the favicon); custom
+  // uploads keep the soft muted tile.
   return (
     <div
       className={cn(
         // Soft tile — avoid a heavy shadow/ring that makes the mark
         // dominate short wordmarks in the navbar lockup.
-        "shrink-0 overflow-hidden rounded-md bg-muted ring-1 ring-border/50 dark:ring-white/10",
+        "shrink-0 overflow-hidden rounded-md ring-1 ring-border/50 dark:ring-white/10",
+        effectiveSrc === DEFAULT_SITE_LOGO
+          ? "bg-black dark:bg-white"
+          : "bg-muted",
         className
       )}
     >

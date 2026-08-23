@@ -30,9 +30,19 @@ if (existsSync(LOGO_SOURCE)) {
   // 提取都依赖不透明背景——透明像素的 RGB 残留会把四角均值染浅灰、
   // 让亮度阈值吃进整片背景。
   const src = decodePng(readFileSync(LOGO_SOURCE))
+  // 透明背景是模板派生（按亮度阈值区分图形/背景）的前提——无 alpha 的
+  // RGB logo 会把整片背景提亮后吃进模板。尽早暴露，别静默产花图。
+  let hasTransparency = false
+  for (let i = 0; i < src.width * src.height; i++) {
+    if (src.data[i * 4 + 3] < 255) { hasTransparency = true; break }
+  }
+  if (!hasTransparency) {
+    console.warn("logo has no alpha channel — tray template derivation will include the background")
+  }
   const onBlack = composeOnBlack(src)
   writeMaskedAppIcon(onBlack, ICON_TARGET)
-  writeFileSync(TRAY_TARGET, pngFromRgba(onBlack.width, onBlack.data))
+  // 托盘彩色图标：不透明黑底方图（Windows/Linux 任务栏，与 app 图标同底色）。
+  writeFileSync(TRAY_TARGET, pngFromRgba(onBlack.width, opaqueOnBlack(onBlack).data))
   // 模板派生源提亮图形：toTemplateAlpha 按 128 亮度阈值提取，中灰
   // 图形（128-176）直接阈值会被切掉大半，菜单栏模板淡到不可见。
   const mark = brightenGlyph(onBlack)
@@ -73,8 +83,19 @@ function composeOnBlack(src) {
   return { width, height, data: out }
 }
 
-/** 图形亮度线性拉伸到 200-255（按原亮度比例缩放 RGB 保持色调）。
- *  仅用于模板派生源——应用图标保持原色。 */
+/** composeOnBlack 后再铺满不透明（托盘彩色图标要完整黑底方图）。 */
+function opaqueOnBlack(src) {
+  const { width, height, data } = composeOnBlack(src)
+  const out = Buffer.from(data)
+  for (let i = 0; i < width * height; i++) {
+    out[i * 4 + 3] = 255
+  }
+  return { width, height, data: out }
+}
+
+/** 图形亮度提亮到 200-255：向白色方向混合（t=(target-lum)/(255-lum)），
+ *  饱和色不被 255 clamp 截断（按比例缩放 RGB 时亮通道先到 255，提亮
+ *  落空）。仅用于模板派生源——应用图标保持原色。 */
 function brightenGlyph(src) {
   const { width, height, data } = src
   const out = Buffer.from(data)
@@ -82,11 +103,15 @@ function brightenGlyph(src) {
     const o = i * 4
     if (out[o + 3] > 0) {
       const lum = (out[o] + out[o + 1] + out[o + 2]) / 3
-      const k =
-        (200 + ((lum - 128) / 112) * 55) / Math.max(1, lum)
-      out[o] = Math.min(255, Math.round(out[o] * k))
-      out[o + 1] = Math.min(255, Math.round(out[o + 1] * k))
-      out[o + 2] = Math.min(255, Math.round(out[o + 2] * k))
+      // 近黑像素跳过：向白混合会把它们抬过 128 阈值，模板里出现
+      // 本不存在的杂点。
+      if (lum < 96) continue
+      const target = 200 + ((lum - 128) / 112) * 55
+      if (target <= lum) continue
+      const t = (target - lum) / (255 - lum)
+      out[o] = Math.min(255, Math.round(out[o] + (255 - out[o]) * t))
+      out[o + 1] = Math.min(255, Math.round(out[o + 1] + (255 - out[o + 1]) * t))
+      out[o + 2] = Math.min(255, Math.round(out[o + 2] + (255 - out[o + 2]) * t))
     }
   }
   return { width, height, data: out }
@@ -94,8 +119,10 @@ function brightenGlyph(src) {
 
 // ── 菜单栏模板图标派生（macOS） ──────────────────────────────────────
 // 菜单栏图标必须是"模板图"：黑色图形 + alpha 透明通道，系统自动按
-// 浅色/深色菜单栏渲染黑/白（HIG）。源图应是深底白标（tray-mark.png）；
-// 按亮度阈值提取图形为黑色 + 透明背景。彩色 logo 亮度不够，抽出来会发淡。
+// 浅色/深色菜单栏渲染黑/白（HIG）。模板源是下方派生并写回
+// assets/tray-mark.png 的黑底提亮版（tray-mark 本身已是派生产物，
+// 手工调整会被下次 gen-icons 覆盖）；按亮度阈值提取图形为黑色 +
+// 透明背景。
 function deriveTrayTemplates(sourcePath) {
   let src
   try {
@@ -105,7 +132,18 @@ function deriveTrayTemplates(sourcePath) {
     return
   }
   for (const { size, file } of TRAY_TEMPLATES) {
-    writeFileSync(join(root, "assets", file), pngFromRgba(size, boxDownsampleTemplate(src, size)))
+    const buf = boxDownsampleTemplate(src, size)
+    // 全透明产物（图形亮度全部低于阈值）不是失败信号——tray.ts 的
+    // image.isEmpty() 只判"无数据"，全透明图会被直接用作菜单栏图标，
+    // 菜单栏上完全不可见。提前暴露，别静默。
+    let covered = 0
+    for (let i = 0; i < size * size; i++) {
+      if (buf[i * 4 + 3] > 0) covered++
+    }
+    if (covered === 0) {
+      console.warn(`tray template ${file} is fully transparent — logo may be too dark for the 128-lum threshold`)
+    }
+    writeFileSync(join(root, "assets", file), pngFromRgba(size, buf))
   }
   console.log("generated assets/trayTemplate.png + trayTemplate@2x.png")
 }

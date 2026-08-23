@@ -237,9 +237,10 @@ export default function AdminLoginPage() {
             href="/"
             className="inline-flex items-center gap-3 rounded-xl transition-opacity hover:opacity-80"
           >
-            {/* Full-bleed rounded tile, same recipe as the chip — and
-                bg-card is opaque, so a dark-mode inverted transparent PNG
-                rasterizes onto it, not onto the page background. */}
+            {/* Full-bleed rounded tile — opaque so a dark-mode inverted
+                transparent PNG rasterizes onto it, not onto the page
+                background. With the built-in mark SiteLogo renders its
+                own black/white brand tile that covers this card one. */}
             <span className="flex size-11 items-center justify-center overflow-hidden rounded-lg border bg-card shadow-sm">
               <SiteLogo
                 src={logoSrc}
