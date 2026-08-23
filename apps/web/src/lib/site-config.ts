@@ -75,8 +75,10 @@ export const defaultSiteConfig: SiteConfig = {
 }
 
 export const DEFAULT_SITE_LOGO = "/zlog-logo.png"
-/** Built-in favicon — same colorful mark as the navbar. */
-export const DEFAULT_FAVICON = "/zlog-logo.png"
+/** Built-in favicon — same colorful mark as the navbar, rounded corners
+ *  (22% radius, transparent outside). Separate file so the navbar logo
+ *  keeps its square shape. */
+export const DEFAULT_FAVICON = "/zlog-favicon.png"
 
 export function siteLogoSrc(config: Pick<SiteConfig, "logoUrl">): string {
   return config.logoUrl || DEFAULT_SITE_LOGO
