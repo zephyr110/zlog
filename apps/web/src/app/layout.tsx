@@ -41,15 +41,11 @@ export async function generateMetadata(): Promise<Metadata> {
     icons: {
       // The favicon follows the uploaded site logo — /icon proxies its
       // bytes; the ?u= query cache-busts so a logo change shows up on
-      // the next page render. No logo → the built-in theme-switching
-      // SVG, with the fixed black-tile PNG as fallback for engines that
-      // don't render SVG favicons (Safari < 16.4, Firefox raster quirk).
+      // the next page render. No logo → the built-in mark.
       icon: site.logoUrl.trim()
         ? `/icon?u=${encodeURIComponent(site.logoUrl.trim())}`
-        : [DEFAULT_FAVICON, DEFAULT_APPLE_ICON],
+        : DEFAULT_FAVICON,
       // Fixed black tile — iOS ignores SVG and can't follow the theme.
-      // (Not proxying the uploaded logo: uploads allow jpeg/gif/webp/svg,
-      // which iOS rejects for apple-touch-icon — must be a square PNG.)
       apple: DEFAULT_APPLE_ICON,
     },
     openGraph: {
