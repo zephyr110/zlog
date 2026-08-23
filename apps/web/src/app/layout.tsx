@@ -8,7 +8,7 @@ import { SiteConfigProvider } from "@/components/layout/site-config-provider"
 import { DocumentTitle } from "@/components/layout/document-title"
 import { SiteAnalytics } from "@/components/layout/site-analytics"
 import { getSiteConfig } from "@/lib/get-site-config"
-import { DEFAULT_APPLE_ICON, DEFAULT_FAVICON } from "@/lib/site-config"
+import { DEFAULT_FAVICON } from "@/lib/site-config"
 import { defaultLocale } from "@/lib/i18n"
 import { getAllTags } from "@zlog/database"
 import { unstable_cache } from "next/cache"
@@ -45,8 +45,7 @@ export async function generateMetadata(): Promise<Metadata> {
       icon: site.logoUrl.trim()
         ? `/icon?u=${encodeURIComponent(site.logoUrl.trim())}`
         : DEFAULT_FAVICON,
-      // Fixed black tile — iOS ignores SVG and can't follow the theme.
-      apple: DEFAULT_APPLE_ICON,
+      apple: DEFAULT_FAVICON,
     },
     openGraph: {
       title: site.title,

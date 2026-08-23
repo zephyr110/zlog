@@ -88,31 +88,7 @@ export function SiteLogo({
     />
   )
 
-  if (!chip) {
-    // The shipped mark is a transparent PNG — it needs a brand tile
-    // (black in light theme, white in dark, matching the favicon) or it
-    // floats on the page background. Custom uploads render bare,
-    // honoring their own pixels.
-    if (effectiveSrc === DEFAULT_SITE_LOGO) {
-      return (
-        <div
-          className={cn(
-            "flex shrink-0 items-center justify-center overflow-hidden bg-black dark:bg-white",
-            className
-          )}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element -- remote/uploaded logos; avoid next/image domain config */}
-          <img
-            src={effectiveSrc}
-            alt={alt}
-            className="size-full object-contain"
-            onError={handleError}
-          />
-        </div>
-      )
-    }
-    return img
-  }
+  if (!chip) return img
 
   // The tile IS the logo display — the mark fills it edge-to-edge with no
   // padding (a padded tile leaves gaps around small uploaded images), and

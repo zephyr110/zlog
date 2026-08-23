@@ -75,13 +75,10 @@ export const defaultSiteConfig: SiteConfig = {
 }
 
 export const DEFAULT_SITE_LOGO = "/zlog-logo.png"
-/** Built-in favicon — the mark on a black tile in light mode, white tile
- *  in dark mode (the SVG switches via prefers-color-scheme), 22% rounded
- *  corners. Separate file so the navbar logo keeps its square shape. */
-export const DEFAULT_FAVICON = "/zlog-favicon.svg"
-/** Fixed black-background rounded PNG — apple-touch-icon (iOS doesn't
- *  support SVG favicons and can't follow the theme). */
-export const DEFAULT_APPLE_ICON = "/zlog-favicon.png"
+/** Built-in favicon — same colorful mark as the navbar, rounded corners
+ *  (22% radius, transparent outside). Separate file so the navbar logo
+ *  keeps its square shape. */
+export const DEFAULT_FAVICON = "/zlog-favicon.png"
 
 export function siteLogoSrc(config: Pick<SiteConfig, "logoUrl">): string {
   return config.logoUrl || DEFAULT_SITE_LOGO
