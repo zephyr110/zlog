@@ -26,14 +26,19 @@ const TRAY_TEMPLATES = [
 if (existsSync(LOGO_SOURCE)) {
   mkdirSync(join(root, "assets"), { recursive: true })
   mkdirSync(join(root, "build"), { recursive: true })
-  writeMaskedAppIcon(LOGO_SOURCE, ICON_TARGET)
-  copyFileSync(LOGO_SOURCE, TRAY_TARGET)
-  const trayMark = existsSync(TRAY_MARK_SOURCE) ? TRAY_MARK_SOURCE : LOGO_SOURCE
-  if (trayMark === LOGO_SOURCE) {
-    console.warn("tray-mark.png not found — deriving menu-bar template from colorful logo")
-  }
-  deriveTrayTemplates(trayMark)
-  console.log("icons copied from", LOGO_SOURCE)
+  // 透明 logo 先合成纯黑底（固定黑底，不随主题）：底色合成与模板
+  // 提取都依赖不透明背景——透明像素的 RGB 残留会把四角均值染浅灰、
+  // 让亮度阈值吃进整片背景。
+  const src = decodePng(readFileSync(LOGO_SOURCE))
+  const onBlack = composeOnBlack(src)
+  writeMaskedAppIcon(onBlack, ICON_TARGET)
+  writeFileSync(TRAY_TARGET, pngFromRgba(onBlack.width, onBlack.data))
+  // 模板派生源提亮图形：toTemplateAlpha 按 128 亮度阈值提取，中灰
+  // 图形（128-176）直接阈值会被切掉大半，菜单栏模板淡到不可见。
+  const mark = brightenGlyph(onBlack)
+  writeFileSync(TRAY_MARK_SOURCE, pngFromRgba(mark.width, mark.data))
+  deriveTrayTemplates(TRAY_MARK_SOURCE)
+  console.log("icons derived from", LOGO_SOURCE)
 } else {
   console.warn(`zlog-logo.png not found at ${LOGO_SOURCE} — generating placeholder icons`)
   generatePlaceholderIcons()
@@ -46,12 +51,45 @@ if (existsSync(icnsCache)) {
 }
 
 /** 应用图标：主体缩进板内再套 squircle（托盘仍用未裁切的方图）。 */
-function writeMaskedAppIcon(sourcePath, destPath) {
-  const src = decodePng(readFileSync(sourcePath))
+function writeMaskedAppIcon(src, destPath) {
   if (src.width !== src.height) {
     throw new Error(`app icon must be square (got ${src.width}×${src.height})`)
   }
   writeFileSync(destPath, pngFromRgba(src.width, composeMacAppIcon(src.data, src.width)))
+}
+
+/** 透明像素铺纯黑（保留原 alpha）。 */
+function composeOnBlack(src) {
+  const { width, height, data } = src
+  const out = Buffer.from(data)
+  for (let i = 0; i < width * height; i++) {
+    const o = i * 4
+    if (out[o + 3] === 0) {
+      out[o] = 0
+      out[o + 1] = 0
+      out[o + 2] = 0
+    }
+  }
+  return { width, height, data: out }
+}
+
+/** 图形亮度线性拉伸到 200-255（按原亮度比例缩放 RGB 保持色调）。
+ *  仅用于模板派生源——应用图标保持原色。 */
+function brightenGlyph(src) {
+  const { width, height, data } = src
+  const out = Buffer.from(data)
+  for (let i = 0; i < width * height; i++) {
+    const o = i * 4
+    if (out[o + 3] > 0) {
+      const lum = (out[o] + out[o + 1] + out[o + 2]) / 3
+      const k =
+        (200 + ((lum - 128) / 112) * 55) / Math.max(1, lum)
+      out[o] = Math.min(255, Math.round(out[o] * k))
+      out[o + 1] = Math.min(255, Math.round(out[o + 1] * k))
+      out[o + 2] = Math.min(255, Math.round(out[o + 2] * k))
+    }
+  }
+  return { width, height, data: out }
 }
 
 // ── 菜单栏模板图标派生（macOS） ──────────────────────────────────────
