@@ -21,6 +21,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @zlog/web check
+      - run: pnpm --filter @zlog/web test
       - run: pnpm --filter @zlog/desktop test
       - run: pnpm --filter @zlog/desktop build
       - run: pnpm --filter @zlog/desktop build:standalone
