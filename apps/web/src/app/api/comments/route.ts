@@ -6,6 +6,7 @@ import {
   isBeforeMinSubmitDelay,
 } from "@/lib/comment-session"
 import { type PublicComment } from "@/lib/comment-shared"
+import { countUrls, isRepetitiveNoise } from "@/lib/comment-filters"
 import {
   getCommentsByPost,
   getReplyTarget,
@@ -54,31 +55,6 @@ const createSchema = z.object({
  *  hex chars (collision odds are negligible at comment volume). */
 function anonymousName(): string {
   return `Anonymous_${crypto.randomUUID().slice(0, 8)}`
-}
-
-/** Max 2 URLs per comment — link spam is the bulk of automated abuse.
- *  Counts full URLs (scheme or www. prefix) and bare domains, each
- *  exactly once — a "www.example.com" URL must not count twice, and
- *  file extensions (package.json) or email domains must not count. */
-function countUrls(content: string): number {
-  const full = (content.match(/(?:https?:\/\/|www\.)[^\s<>"']+/gi) || []).length
-  // After removing full URLs, count bare domain.tld tokens not preceded
-  // by @ (email) or a word char / dot (path segments).
-  const rest = content.replace(/(?:https?:\/\/|www\.)[^\s<>"']+/gi, " ")
-  const bare = (
-    rest.match(/(?<![@\w.-])\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}\b/gi) || []
-  ).length
-  return full + bare
-}
-
-/** A comment made of one repeated character/short loop (aaaa…, 66666…,
- *  lkjhggfd…) is noise. Flag when the distinct-character set is tiny.
- *  Short comments (< 8 chars) are exempt — "哈哈哈", "666", "kkk" are
- *  legitimate human reactions and would otherwise all be rejected. */
-function isRepetitiveNoise(content: string): boolean {
-  if (content.length < 8) return false
-  const distinct = new Set(content.replace(/\s/g, "")).size
-  return distinct < Math.max(2, Math.floor(content.length * 0.2))
 }
 
 // ── Turnstile ───────────────────────────────────────────────────────────
