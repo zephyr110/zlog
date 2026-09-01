@@ -24,10 +24,17 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 })
   }
 
+  const isSvg = record.contentType === "image/svg+xml"
   return new NextResponse(Buffer.from(record.data), {
     headers: {
       "Content-Type": record.contentType,
       "Cache-Control": "public, max-age=86400",
+      // SVG can carry scripts that run when opened as a top-level
+      // document (not when embedded via <img>). Sandbox it: opaque
+      // origin, no scripts, no top-level navigation — a hostile SVG
+      // can't touch the site even if one slips past the upload check.
+      ...(isSvg ? { "Content-Security-Policy": "sandbox" } : {}),
+      "X-Content-Type-Options": "nosniff",
     },
   })
 }

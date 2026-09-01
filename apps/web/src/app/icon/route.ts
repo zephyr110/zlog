@@ -41,12 +41,28 @@ function defaultFaviconType(path: string): string {
   return "image/png"
 }
 
+/** Response headers for image bodies: nosniff everywhere, plus a CSP
+ *  sandbox for SVG — an SVG opened as a top-level document (e.g. a
+ *  direct visit to /icon?u=… with an SVG logo) must not run scripts
+ *  against the site's origin. <img>/favicon embedding is unaffected. */
+function imageHeaders(
+  type: string,
+  cacheControl: string
+): Record<string, string> {
+  return {
+    "Content-Type": type,
+    "Cache-Control": cacheControl,
+    ...(type === "image/svg+xml" ? { "Content-Security-Policy": "sandbox" } : {}),
+    "X-Content-Type-Options": "nosniff",
+  }
+}
+
 async function defaultFavicon(request: NextRequest): Promise<Response> {
   const file = DEFAULT_FAVICON.replace(/^\//, "")
-  const headers = {
-    "Content-Type": defaultFaviconType(file),
-    "Cache-Control": "public, max-age=3600",
-  }
+  const headers = imageHeaders(
+    defaultFaviconType(file),
+    "public, max-age=3600"
+  )
   try {
     const buf = readFileSync(join(process.cwd(), "public", file))
     return new Response(buf, { headers })
@@ -62,10 +78,7 @@ async function defaultFavicon(request: NextRequest): Promise<Response> {
       return new Response(await res.arrayBuffer(), { headers })
     } catch {
       return new Response(FALLBACK_SVG, {
-        headers: {
-          "Content-Type": "image/svg+xml",
-          "Cache-Control": "public, max-age=3600",
-        },
+        headers: imageHeaders("image/svg+xml", "public, max-age=3600"),
       })
     }
   }
@@ -176,12 +189,12 @@ export async function GET(request: NextRequest) {
     if (bytes.byteLength > MAX_FAVICON_BYTES) throw new Error("favicon too large")
 
     return new Response(bytes, {
-      headers: {
-        "Content-Type": type,
+      headers: imageHeaders(
+        type,
         // Favicons get cached aggressively; an hour is cheap enough while
         // being short enough that removing a logo recovers quickly.
-        "Cache-Control": "public, max-age=3600, stale-while-revalidate=3600",
-      },
+        "public, max-age=3600, stale-while-revalidate=3600"
+      ),
     })
   } catch (error) {
     console.error("[icon] favicon proxy failed — serving built-in mark:", error)

@@ -9,6 +9,7 @@ import {
 } from "@zlog/database"
 import { cdnUrl } from "@/lib/github-image"
 import { MAX_UPLOAD_BYTES } from "@/lib/upload-constants"
+import { hasDangerousSvgContent } from "@/lib/svg-sanitize"
 import path from "path"
 
 const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]
@@ -168,6 +169,15 @@ export async function POST(request: NextRequest) {
       if (!looksLikeSvg(buffer)) {
         return NextResponse.json(
           { error: "Invalid SVG content" },
+          { status: 400 }
+        )
+      }
+      // SVG can carry scripts that run when the file is opened as a
+      // document — reject the payloads at upload (the media route adds
+      // a CSP sandbox header as a second layer).
+      if (hasDangerousSvgContent(buffer.toString("utf8"))) {
+        return NextResponse.json(
+          { error: "SVG contains unsafe content" },
           { status: 400 }
         )
       }
