@@ -130,8 +130,9 @@ export default function AdminLoginPage() {
       })
 
       if (res.ok) {
-        const data = await res.json()
-        setToken(data.token)
+        // The server set the HttpOnly session cookie; setToken() only
+        // mirrors the client-side session flag + notifies listeners.
+        setToken()
         toast.success(t("admin.welcomeBack"))
         router.push("/admin/dashboard")
         router.refresh()

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { AdminSidebar, AdminSidebarTrigger } from "@/components/admin/admin-sidebar"
 import { CommentUnreadProvider } from "@/components/admin/comment-unread"
-import { getToken, apiFetch, clearToken } from "@/lib/api-client"
+import { apiFetch, clearToken } from "@/lib/api-client"
 import { PageLoader } from "@/components/ui/page-loader"
 import { useT } from "@/components/layout/trans"
 import { cn } from "@/lib/utils"
@@ -91,13 +91,9 @@ export default function AdminLayout({
     }
 
     async function checkAuth() {
-      const token = getToken()
-      if (!token) {
-        router.push("/admin/login")
-        setLoading(false)
-        return
-      }
-
+      // The session token lives in an HttpOnly cookie JS can't read —
+      // the server is the only authority: /api/auth/me answers 200 with
+      // the user, or 401 when the cookie is missing/expired.
       try {
         // skipAuthRedirect: the layout owns the redirect here, so the
         // apiFetch 401 interceptor doesn't race it with a hard reload.
@@ -106,11 +102,11 @@ export default function AdminLayout({
           const data = await res.json()
           setUser(data.user)
         } else {
-          clearToken()
+          await clearToken()
           router.push("/admin/login")
         }
       } catch {
-        clearToken()
+        await clearToken()
         router.push("/admin/login")
       } finally {
         setLoading(false)

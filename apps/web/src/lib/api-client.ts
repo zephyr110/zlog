@@ -1,9 +1,23 @@
-const TOKEN_KEY = "blog-admin-token"
-/** Cookie mirrored from localStorage so proxy can gate `/admin` routes. */
-export const ADMIN_TOKEN_COOKIE = "blog-admin-token"
-const COOKIE_NAME = ADMIN_TOKEN_COOKIE
+/**
+ * Client-side admin session helpers.
+ *
+ * The session JWT itself lives ONLY in an HttpOnly cookie set by
+ * /api/auth/login — JavaScript never sees it (see lib/auth-cookie.ts).
+ * What the client tracks instead:
+ *  - a non-sensitive localStorage flag mirroring "a session exists",
+ *    used for analytics suppression and the footer's admin link;
+ *  - an event dispatched on login/logout so same-tab listeners (and the
+ *    cross-tab `storage` event) can re-read the flag.
+ */
+
+/** localStorage flag — "1" while a session exists. Never holds the token.
+ *  Exporting it lets client components (site-analytics bootstrap) read
+ *  the same key instead of duplicating the literal. */
+export const ADMIN_SESSION_FLAG = "zlog-admin-session"
+
 /** Same-tab signal for analytics (and other listeners) when login/logout
- *  mutates localStorage — the browser `storage` event only fires cross-tab. */
+ *  mutates the session flag — the browser `storage` event only fires
+ *  cross-tab. */
 export const ADMIN_SESSION_EVENT = "zlog:admin-session"
 const REQUEST_TIMEOUT = 15_000
 
@@ -20,43 +34,43 @@ function notifyAdminSessionChange(): void {
   window.dispatchEvent(new Event(ADMIN_SESSION_EVENT))
 }
 
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null
-  return localStorage.getItem(TOKEN_KEY)
-}
-
-/** True when this browser holds an admin session (localStorage or cookie).
- *  Used to suppress analytics collection for the owner’s own browsing. */
+/** True when this browser holds an admin session (localStorage flag).
+ *  Used to suppress analytics collection for the owner's own browsing. */
 export function hasAdminSession(): boolean {
   if (typeof window === "undefined") return false
-  if (localStorage.getItem(TOKEN_KEY)) return true
-  return document.cookie.split(";").some((part) => {
-    const [name, ...rest] = part.trim().split("=")
-    return name === COOKIE_NAME && rest.join("=").length > 0
-  })
+  return localStorage.getItem(ADMIN_SESSION_FLAG) === "1"
 }
 
-export function setToken(token: string): void {
+/**
+ * Called after a successful login. The server already set the HttpOnly
+ * session cookie; this mirrors a localStorage flag (for client-side
+ * session detection) and notifies same-tab listeners.
+ */
+export function setToken(): void {
   if (typeof window !== "undefined") {
-    localStorage.setItem(TOKEN_KEY, token)
-    // Keep a cookie in sync so proxy can validate admin routes.
-    const maxAge = 60 * 60 * 24 * 7 // 7 days
-    document.cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax`
+    localStorage.setItem(ADMIN_SESSION_FLAG, "1")
     notifyAdminSessionChange()
   }
 }
 
-export function clearToken(): void {
+/** Clear the session: drop the local flag immediately (client state must
+ *  not depend on a network round-trip), then ask the server to delete
+ *  the HttpOnly cookie. Best effort — the request is fire-and-forget. */
+export async function clearToken(): Promise<void> {
   if (typeof window !== "undefined") {
-    localStorage.removeItem(TOKEN_KEY)
-    document.cookie = `${COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`
+    localStorage.removeItem(ADMIN_SESSION_FLAG)
     notifyAdminSessionChange()
+  }
+  try {
+    await fetch("/api/auth/logout", { method: "POST" })
+  } catch {
+    // best effort — local state is already cleared
   }
 }
 
 /** Redirect to the login page (only when a session has genuinely expired). */
 function redirectToLogin(): void {
-  clearToken()
+  void clearToken()
   if (
     typeof window !== "undefined" &&
     !window.location.pathname.startsWith("/admin/login")
@@ -75,10 +89,11 @@ interface ApiFetchOptions extends RequestInit {
 
 /**
  * fetch wrapper with:
- * - automatic Bearer token injection
+ * - automatic cookie-based auth (the HttpOnly session cookie is sent by
+ *   the browser on same-origin requests — no Authorization header needed)
  * - FormData-aware Content-Type handling
  * - 15s timeout (fetch has no default timeout)
- * - 401 → clear token + redirect to /admin/login, except for
+ * - 401 → clear session + redirect to /admin/login, except for
  *   login/change-password routes where 401 is a business error
  */
 export async function apiFetch(
@@ -86,13 +101,8 @@ export async function apiFetch(
   options: ApiFetchOptions = {}
 ): Promise<Response> {
   const { skipAuthRedirect = false, timeout = REQUEST_TIMEOUT, ...init } = options
-  const token = getToken()
   const headers: Record<string, string> = {
     ...(init.headers as Record<string, string>),
-  }
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`
   }
 
   // Don't set Content-Type for FormData (browser sets it with boundary)

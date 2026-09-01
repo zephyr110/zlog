@@ -14,7 +14,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { getToken } from "@/lib/api-client"
+import { hasAdminSession } from "@/lib/api-client"
 
 const iconButtonClass =
   "inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
@@ -34,11 +34,12 @@ export function Footer() {
   const githubUrl = site.social.github || defaultSiteConfig.social.github
   const [loggedIn, setLoggedIn] = useState(false)
 
-  // The token lives in localStorage, so it can only be read after mount —
+  // The session flag lives in localStorage (the JWT itself is in an
+  // HttpOnly cookie JS can't read), so it can only be read after mount —
   // and re-read on navigation so login/logout elsewhere reflects here.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is client-only; post-mount read avoids hydration mismatch
-    setLoggedIn(!!getToken())
+    setLoggedIn(hasAdminSession())
   }, [pathname])
 
   if (pathname?.startsWith("/admin")) return null

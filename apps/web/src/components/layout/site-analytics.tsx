@@ -5,7 +5,7 @@ import { Analytics, type BeforeSendEvent } from "@vercel/analytics/next"
 import { GoogleAnalytics } from "@next/third-parties/google"
 import {
   ADMIN_SESSION_EVENT,
-  ADMIN_TOKEN_COOKIE,
+  ADMIN_SESSION_FLAG,
   hasAdminSession,
 } from "@/lib/api-client"
 import { isPublicTrafficPath } from "@/lib/analytics-paths"
@@ -40,8 +40,8 @@ function getServerReadySnapshot() {
 
 /**
  * Site-wide pageview collectors. Drops owner noise at send time:
- * - admin session (token in localStorage / cookie) — covers public pages
- *   while logged in, not just /admin/*
+ * - admin session (localStorage flag mirroring the HttpOnly session
+ *   cookie) — covers public pages while logged in, not just /admin/*
  * - any /admin path (login page included)
  *
  * Historical aggregates cannot be scrubbed; this only affects new events.
@@ -79,11 +79,13 @@ export function SiteAnalytics({ gaId }: { gaId?: string }) {
     return event
   }, [])
 
-  // Runs before GoogleAnalytics’s script: cookie-only check so an admin
-  // hard-refresh does not send a first hit while React hydrates.
+  // Runs before GoogleAnalytics's script: localStorage flag check so an
+  // admin hard-refresh does not send a first hit while React hydrates.
+  // (The JWT cookie is HttpOnly — document.cookie can't see it, and the
+  // localStorage flag is the client-side mirror.)
   const gaDisableBootstrap =
     gaId &&
-    `(function(){try{if(/(?:^|;\\s*)${ADMIN_TOKEN_COOKIE}=/.test(document.cookie)){window[${JSON.stringify(`ga-disable-${gaId}`)}]=true}}catch(e){}})();`
+    `(function(){try{if(localStorage.getItem(${JSON.stringify(ADMIN_SESSION_FLAG)})){window[${JSON.stringify(`ga-disable-${gaId}`)}]=true}}catch(e){}})();`
 
   return (
     <>

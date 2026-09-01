@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createToken, attemptLogin } from "@zlog/auth"
 import { lockedResponse } from "@/lib/auth-lockout"
+import { ADMIN_TOKEN_COOKIE, adminCookieOptions } from "@/lib/auth-cookie"
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +33,17 @@ export async function POST(request: NextRequest) {
 
     const token = await createToken(attempt.user)
 
-    return NextResponse.json({ user: attempt.user, token })
+    // The JWT rides ONLY in an HttpOnly + Secure + SameSite=Lax cookie —
+    // it is never returned to JavaScript, so XSS can't read it and
+    // cross-site POSTs can't carry it (CSRF). API auth reads the cookie
+    // via requireAuth; proxy.ts reads it to gate /admin routes.
+    const res = NextResponse.json({ user: attempt.user })
+    res.cookies.set(
+      ADMIN_TOKEN_COOKIE,
+      token,
+      adminCookieOptions(request.nextUrl.protocol, request.nextUrl.hostname)
+    )
+    return res
   } catch (error) {
     console.error("Login error:", error)
     return NextResponse.json(
