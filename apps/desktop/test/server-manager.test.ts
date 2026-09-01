@@ -30,12 +30,16 @@ describe("envWithoutInheritedProxy", () => {
       https_proxy: "http://127.0.0.1:1",
       ALL_PROXY: "socks5://127.0.0.1:1",
       ANALYTICS_HTTPS_PROXY: "http://127.0.0.1:1",
+      ELECTRON_RUN_AS_NODE: "1",
     })
     expect(cleaned.PATH).toBe("/bin")
     expect(cleaned.HTTPS_PROXY).toBeUndefined()
     expect(cleaned.https_proxy).toBeUndefined()
     expect(cleaned.ALL_PROXY).toBeUndefined()
     expect(cleaned.ANALYTICS_HTTPS_PROXY).toBeUndefined()
+    // 该变量只对 electron 二进制有意义；utilityProcess 子进程不得继承
+    // （也保证 env 断言的测试在任何环境下都不漂移）。
+    expect(cleaned.ELECTRON_RUN_AS_NODE).toBeUndefined()
   })
 })
 

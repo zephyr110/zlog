@@ -2,7 +2,10 @@ import { createWriteStream, mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { createServer } from "node:net"
 
-/** IDE / 终端常注入已失效的 HTTPS_PROXY；子进程只接受 buildServerEnv 给出的代理。 */
+/** IDE / 终端常注入已失效的 HTTPS_PROXY；子进程只接受 buildServerEnv 给出的代理。
+ *  ELECTRON_RUN_AS_NODE 一并剥离：子进程经 utilityProcess.fork（Chromium Helper）
+ *  启动，该变量对其毫无意义；父进程环境（测试/CI）残留时会泄漏进 server 子进程，
+ *  并使依赖 env 断言的测试随环境漂移。 */
 const INHERITED_PROXY_KEYS = [
   "HTTPS_PROXY",
   "https_proxy",
@@ -11,6 +14,7 @@ const INHERITED_PROXY_KEYS = [
   "ALL_PROXY",
   "all_proxy",
   "ANALYTICS_HTTPS_PROXY",
+  "ELECTRON_RUN_AS_NODE",
 ] as const
 
 export function envWithoutInheritedProxy(
