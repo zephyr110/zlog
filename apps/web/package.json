@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "check": "pnpm lint && pnpm typecheck",
     "check:i18n": "node scripts/check-i18n.mjs",
-    "generate:geo": "node scripts/generate-geo-assets.mjs"
+    "generate:geo": "node scripts/generate-geo-assets.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -63,6 +64,7 @@
     "tailwindcss": "^4",
     "topojson-client": "^3.1.0",
     "typescript": "^5",
+    "vitest": "^3.2.4",
     "world-atlas": "^2.0.2",
     "world-countries": "^5.1.0"
   }
