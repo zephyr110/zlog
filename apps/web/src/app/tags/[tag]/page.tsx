@@ -19,9 +19,11 @@ export async function generateStaticParams() {
   // 运行时按需渲染（force-dynamic 不跳过 generateStaticParams，Task 12 CI 实测）
   if (process.env.NEXT_DESKTOP === "true") return []
   const tags = await getAllTags()
-  // 系列 tag 不是普通标签（/tags/series-x 由页面重定向到 /series/x），
-  // 不为其生成静态路径——预渲染期抛重定向没有意义。
-  return tags.filter((tag) => !isSeriesTag(tag)).map((tag) => ({ tag }))
+  // 系列 tag 同样生成静态路径：预渲染时页面里的 permanentRedirect 会被
+  // 导出成跳转 HTML（与 category/[name] 同款兜底），否则导出构建里旧的
+  // /tags/series-* 链接会落到 404.html。运行时构建由 next.config 的
+  // redirects 先行处理，不经过页面。
+  return tags.map((tag) => ({ tag }))
 }
 
 export async function generateMetadata({

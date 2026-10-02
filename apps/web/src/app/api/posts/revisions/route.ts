@@ -4,6 +4,7 @@ import {
   getPostBySlug,
   getPostRevision,
   listPostRevisions,
+  parseRevisionId,
   savePost,
 } from "@zlog/database"
 
@@ -32,13 +33,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  let id: number
+  let id: number | null
   try {
-    id = Number((await request.json())?.id)
+    id = parseRevisionId((await request.json())?.id)
   } catch {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 })
   }
-  if (!Number.isInteger(id) || id <= 0) {
+  if (id === null) {
     return NextResponse.json({ error: "Invalid revision id" }, { status: 400 })
   }
 

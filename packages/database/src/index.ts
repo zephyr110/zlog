@@ -12,6 +12,7 @@ export {
   getPostsByCategory,
   getPostsByTag,
   searchPublishedPosts,
+  listPostTitles,
 } from "./content"
 export {
   insertPostRevision,
@@ -19,6 +20,7 @@ export {
   listPostRevisions,
   getPostRevision,
   samePostContent,
+  parseRevisionId,
   REVISION_LIMIT,
 } from "./revisions"
 export type { PostRevision, PostRevisionSummary } from "./revisions"

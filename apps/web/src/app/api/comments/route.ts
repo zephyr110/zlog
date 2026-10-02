@@ -5,9 +5,9 @@ import {
   verifyCommentSession,
   isBeforeMinSubmitDelay,
 } from "@/lib/comment-session"
-import { type PublicComment } from "@/lib/comment-shared"
+import { toPublicComment } from "@/lib/comment-shared"
 import { countUrls, isRepetitiveNoise } from "@/lib/comment-filters"
-import { isScheduled } from "@/lib/schedule"
+import { isPublic } from "@/lib/schedule"
 import {
   getCommentsByPost,
   getReplyTarget,
@@ -106,15 +106,7 @@ export async function GET(request: NextRequest) {
   }
 
   const comments = await getCommentsByPost(parsed.data.post)
-  const publicComments: PublicComment[] = comments.map((c) => ({
-    id: c.id,
-    postSlug: c.postSlug,
-    authorName: c.authorName,
-    content: c.content,
-    parentId: c.parentId,
-    createdAt: c.createdAt,
-  }))
-  return NextResponse.json({ comments: publicComments })
+  return NextResponse.json({ comments: comments.map(toPublicComment) })
 }
 
 /** Guest comment submission — the full anti-spam pipeline. Order is
@@ -124,21 +116,21 @@ export async function POST(request: NextRequest) {
   //    script gets no feedback, but never store the comment. Checked on
   //    the RAW body, before schema validation: a honeypot-filled probe
   //    must not be told — via a distinguishing 400 — whether its other
-  //    fields were valid, and any non-empty string counts regardless of
-  //    length or shape (the schema would reject an over-long value).
+  //    fields were valid, and ANY non-empty value counts regardless of
+  //    type, length or shape (createSchema strips unknown keys, so a
+  //    non-string fill would otherwise sail through the trap).
   let raw: unknown
   try {
     raw = await request.json()
   } catch {
     return NextResponse.json({ error: "Invalid comment" }, { status: 400 })
   }
-  if (
-    typeof raw === "object" &&
-    raw !== null &&
-    typeof (raw as { website?: unknown }).website === "string" &&
-    (raw as { website: string }).website.length > 0
-  ) {
-    return NextResponse.json({ ok: true })
+  if (typeof raw === "object" && raw !== null) {
+    const website = (raw as { website?: unknown }).website
+    // Absence and "" pass — the real client always sends an empty string.
+    if (website !== undefined && website !== null && website !== "") {
+      return NextResponse.json({ ok: true })
+    }
   }
 
   // 2. Shape
@@ -176,7 +168,7 @@ export async function POST(request: NextRequest) {
   //    A scheduled post is not public yet, so it accepts no comments.
   {
     const post = await getPostBySlug(body.postSlug, true)
-    if (!post || post.draft || isScheduled(post.publishAt)) {
+    if (!post || !isPublic(post)) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 })
     }
   }
@@ -284,16 +276,7 @@ export async function POST(request: NextRequest) {
     )
   }
   return NextResponse.json(
-    {
-      comment: {
-        id: comment.id,
-        postSlug: comment.postSlug,
-        authorName: comment.authorName,
-        content: comment.content,
-        parentId: comment.parentId,
-        createdAt: comment.createdAt,
-      } satisfies PublicComment,
-    },
+    { comment: toPublicComment(comment) },
     { status: 201 }
   )
 }

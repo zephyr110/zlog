@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getMediaData, listMedia } from "@zlog/database"
+import { getMediaData } from "@zlog/database"
 
 /** Serves the Turso copy of a media file — disaster-recovery fallback for
- *  jsdelivr and the read path for exports. Public, like jsdelivr itself. */
+ *  jsdelivr. Public, like jsdelivr itself.
+ *
+ *  静态导出站不提供此路由：toggle-force-static.mjs 在 export 构建时
+ *  把 api/ 下的动态段路由整体 stash（Next 16 不导出带动态段的 route
+ *  handler——本文件曾带 generateStaticParams 仍报 missing，实证），
+ *  导出站的图片走 jsdelivr 主路径。 */
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ name: string }> }
@@ -37,20 +42,4 @@ export async function GET(
       "X-Content-Type-Options": "nosniff",
     },
   })
-}
-
-/**
- * Static export requires dynamic segments to enumerate their params —
- * with output: export every media file is pre-rendered as a static file
- * under /api/media/<name>, which is exactly what this route exists for
- * (the read path for exports; jsdelivr remains the primary delivery).
- * New uploads appear after the next export run, matching the static
- * deployment model.
- */
-export async function generateStaticParams(): Promise<{ name: string }[]> {
-  // 桌面 standalone 构建（NEXT_DESKTOP=true）无数据库：不枚举静态路径，
-  // 运行时按需读本地库（force-dynamic 不跳过 generateStaticParams，Task 12 CI 实测）
-  if (process.env.NEXT_DESKTOP === "true") return []
-  const media = await listMedia()
-  return media.map((m) => ({ name: m.name }))
 }

@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react"
 
+import { isPublic } from "@/lib/schedule"
+import { publicTags } from "@/lib/series"
+
 import {
   AreaChart,
   Area,
@@ -34,7 +37,6 @@ import {
 import { useT } from "@/components/layout/trans"
 import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { resolveCategory, getCategoryLabel } from "@/lib/categories"
-import { isScheduled } from "@/lib/schedule"
 import { type PostSummary } from "@zlog/database"
 
 /** Bars cycle the shared chart palette (chart-1…chart-5). */
@@ -100,10 +102,7 @@ export function PostStats({ posts }: PostStatsProps) {
     [t]
   )
 
-  const publishedPosts = useMemo(
-    () => posts.filter((p) => !p.draft && !isScheduled(p.publishAt)),
-    [posts]
-  )
+  const publishedPosts = useMemo(() => posts.filter(isPublic), [posts])
 
   const timeRangeLabels = useMemo<Record<TimeRange, string>>(
     () => ({
@@ -152,7 +151,9 @@ export function PostStats({ posts }: PostStatsProps) {
   const topicData = useMemo(() => {
     const byTopic: Record<string, number> = {}
     for (const p of topicFiltered) {
-      const topics = new Set(p.tags.map(resolveCategory))
+      // Series tags are metadata, not topics — same rule as every public
+      // tag surface (otherwise "series-部署指南" appears as a topic bar).
+      const topics = new Set(publicTags(p.tags).map(resolveCategory))
       for (const topic of topics) {
         byTopic[topic] = (byTopic[topic] || 0) + 1
       }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/api-auth"
-import { getPostRevision } from "@zlog/database"
+import { getPostRevision, parseRevisionId } from "@zlog/database"
 
 export const dynamic = "force-dynamic"
 
@@ -15,8 +15,8 @@ export async function GET(
   }
 
   const { id: raw } = await params
-  const id = Number(raw)
-  if (!Number.isInteger(id) || id <= 0) {
+  const id = parseRevisionId(raw)
+  if (id === null) {
     return NextResponse.json({ error: "Invalid revision id" }, { status: 400 })
   }
 

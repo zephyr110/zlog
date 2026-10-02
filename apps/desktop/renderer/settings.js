@@ -875,11 +875,14 @@ document.getElementById("openBtn2")?.addEventListener("click", () => {
 })
 
 refreshStatus()
-// 面板常开时每 10s 自动刷新同步状态（窗口隐藏时跳过；主进程对托盘
-// tooltip 另有 30s 轮询 + 系统通知）。手动点「立即同步」后本就即时刷新。
-setInterval(() => {
+// 同步状态改为事件驱动刷新：窗口重新可见 / 获得焦点时拉一次即可
+// （此前是窗口可见就每 10s 轮询——窗口开着但压在别的窗口后面时也在
+// 空转；主进程对托盘 tooltip 另有 30s 轮询 + 系统通知兜底）。手动点
+// 「立即同步」后本就即时刷新。
+document.addEventListener("visibilitychange", () => {
   if (!document.hidden) refreshStatus()
-}, 10_000)
+})
+window.addEventListener("focus", refreshStatus)
 
 // ── 一键部署（Go Live 面板） ─────────────────────────────────────────
 // 状态机：idle → validating → project → env → source → upload → building

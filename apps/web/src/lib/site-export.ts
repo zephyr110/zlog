@@ -58,10 +58,18 @@ export function buildExportEntries(
   at: Date,
   siteName: string
 ): ZipEntry[] {
-  const files = posts.map((post) => ({
-    path: `posts/${safeExportSlug(post.slug)}.md`,
-    text: serializePostMarkdown(post),
-  }))
+  // Two legitimate slugs can collapse to one export path ("-foo" and
+  // "foo" both sanitize to "foo") — suffix the later one instead of
+  // emitting duplicate zip entries, which unzip tools silently resolve
+  // to a single file (dropping a post from the export).
+  const usedPaths = new Set<string>()
+  const files = posts.map((post) => {
+    const base = `posts/${safeExportSlug(post.slug)}`
+    let path = `${base}.md`
+    for (let n = 2; usedPaths.has(path); n++) path = `${base}-${n}.md`
+    usedPaths.add(path)
+    return { path, text: serializePostMarkdown(post) }
+  })
   const drafts = posts.filter((post) => post.draft).length
   const manifest: SiteExportManifest = {
     generator: "zlog",

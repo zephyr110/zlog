@@ -376,8 +376,16 @@ async function main() {
             body: copy.body(unread),
           })
           notification.on("click", () => {
+            // Already on the comments page (just unfocused): focusing is
+            // the whole ask — loadURL here would reload the page and
+            // discard whatever the admin had open (e.g. a half-typed
+            // reply).
+            const alreadyOnComments =
+              !!mainWindow &&
+              !mainWindow.isDestroyed() &&
+              isCommentsPageUrl(mainWindow.webContents.getURL())
             showMainWindow()
-            if (mainWindow && !mainWindow.isDestroyed()) {
+            if (!alreadyOnComments && mainWindow && !mainWindow.isDestroyed()) {
               void mainWindow.loadURL(`${serverManager.url}/admin/comments`)
             }
           })

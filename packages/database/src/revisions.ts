@@ -63,6 +63,13 @@ export type PostRevision = Post & { id: number; createdAt: string }
 
 // ── Pure ────────────────────────────────────────────────────────────────
 
+/** 解析历史版本 id（URL 参数或请求体皆可）：仅正整数有效，其余
+ *  （含 "1.5"、"1e3"、" 1"、NaN）一律 null，路由据此回 400。 */
+export function parseRevisionId(value: unknown): number | null {
+  const id = Number(value)
+  return Number.isInteger(id) && id > 0 ? id : null
+}
+
 /** 是否值得存快照：内容字段逐项比对。pinnedAt 不参与——置顶走
  *  setPostPinned 专用路径，编辑保存根本不触碰它；把置顶变化算作
  *  "内容变化"会让自动保存反复生成快照。 */

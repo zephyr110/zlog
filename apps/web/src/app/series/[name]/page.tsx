@@ -1,3 +1,4 @@
+import { cache } from "react"
 import { notFound } from "next/navigation"
 import { type Metadata } from "next"
 import Link from "next/link"
@@ -14,11 +15,15 @@ interface SeriesPageProps {
   params: Promise<{ name: string }>
 }
 
+/** generateMetadata 与页面体在同一请求内各要一份全量列表——React
+ *  cache 按请求去重（get-site-config 同款做法），渲染不再多查一次。 */
+const getSeriesSource = cache(getPublishedPosts)
+
 export async function generateStaticParams() {
   // 桌面 standalone 构建（NEXT_DESKTOP=true）无数据库：不枚举静态路径，
   // 运行时按需渲染（与 posts/[slug]、tags/[tag] 同款处理）。
   if (process.env.NEXT_DESKTOP === "true") return []
-  const series = listSeries(await getPublishedPosts())
+  const series = listSeries(await getSeriesSource())
   return series.map((entry) => ({ name: entry.name.toLowerCase() }))
 }
 
@@ -27,7 +32,7 @@ export async function generateMetadata({
 }: SeriesPageProps): Promise<Metadata> {
   const { name } = await params
   const decoded = decodeURIComponent(name)
-  const posts = collectSeriesPosts(await getPublishedPosts(), decoded)
+  const posts = collectSeriesPosts(await getSeriesSource(), decoded)
   if (posts.length === 0) {
     return { title: t(defaultLocale, "site.notFound") as string }
   }
@@ -44,7 +49,7 @@ export async function generateMetadata({
 export default async function SeriesPage({ params }: SeriesPageProps) {
   const { name } = await params
   const decoded = decodeURIComponent(name)
-  const posts = collectSeriesPosts(await getPublishedPosts(), decoded)
+  const posts = collectSeriesPosts(await getSeriesSource(), decoded)
   if (posts.length === 0) notFound()
 
   const tag = seriesTagOf(posts[0].tags)

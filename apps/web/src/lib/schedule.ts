@@ -14,7 +14,7 @@ export function toPublishAtUtc(localValue: string): string | null {
   // exactly what the author picked in their browser.
   const date = new Date(localValue)
   if (Number.isNaN(date.getTime())) return null
-  return date.toISOString().slice(0, 19).replace("T", " ")
+  return toUtcStamp(date)
 }
 
 /** Stored UTC → the local value the datetime-local input expects.
@@ -37,5 +37,21 @@ export function isScheduled(
   now: Date = new Date()
 ): boolean {
   if (!publishAt) return false
-  return publishAt > now.toISOString().slice(0, 19).replace("T", " ")
+  return publishAt > toUtcStamp(now)
+}
+
+/** Date → stored UTC "YYYY-MM-DD HH:MM:SS" (the publish_at / pinned_at
+ *  format; identical to datetime('now')). */
+export function toUtcStamp(date: Date): string {
+  return date.toISOString().slice(0, 19).replace("T", " ")
+}
+
+/** Client-side mirror of the server's PUBLISHED_SQL predicate (draft = 0
+ *  AND (publish_at IS NULL OR publish_at <= now)) — the two must stay in
+ *  sync; this one just uses the browser clock. */
+export function isPublic(p: {
+  draft: boolean
+  publishAt?: string | null
+}): boolean {
+  return !p.draft && !isScheduled(p.publishAt)
 }

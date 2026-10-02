@@ -182,6 +182,26 @@ describe("buildExportEntries", () => {
     })
   })
 
+  it("sanitize 后同名的 slug 加序号，不产生重复条目", () => {
+    const posts = [
+      mkPost({ slug: "-foo", title: "Dash prefixed" }),
+      mkPost({ slug: "foo", title: "Plain" }),
+      mkPost({ slug: "-", title: "All dash" }),
+      mkPost({ slug: "post", title: "Post" }),
+    ]
+    const entries = buildExportEntries(posts, AT, "Zlog")
+    const paths = entries.map((e) => e.path)
+    expect(paths).toEqual([
+      "manifest.json",
+      "posts/foo.md",
+      "posts/foo-2.md",
+      "posts/post.md",
+      "posts/post-2.md",
+    ])
+    expect(new Set(paths).size).toBe(paths.length)
+    expect(JSON.parse(entries[0].text).files).toEqual(paths.slice(1))
+  })
+
   it("空站导出仍带合法 manifest", () => {
     const entries = buildExportEntries([], AT, "Zlog")
     expect(entries).toHaveLength(1)

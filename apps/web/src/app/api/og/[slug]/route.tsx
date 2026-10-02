@@ -78,8 +78,12 @@ export async function GET(
   const title = fitOgTitle(post.title)
   const separator = "·"
 
+  // Subset from the RENDERED strings: fitOgTitle may return "Untitled" or
+  // a truncated text ending in "…" whose glyphs are not in the raw title,
+  // and a missing glyph sends satori off to fetch a fallback font at
+  // render time (or draws .notdef when that fetch fails).
   const subsetText = ogSubsetText([
-    post.title,
+    title.text,
     site.name,
     host,
     post.date,
@@ -178,7 +182,11 @@ export async function GET(
     ),
     {
       ...OG_SIZE,
-      fonts,
+      // Only pass fonts when at least one loaded: `fonts: []` is truthy,
+      // and satori throws "No fonts are loaded" instead of using
+      // next/og's built-in default — the offline fallback the loader
+      // above relies on.
+      ...(fonts.length > 0 ? { fonts } : {}),
       headers: {
         // Stable URL per post but content can change on edit — cache a
         // day at the edge, revalidate in the background after that.

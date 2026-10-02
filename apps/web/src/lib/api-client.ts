@@ -110,21 +110,42 @@ export async function apiFetch(
     headers["Content-Type"] = headers["Content-Type"] || "application/json"
   }
 
+  // Merge a caller-provided signal with the timeout. AbortSignal.any is
+  // the clean way; where it is missing (Safari < 17.4) the two are wired
+  // manually — a bare `init.signal ?? timeout` would silently drop the
+  // timeout whenever a caller passed a signal.
+  const callerSignal = init.signal ?? undefined
+  const timeoutSignal = AbortSignal.timeout(timeout)
+  let signal: AbortSignal = timeoutSignal
+  let removeAbortListeners: (() => void) | undefined
+  if (callerSignal) {
+    if (typeof AbortSignal.any === "function") {
+      signal = AbortSignal.any([callerSignal, timeoutSignal])
+    } else {
+      const controller = new AbortController()
+      const abort = (reason: unknown) => controller.abort(reason)
+      const onCallerAbort = () => abort(callerSignal.reason)
+      const onTimeout = () => abort(timeoutSignal.reason)
+      callerSignal.addEventListener("abort", onCallerAbort, { once: true })
+      timeoutSignal.addEventListener("abort", onTimeout, { once: true })
+      if (callerSignal.aborted) onCallerAbort()
+      removeAbortListeners = () => {
+        callerSignal.removeEventListener("abort", onCallerAbort)
+        timeoutSignal.removeEventListener("abort", onTimeout)
+      }
+      signal = controller.signal
+    }
+  }
+
   let res: Response
   try {
-    res = await fetch(url, {
-      ...init,
-      headers,
-      // AbortSignal.any merges a caller-provided signal with the timeout.
-      signal:
-        init.signal && typeof AbortSignal.any === "function"
-          ? AbortSignal.any([init.signal, AbortSignal.timeout(timeout)])
-          : init.signal ?? AbortSignal.timeout(timeout),
-    })
+    res = await fetch(url, { ...init, headers, signal })
   } catch (error) {
     // Network failure or timeout — rethrow so callers can show
     // their network-error toast.
     throw error
+  } finally {
+    removeAbortListeners?.()
   }
 
   if (

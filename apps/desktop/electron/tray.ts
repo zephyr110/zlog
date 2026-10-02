@@ -143,21 +143,19 @@ export function updateTraySyncStatus(
   // "idle"（30s 轮询）时按 detail 推导真实状态：WalConflict / 云端读取
   // 被封这类错误在下次成功同步前会一直挂在 lastSyncError 上，托盘
   // tooltip 必须持续显示异常，而不是只在同步调用失败的那一刻。
+  // "synced" 无需再查 lastSyncError——它只在 runSync() 成功后传入，
+  // 而 runSync 成功时已把 lastSyncError 清空。
   // "server-exited" 维持无后缀——服务崩溃已有独立弹窗。
   const effective =
-    state === "synced"
-      ? d.lastSyncError
+    state === "error" || state === "server-exited" || state === "synced"
+      ? state
+      : d.lastSyncError
         ? "error"
-        : "synced"
-      : state === "error" || state === "server-exited"
-        ? state
-        : d.lastSyncError
-          ? "error"
-          : d.syncing
-            ? "syncing"
-            : d.configured && d.lastSyncAt
-              ? "synced"
-              : "idle"
+        : d.syncing
+          ? "syncing"
+          : d.configured && d.lastSyncAt
+            ? "synced"
+            : "idle"
   const suffix =
     effective === "synced"
       ? ` ${SYNC_SUFFIX[lang].synced}`

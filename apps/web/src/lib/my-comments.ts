@@ -8,6 +8,8 @@
 // per-entry watermark (seenUpTo) is the id of the newest reply already
 // surfaced to the visitor.
 
+import { REPLY_IDS_MAX } from "./comment-shared"
+
 export interface MyCommentEntry {
   /** The comment this browser posted. */
   id: number
@@ -17,8 +19,10 @@ export interface MyCommentEntry {
   seenUpTo: number
 }
 
-/** Newest N entries are kept — older ones silently age out. */
-export const MY_COMMENTS_MAX = 50
+/** Newest N entries are kept — older ones silently age out. The replies
+ *  route caps its id list at the same constant, so the poll can never
+ *  exceed the server's limit. */
+export const MY_COMMENTS_MAX = REPLY_IDS_MAX
 
 export const MY_COMMENTS_STORAGE_KEY = "zlog:my-comments:v1"
 

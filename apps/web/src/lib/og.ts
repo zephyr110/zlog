@@ -14,24 +14,31 @@ const MAX_LINES = 3
 /** Greedy wrapping wastes some space at line ends — keep a little slack. */
 const WRAP_SLACK = 0.96
 
+/** Wide (≈1em) code-point ranges: CJK, Hangul, full-width forms and the
+ *  CJK extension planes. One table serves both the width estimate and
+ *  the locale heuristic below, so a range added for one cannot go
+ *  missing from the other. */
+const WIDE_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0x1100, 0x115f], // Hangul Jamo
+  [0x2e80, 0xa4cf], // CJK radicals … Yi
+  [0xac00, 0xd7a3], // Hangul syllables
+  [0xf900, 0xfaff], // CJK compatibility ideographs
+  [0xfe30, 0xfe4f], // CJK compatibility forms
+  [0xff00, 0xff60], // full-width forms
+  [0xffe0, 0xffe6],
+  [0x20000, 0x10ffff], // CJK extension planes
+]
+
+function isWideCode(code: number): boolean {
+  return WIDE_RANGES.some(([lo, hi]) => code >= lo && code <= hi)
+}
+
 /** CJK / full-width glyphs occupy ≈1em; Latin, digits and punctuation
  *  ≈0.55em; spaces ≈0.3em. The estimate only needs to be conservative. */
 function charWidth(ch: string): number {
   const code = ch.codePointAt(0) ?? 0
   if (code === 0x20 || code === 0x3000) return 0.3
-  if (
-    (code >= 0x1100 && code <= 0x115f) || // Hangul Jamo
-    (code >= 0x2e80 && code <= 0xa4cf) || // CJK radicals … Yi
-    (code >= 0xac00 && code <= 0xd7a3) || // Hangul syllables
-    (code >= 0xf900 && code <= 0xfaff) || // CJK compatibility ideographs
-    (code >= 0xfe30 && code <= 0xfe4f) || // CJK compatibility forms
-    (code >= 0xff00 && code <= 0xff60) || // full-width forms
-    (code >= 0xffe0 && code <= 0xffe6) ||
-    code >= 0x20000 // CJK extension planes
-  ) {
-    return 1
-  }
-  return 0.55
+  return isWideCode(code) ? 1 : 0.55
 }
 
 export function estimateTextWidth(text: string, fontSize: number): number {
@@ -74,7 +81,16 @@ export function fitOgTitle(rawTitle: string): OgTitleLayout {
   return { fontSize, text: `${out.trimEnd()}…` }
 }
 
-const CJK_RE = /[\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFF00-\uFF60]/
+/** Derived from WIDE_RANGES so the two classifications can never drift
+ *  (a fullwidth-￥ title used to measure wide but classify as "en").
+ *  Hangul already counted as "zh" before — the card locale only picks
+ *  the minRead string, so the unification matches existing intent. */
+const CJK_RE = new RegExp(
+  `[${WIDE_RANGES.map(
+    ([lo, hi]) => `\\u{${lo.toString(16)}}-\\u{${hi.toString(16)}}`
+  ).join("")}]`,
+  "u"
+)
 
 /** OG requests carry no locale (crawlers send no cookie), so the card's
  *  language is inferred from the post's own visible text: any CJK glyph

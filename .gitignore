@@ -58,3 +58,6 @@ next-env.d.ts
 
 # stray temp dirs (deploy flattening scratch)
 .tmp-*/
+
+# export-build stash (toggle-force-static.mjs moves force-dynamic routes here)
+apps/web/scripts/.export-stash/

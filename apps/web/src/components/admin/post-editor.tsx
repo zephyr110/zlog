@@ -49,6 +49,30 @@ interface NewPostDraft {
   savedAt: number
 }
 
+/** localStorage drafts can be poisoned (hand-edited, written by an older
+ *  build, or corrupted) — coerce every field to the type the state
+ *  expects instead of trusting JSON.parse. */
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : ""
+}
+
+/** "Is there anything worth restoring/persisting?" — one predicate for
+ *  the restore and the persist path so the two cannot drift. */
+function draftHasContent(draft: {
+  title: string
+  slug: string
+  description: string
+  content: string
+  cover: string
+  tags: string[]
+}): boolean {
+  return (
+    [draft.title, draft.slug, draft.description, draft.content, draft.cover].some(
+      (v) => v.trim() !== ""
+    ) || draft.tags.length > 0
+  )
+}
+
 /** Content textarea with image paste / drag-drop upload. Both entry
  *  points funnel `File[]` to the parent, which uploads via /api/upload
  *  and inserts the markdown at the cursor. */
@@ -288,11 +312,15 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
     const tags = Array.isArray(draft.tags)
       ? draft.tags.filter((x): x is string => typeof x === "string")
       : []
-    const hasContent =
-      [draft.title, draft.slug, draft.description, draft.content, draft.cover].some(
-        (v) => typeof v === "string" && v.trim() !== ""
-      ) || tags.length > 0
-    if (!hasContent) {
+    const restored = {
+      title: asString(draft.title),
+      slug: asString(draft.slug),
+      description: asString(draft.description),
+      content: asString(draft.content),
+      cover: asString(draft.cover),
+      tags,
+    }
+    if (!draftHasContent(restored)) {
       try {
         localStorage.removeItem(NEW_POST_DRAFT_KEY)
       } catch {
@@ -300,12 +328,12 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
       }
       return
     }
-    setTitle(draft.title ?? "") // eslint-disable-line react-hooks/set-state-in-effect -- one-time restore from localStorage
-    setSlug(draft.slug ?? "")
-    setDescription(draft.description ?? "")
-    setContent(draft.content ?? "")
-    setTags(tags)
-    setCover(draft.cover ?? "")
+    setTitle(restored.title) // eslint-disable-line react-hooks/set-state-in-effect -- one-time restore from localStorage
+    setSlug(restored.slug)
+    setDescription(restored.description)
+    setContent(restored.content)
+    setTags(restored.tags)
+    setCover(restored.cover)
     toast(t("admin.draftRestored"), {
       action: {
         label: t("admin.draftDiscard"),
@@ -336,19 +364,17 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
   // first effect run (empty state → removeItem) and wipe a stored draft
   // before the restore effect above ever reads it.
   const lastDraftWriteRef = useRef(Date.now())
+  // The pending trailing-debounce timer. The create-success path cancels
+  // it explicitly: the effect's own cleanup only runs on unmount/dep
+  // change, so a timer armed <800ms before a successful create could
+  // otherwise fire during navigation and re-write the draft key after it
+  // was cleared.
+  const draftWriteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     if (!isNew) return
     const write = () => {
       lastDraftWriteRef.current = Date.now()
-      const hasContent =
-        [title, slug, description, content, cover].some(
-          (v) => v.trim() !== ""
-        ) || tags.length > 0
       try {
-        if (!hasContent) {
-          localStorage.removeItem(NEW_POST_DRAFT_KEY)
-          return
-        }
         const draft: NewPostDraft = {
           title,
           slug,
@@ -357,6 +383,10 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
           tags,
           cover,
           savedAt: Date.now(),
+        }
+        if (!draftHasContent(draft)) {
+          localStorage.removeItem(NEW_POST_DRAFT_KEY)
+          return
         }
         localStorage.setItem(NEW_POST_DRAFT_KEY, JSON.stringify(draft))
       } catch {
@@ -367,7 +397,11 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
     const MAX_WAIT_MS = 5_000
     if (Date.now() - lastDraftWriteRef.current >= MAX_WAIT_MS) write()
     const id = setTimeout(write, 800)
-    return () => clearTimeout(id)
+    draftWriteTimerRef.current = id
+    return () => {
+      clearTimeout(id)
+      if (draftWriteTimerRef.current === id) draftWriteTimerRef.current = null
+    }
   }, [isNew, title, slug, description, content, tags, cover])
 
   // Word / char count — shared CJK-aware stats (same as API persist path)
@@ -570,6 +604,13 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
           toast.success(t("admin.autoSaved"))
         }
         if (isNew) {
+          if (draftWriteTimerRef.current) {
+            // Kill the armed trailing debounce before clearing the key —
+            // it closes over the just-saved state and would resurrect the
+            // draft mid-navigation otherwise.
+            clearTimeout(draftWriteTimerRef.current)
+            draftWriteTimerRef.current = null
+          }
           try {
             localStorage.removeItem(NEW_POST_DRAFT_KEY)
           } catch {

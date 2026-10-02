@@ -14,6 +14,33 @@ export type PublicComment = {
   createdAt: string
 }
 
+/** Project a stored comment row down to the public wire shape (drops
+ *  authorEmail / ipHash / isRead). Structural parameter keeps this file
+ *  dependency-free — the database CommentRecord rows satisfy it. */
+export function toPublicComment(comment: {
+  id: number
+  postSlug: string
+  authorName: string
+  content: string
+  parentId: number | null
+  createdAt: string
+}): PublicComment {
+  return {
+    id: comment.id,
+    postSlug: comment.postSlug,
+    authorName: comment.authorName,
+    content: comment.content,
+    parentId: comment.parentId,
+    createdAt: comment.createdAt,
+  }
+}
+
+/** The largest id list GET /api/comments/replies accepts. my-comments
+ *  keeps at most this many stored entries, so the client's single-shot
+ *  id query can never trip the 400 that would otherwise kill the
+ *  notification poll silently. */
+export const REPLY_IDS_MAX = 50
+
 /** Render name for a comment author — the server assigns nameless
  *  visitors `Anonymous_<hex>`; the suffix reads as noise on the page,
  *  so any Anonymous_ name displays as plain "Anonymous" (the stored

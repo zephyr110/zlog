@@ -39,7 +39,7 @@ import { FormattedDate } from "@/components/blog/formatted-date"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
 import { categoryKeys, getCategoryLabel, resolveCategory } from "@/lib/categories"
-import { isScheduled } from "@/lib/schedule"
+import { isPublic, isScheduled } from "@/lib/schedule"
 import { type PostSummary } from "@zlog/database"
 
 /** Draft / scheduled / published badge — shared by the mobile card and
@@ -149,8 +149,7 @@ function AdminPostsContent() {
 
   const filteredPosts = useMemo(() => {
     let result = posts
-    if (statusFilter === "published")
-      result = result.filter((p) => !p.draft && !isScheduled(p.publishAt))
+    if (statusFilter === "published") result = result.filter(isPublic)
     if (statusFilter === "scheduled")
       result = result.filter((p) => !p.draft && isScheduled(p.publishAt))
     if (statusFilter === "drafts") result = result.filter((p) => p.draft)

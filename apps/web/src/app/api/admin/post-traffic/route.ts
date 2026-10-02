@@ -13,7 +13,7 @@ import { isVercelAnalyticsConfigured } from "@/lib/vercel-analytics"
 import { buildPostTraffic } from "@/lib/post-traffic"
 import {
   earliestArchivedMonth,
-  getAllPosts,
+  listPostTitles,
   monthlyDimensionRows,
 } from "@zlog/database"
 
@@ -71,10 +71,7 @@ export async function GET(request: NextRequest) {
   const months = monthsBetween(fromMonth, toMonth)
   const rows = await monthlyDimensionRows(source, "pages", fromMonth, toMonth)
   // 标题映射含草稿：被归档过的文章即使已转草稿，趋势仍应显示。
-  const posts = (await getAllPosts(true)).map((p) => ({
-    slug: p.slug,
-    title: p.title,
-  }))
+  const posts = await listPostTitles()
 
   return NextResponse.json(
     {

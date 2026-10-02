@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireAuth } from "@/lib/api-auth"
+import { safeSlug } from "@zlog/core"
 import {
   getAllPosts,
   savePost,
@@ -32,6 +33,18 @@ const postBodySchema = z.object({
       /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
       "publishAt must be YYYY-MM-DD HH:MM:SS (UTC)"
     )
+    // Shape alone is not enough: '2026-13-45 10:00:00' matches the regex
+    // but never becomes due (stored format compares as a string), and the
+    // editor would show the post as unscheduled. Round-trip through Date
+    // to reject impossible instants (also catches V8's day-overflow
+    // rollover, e.g. 02-30).
+    .refine((s) => {
+      const parsed = new Date(`${s.replace(" ", "T")}Z`)
+      return (
+        !Number.isNaN(parsed.getTime()) &&
+        parsed.toISOString().slice(0, 19).replace("T", " ") === s
+      )
+    }, "publishAt must be a real UTC timestamp")
     .nullable()
     .optional()
     .or(z.literal("")),
@@ -144,8 +157,18 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = parseResult.data
-  const newSlug = body.slug || slug
-  if (newSlug !== slug) {
+  // The client sends the raw input ("HELLO-WORLD", stray spaces) while
+  // stored slugs are safeSlug-normalized — normalize BEFORE comparing,
+  // or a slug that sanitizes back to the current one looks like a rename
+  // and the conflict lookup finds the post itself (bogus 409).
+  const newSlug = safeSlug(body.slug || slug)
+  if (!newSlug) {
+    return NextResponse.json(
+      { error: "Slug could not be generated" },
+      { status: 400 }
+    )
+  }
+  if (newSlug !== existingPost.slug) {
     // Check for duplicate slug on rename
     const conflict = await getPostBySlug(newSlug, true)
     if (conflict) {

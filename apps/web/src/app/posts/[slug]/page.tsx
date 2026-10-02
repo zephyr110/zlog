@@ -45,10 +45,15 @@ export async function generateMetadata({
     path.startsWith("http") ? path : `${site.siteUrl}${path}`
 
   // A real cover beats a generated card; posts without one get a
-  // per-post card (title, date, reading time, tags) from /api/og.
+  // per-post card (title, date, reading time, tags) from /api/og — which
+  // only exists on the server build. The static export (GitHub Pages
+  // mirror) has no route handlers, so there it falls back to the
+  // site-wide OG image instead of linking a 404.
   const postImage = post.cover
     ? ogImageUrl(post.cover)
-    : `${site.siteUrl}/api/og/${post.slug}`
+    : process.env.NEXT_EXPORT === "true"
+      ? `${site.siteUrl}${site.ogImage}`
+      : `${site.siteUrl}/api/og/${post.slug}`
 
   return {
     title: post.title,

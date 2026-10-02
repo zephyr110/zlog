@@ -114,6 +114,21 @@ export async function getPublishedCount(): Promise<number> {
   return Number(result.rows[0]?.count ?? 0)
 }
 
+/** Slug + title of every post (drafts included). For callers that only
+ *  need a slug→title map — SELECT * would drag every post's full content
+ *  over the wire for two short strings. */
+export async function listPostTitles(): Promise<
+  Array<{ slug: string; title: string }>
+> {
+  const db = requireDb()
+  await ensureTable(db)
+  const result = await db.execute("SELECT slug, title FROM posts")
+  return result.rows.map((row) => ({
+    slug: String(row.slug),
+    title: String(row.title),
+  }))
+}
+
 /** Full-text-ish search over published posts: every term must hit at
  *  least one of title / description / content (AND semantics).
  *
@@ -196,20 +211,12 @@ export async function savePost(
     await insertPostRevision(existing, clean)
   }
 
-  // If the slug changed, remove the old row to avoid duplicates.
-  if (oldSlug !== clean) {
-    await db.execute({
-      sql: "DELETE FROM posts WHERE slug = ?",
-      args: [oldSlug],
-    })
-  }
-
   const p = toParams(post)
   // pinned_at is written on INSERT only. Updates must not touch it — pin /
   // unpin goes through setPostPinned, and editor/auto-save RMW must not
   // clobber a newer pin with a stale null from a prior read. publish_at,
   // by contrast, is the editor's to change on every save.
-  await db.execute({
+  const upsert = {
     sql: `INSERT INTO posts (slug, title, date, updated, tags, description, cover, draft, pinned_at, publish_at, content, word_count, reading_time)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(slug) DO UPDATE SET
@@ -233,7 +240,20 @@ export async function savePost(
       p.word_count,
       p.reading_time,
     ],
-  })
+  }
+
+  if (oldSlug !== clean) {
+    // Rename: drop the old row and write the new one in ONE transaction —
+    // as two autocommit statements a failure in between (drop after the
+    // DELETE, network-backed libsql) would leave the post nowhere.
+    // batch() runs as BEGIN/COMMIT on both the file and hrana transports.
+    await db.batch([
+      { sql: "DELETE FROM posts WHERE slug = ?", args: [oldSlug] },
+      upsert,
+    ])
+  } else {
+    await db.execute(upsert)
+  }
 
   scheduleSync()
 }

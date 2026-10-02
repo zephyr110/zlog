@@ -12,7 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
 import { fetchAdminPosts } from "@/lib/admin-posts"
-import { isScheduled } from "@/lib/schedule"
+import { isPublic, isScheduled } from "@/lib/schedule"
+import { publicTags } from "@/lib/series"
 import { useCommentUnread } from "@/components/admin/comment-unread"
 import { cn } from "@/lib/utils"
 import { FileText, PenLine, Clock, Tag, MessageSquare } from "lucide-react"
@@ -41,9 +42,11 @@ export default function AdminDashboardPage() {
 
   // Scheduled posts are public-facing "published" rows but not live yet —
   // count them with neither, matching getPublishedCount on the site.
-  const published = posts.filter((p) => !p.draft && !isScheduled(p.publishAt))
+  const published = posts.filter(isPublic)
   const drafts = posts.filter((p) => p.draft)
-  const allTags = new Set(posts.flatMap((p) => p.tags))
+  // Series tags are series metadata, not browsable topics — every public
+  // surface strips them, and so must the tag count.
+  const allTags = new Set(posts.flatMap((p) => publicTags(p.tags)))
 
   const stats = [
     {

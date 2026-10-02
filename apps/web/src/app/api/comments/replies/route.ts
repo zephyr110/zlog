@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { type PublicComment } from "@/lib/comment-shared"
+import { REPLY_IDS_MAX, toPublicComment } from "@/lib/comment-shared"
 import { getRepliesToComments } from "@zlog/database"
 
 // Guest reply notifications: the visitor's browser stores the ids of the
@@ -9,7 +9,10 @@ import { getRepliesToComments } from "@zlog/database"
 // id list is strictly validated and capped to keep the IN() clause and
 // the response bounded.
 
-const MAX_IDS = 50
+/** Shared with the client-side entry cap (comment-shared) so the two
+ *  cannot drift apart — a client list longer than this would 400 every
+ *  poll and silently kill guest reply notifications. */
+const MAX_IDS = REPLY_IDS_MAX
 
 /** Digits only — ids are AUTOINCREMENT integers. Rejecting junk here
  *  keeps the placeholder list in the DB layer purely numeric. */
@@ -30,13 +33,5 @@ export async function GET(request: NextRequest) {
   }
 
   const replies = await getRepliesToComments(parts.map(Number))
-  const publicReplies: PublicComment[] = replies.map((c) => ({
-    id: c.id,
-    postSlug: c.postSlug,
-    authorName: c.authorName,
-    content: c.content,
-    parentId: c.parentId,
-    createdAt: c.createdAt,
-  }))
-  return NextResponse.json({ replies: publicReplies })
+  return NextResponse.json({ replies: replies.map(toPublicComment) })
 }

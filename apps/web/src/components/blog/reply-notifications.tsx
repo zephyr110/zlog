@@ -32,20 +32,27 @@ export function ReplyNotifications() {
   const { t } = useT()
   const [unseen, setUnseen] = useState<UnseenReply[]>([])
   const lastCheckRef = useRef(0)
+  // Every check() and dismissAll() bumps this — a response landing after
+  // a dismissal (or after a newer check started) is discarded instead of
+  // resurrecting the banner from stale state.
+  const checkSeqRef = useRef(0)
 
   const check = useCallback(async () => {
     const entries = listMyComments()
     if (entries.length === 0) return
     lastCheckRef.current = Date.now()
+    const seq = ++checkSeqRef.current
     try {
       const ids = entries.map((e) => e.id).join(",")
       const res = await fetch(`/api/comments/replies?ids=${ids}`)
       if (!res.ok) return
       const data = (await res.json()) as { replies: PublicComment[] }
-      // Re-subtract against entries re-read by findUnseenReplies callers:
-      // the watermark may have moved while the request was in flight
-      // (e.g. the visitor dismissed a previous batch).
-      setUnseen(findUnseenReplies(entries, data.replies ?? []))
+      if (seq !== checkSeqRef.current) return
+      // Re-read the watermark AFTER the await: findUnseenReplies is pure
+      // over the entries it receives, so the pre-fetch snapshot would
+      // resurrect replies the visitor dismissed while the request was
+      // in flight.
+      setUnseen(findUnseenReplies(listMyComments(), data.replies ?? []))
     } catch {
       // Offline / aborted — retry on the next tick.
     }
@@ -77,6 +84,7 @@ export function ReplyNotifications() {
    *  banner must not re-appear on the next page (the root layout keeps
    *  this component mounted across client-side navigation). */
   const dismissAll = useCallback(() => {
+    checkSeqRef.current++ // discard any in-flight check's stale result
     const groups = new Map<
       number,
       { entry: MyCommentEntry; replies: PublicComment[] }
