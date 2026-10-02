@@ -7,6 +7,7 @@ import {
 } from "@/lib/comment-session"
 import { type PublicComment } from "@/lib/comment-shared"
 import { countUrls, isRepetitiveNoise } from "@/lib/comment-filters"
+import { isScheduled } from "@/lib/schedule"
 import {
   getCommentsByPost,
   getReplyTarget,
@@ -158,9 +159,10 @@ export async function POST(request: NextRequest) {
   // 5. The post must actually exist and be published — comments for
   //    arbitrary slugs would otherwise land in the admin inbox with a
   //    404 link (an open channel when Turnstile is unconfigured).
+  //    A scheduled post is not public yet, so it accepts no comments.
   {
     const post = await getPostBySlug(body.postSlug, true)
-    if (!post || post.draft) {
+    if (!post || post.draft || isScheduled(post.publishAt)) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 })
     }
   }

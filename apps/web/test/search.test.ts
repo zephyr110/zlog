@@ -17,6 +17,7 @@ function mkPost(overrides: Partial<Post>): Post {
     description: "",
     draft: false,
     pinnedAt: null,
+    publishAt: null,
     content: "",
     wordCount: 0,
     readingTime: 0,

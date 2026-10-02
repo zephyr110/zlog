@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS posts (
   cover TEXT,
   draft INTEGER NOT NULL DEFAULT 0,
   pinned_at TEXT,
+  publish_at TEXT,
   content TEXT NOT NULL DEFAULT '',
   word_count INTEGER NOT NULL DEFAULT 0,
   reading_time INTEGER NOT NULL DEFAULT 0,
@@ -38,12 +39,14 @@ async function ensureTable(db: Client): Promise<void> {
   if (!tableReady) {
     tableReady = (async () => {
       await db.executeMultiple(SCHEMA)
-      // Migrate existing DBs that predate pinned_at.
-      try {
-        await db.execute("ALTER TABLE posts ADD COLUMN pinned_at TEXT")
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        if (!/duplicate column/i.test(msg)) throw err
+      // Migrate existing DBs that predate pinned_at / publish_at.
+      for (const column of ["pinned_at TEXT", "publish_at TEXT"]) {
+        try {
+          await db.execute(`ALTER TABLE posts ADD COLUMN ${column}`)
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          if (!/duplicate column/i.test(msg)) throw err
+        }
       }
     })().catch((err) => {
       tableReady = null // reset on failure so next call retries
@@ -72,6 +75,7 @@ function rowToPost(row: any): Post {
     cover: row.cover ?? undefined,
     draft: Boolean(row.draft),
     pinnedAt: (row.pinned_at as string | null) ?? null,
+    publishAt: (row.publish_at as string | null) ?? null,
     content: row.content,
     wordCount: row.word_count,
     readingTime: row.reading_time,
@@ -89,6 +93,7 @@ function toParams(post: Post) {
     cover: post.cover ?? null,
     draft: post.draft ? 1 : 0,
     pinned_at: post.pinnedAt,
+    publish_at: post.publishAt,
     content: post.content,
     word_count: post.wordCount,
     reading_time: post.readingTime,
@@ -101,6 +106,12 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (match) => `\\${match}`)
 }
 
+/** Public visibility, in one place: not a draft, and either unscheduled
+ *  or past its publish time. publish_at shares the "YYYY-MM-DD HH:MM:SS"
+ *  UTC format of datetime('now'), so the comparison is exact. */
+const PUBLISHED_SQL =
+  "draft = 0 AND (publish_at IS NULL OR publish_at <= datetime('now'))"
+
 // ── Public API ──────────────────────────────────────────────────────────
 
 export async function getAllPosts(
@@ -111,7 +122,7 @@ export async function getAllPosts(
   await ensureTable(db)
 
   let sql = "SELECT * FROM posts"
-  if (!includeDrafts) sql += " WHERE draft = 0"
+  if (!includeDrafts) sql += ` WHERE ${PUBLISHED_SQL}`
   // ISO "YYYY-MM-DD" dates sort correctly as text in SQLite — no JS
   // re-sort needed. The TEXT NOT NULL column guarantees a value.
   sql += " ORDER BY date DESC"
@@ -134,7 +145,7 @@ export async function getPublishedCount(): Promise<number> {
   const db = requireDb()
   await ensureTable(db)
   const result = await db.execute(
-    "SELECT COUNT(*) AS count FROM posts WHERE draft = 0"
+    `SELECT COUNT(*) AS count FROM posts WHERE ${PUBLISHED_SQL}`
   )
   return Number(result.rows[0]?.count ?? 0)
 }
@@ -171,7 +182,7 @@ export async function searchPublishedPosts(
   args.push(candidateLimit)
 
   const result = await db.execute({
-    sql: `SELECT * FROM posts WHERE draft = 0 AND ${clauses.join(" AND ")} ORDER BY date DESC LIMIT ?`,
+    sql: `SELECT * FROM posts WHERE ${PUBLISHED_SQL} AND ${clauses.join(" AND ")} ORDER BY date DESC LIMIT ?`,
     args,
   })
   return result.rows.map(rowToPost)
@@ -194,7 +205,7 @@ export async function getPostBySlug(
     })
   } else {
     result = await db.execute({
-      sql: "SELECT * FROM posts WHERE slug = ? AND draft = 0",
+      sql: `SELECT * FROM posts WHERE slug = ? AND ${PUBLISHED_SQL}`,
       args: [clean],
     })
   }
@@ -223,14 +234,15 @@ export async function savePost(
   const p = toParams(post)
   // pinned_at is written on INSERT only. Updates must not touch it — pin /
   // unpin goes through setPostPinned, and editor/auto-save RMW must not
-  // clobber a newer pin with a stale null from a prior read.
+  // clobber a newer pin with a stale null from a prior read. publish_at,
+  // by contrast, is the editor's to change on every save.
   await db.execute({
-    sql: `INSERT INTO posts (slug, title, date, updated, tags, description, cover, draft, pinned_at, content, word_count, reading_time)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    sql: `INSERT INTO posts (slug, title, date, updated, tags, description, cover, draft, pinned_at, publish_at, content, word_count, reading_time)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(slug) DO UPDATE SET
             title=excluded.title, date=excluded.date, updated=excluded.updated,
             tags=excluded.tags, description=excluded.description, cover=excluded.cover,
-            draft=excluded.draft, content=excluded.content,
+            draft=excluded.draft, publish_at=excluded.publish_at, content=excluded.content,
             word_count=excluded.word_count, reading_time=excluded.reading_time,
             updated_at=datetime('now')`,
     args: [
@@ -243,6 +255,7 @@ export async function savePost(
       p.cover,
       p.draft,
       p.pinned_at,
+      p.publish_at,
       p.content,
       p.word_count,
       p.reading_time,
@@ -275,6 +288,9 @@ export async function movePost(
   if (!post) return null
 
   post.draft = toDraft
+  // Publishing an unpublished post means "publish now" — a future
+  // schedule from a previous edit must not silently swallow the click.
+  if (!toDraft) post.publishAt = null
   await savePost(post)
 
   scheduleSync()
@@ -329,14 +345,14 @@ export async function getHomepageLatestPosts(
   const [pinned, unpinned] = await Promise.all([
     db.execute({
       sql: `SELECT * FROM posts
-            WHERE draft = 0 AND pinned_at IS NOT NULL ${excludeSql}
+            WHERE ${PUBLISHED_SQL} AND pinned_at IS NOT NULL ${excludeSql}
             ORDER BY pinned_at DESC, date DESC
             LIMIT ?`,
       args: exclude ? [exclude, pinnedLimit] : [pinnedLimit],
     }),
     db.execute({
       sql: `SELECT * FROM posts
-            WHERE draft = 0 AND pinned_at IS NULL ${excludeSql}
+            WHERE ${PUBLISHED_SQL} AND pinned_at IS NULL ${excludeSql}
             ORDER BY date DESC
             LIMIT ?`,
       args: exclude ? [exclude, limit] : [limit],
@@ -353,7 +369,11 @@ export async function getAllTags(): Promise<string[]> {
   const db = requireDb()
   await ensureTable(db)
 
-  const result = await db.execute("SELECT tags FROM posts")
+  // Public tag surfaces (nav, /tags, /topics): a tag whose only posts are
+  // drafts or scheduled must not appear before its posts do.
+  const result = await db.execute(
+    `SELECT tags FROM posts WHERE ${PUBLISHED_SQL}`
+  )
   const tagSet = new Set<string>()
 
   for (const row of result.rows) {

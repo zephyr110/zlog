@@ -34,6 +34,7 @@ import {
 import { useT } from "@/components/layout/trans"
 import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
 import { resolveCategory, getCategoryLabel } from "@/lib/categories"
+import { isScheduled } from "@/lib/schedule"
 import { type PostSummary } from "@zlog/database"
 
 /** Bars cycle the shared chart palette (chart-1…chart-5). */
@@ -99,7 +100,10 @@ export function PostStats({ posts }: PostStatsProps) {
     [t]
   )
 
-  const publishedPosts = useMemo(() => posts.filter((p) => !p.draft), [posts])
+  const publishedPosts = useMemo(
+    () => posts.filter((p) => !p.draft && !isScheduled(p.publishAt)),
+    [posts]
+  )
 
   const timeRangeLabels = useMemo<Record<TimeRange, string>>(
     () => ({

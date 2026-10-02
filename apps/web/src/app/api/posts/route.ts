@@ -24,6 +24,17 @@ const postBodySchema = z.object({
   draft: z.boolean().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   updated: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
+  /** UTC "YYYY-MM-DD HH:MM:SS" (what the editor converts the local
+   *  datetime-local picker to), "" or null = publish immediately. */
+  publishAt: z
+    .string()
+    .regex(
+      /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+      "publishAt must be YYYY-MM-DD HH:MM:SS (UTC)"
+    )
+    .nullable()
+    .optional()
+    .or(z.literal("")),
 })
 
 export async function GET(request: NextRequest) {
@@ -96,6 +107,7 @@ export async function POST(request: NextRequest) {
     cover: body.cover || undefined,
     draft: body.draft ?? true,
     pinnedAt: null,
+    publishAt: body.publishAt || null,
     content,
     wordCount: stats.wordCount,
     readingTime: stats.readingTime,
@@ -158,6 +170,10 @@ export async function PUT(request: NextRequest) {
     description: body.description ?? existingPost.description,
     cover: body.cover ?? existingPost.cover,
     draft: body.draft ?? existingPost.draft,
+    publishAt:
+      body.publishAt !== undefined
+        ? body.publishAt || null
+        : existingPost.publishAt,
     content,
     wordCount: stats.wordCount,
     readingTime: stats.readingTime,

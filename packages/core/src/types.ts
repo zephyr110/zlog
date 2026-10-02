@@ -8,6 +8,9 @@ export interface Post {
   cover?: string
   draft: boolean
   pinnedAt: string | null
+  /** UTC "YYYY-MM-DD HH:MM:SS" — while in the future (and the post is
+   *  not a draft) the post is hidden from every public surface. */
+  publishAt: string | null
   content: string
   wordCount: number
   readingTime: number
@@ -23,6 +26,7 @@ export interface PostSummary {
   cover?: string
   draft: boolean
   pinnedAt: string | null
+  publishAt: string | null
   wordCount: number
   readingTime: number
 }

@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
 import { fetchAdminPosts } from "@/lib/admin-posts"
+import { isScheduled } from "@/lib/schedule"
 import { useCommentUnread } from "@/components/admin/comment-unread"
 import { cn } from "@/lib/utils"
 import { FileText, PenLine, Clock, Tag, MessageSquare } from "lucide-react"
@@ -37,7 +38,9 @@ export default function AdminDashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once fetch; adding `t` (new identity per render) would refetch on every render
   }, [])
 
-  const published = posts.filter((p) => !p.draft)
+  // Scheduled posts are public-facing "published" rows but not live yet —
+  // count them with neither, matching getPublishedCount on the site.
+  const published = posts.filter((p) => !p.draft && !isScheduled(p.publishAt))
   const drafts = posts.filter((p) => p.draft)
   const allTags = new Set(posts.flatMap((p) => p.tags))
 
@@ -325,6 +328,11 @@ export default function AdminDashboardPage() {
                       {post.draft && (
                         <span className="ml-2 font-medium text-amber-600">
                           {t("admin.draft")}
+                        </span>
+                      )}
+                      {!post.draft && isScheduled(post.publishAt) && (
+                        <span className="ml-2 font-medium text-sky-600">
+                          {t("admin.statusScheduled")}
                         </span>
                       )}
                     </p>

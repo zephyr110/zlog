@@ -39,22 +39,30 @@ import { FormattedDate } from "@/components/blog/formatted-date"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
 import { categoryKeys, getCategoryLabel, resolveCategory } from "@/lib/categories"
+import { isScheduled } from "@/lib/schedule"
 import { type PostSummary } from "@zlog/database"
 
-/** Draft/published badge — shared by the mobile card and desktop table so
- *  the status palette can't drift between the two variants. */
-function StatusBadge({ draft }: { draft: boolean }) {
+/** Draft / scheduled / published badge — shared by the mobile card and
+ *  desktop table so the status palette can't drift between the variants. */
+function StatusBadge({ post }: { post: PostSummary }) {
   const { t } = useT()
+  const scheduled = !post.draft && isScheduled(post.publishAt)
   return (
     <Badge
-      variant={draft ? "secondary" : "default"}
+      variant={post.draft ? "secondary" : "default"}
       className={
-        draft
+        post.draft
           ? "bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
-          : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400"
+          : scheduled
+            ? "bg-sky-100 text-sky-700 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-400"
+            : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400"
       }
     >
-      {draft ? (t("admin.draft")) : (t("admin.publishedStatus"))}
+      {post.draft
+        ? (t("admin.draft"))
+        : scheduled
+          ? (t("admin.statusScheduled"))
+          : (t("admin.publishedStatus"))}
     </Badge>
   )
 }
@@ -89,8 +97,14 @@ function AdminPostsContent() {
   const [posts, setPosts] = useState<PostSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "drafts">(
-    initialStatus === "published" || initialStatus === "drafts" ? initialStatus : "all"
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "published" | "scheduled" | "drafts"
+  >(
+    initialStatus === "published" ||
+      initialStatus === "scheduled" ||
+      initialStatus === "drafts"
+      ? initialStatus
+      : "all"
   )
   // "all" or a category key (frontend, backend, ...) — tags roll up to
   // their topic via resolveCategory, same as the dashboard chart.
@@ -123,7 +137,11 @@ function AdminPostsContent() {
   const [prevInitialStatus, setPrevInitialStatus] = useState(initialStatus)
   if (prevInitialStatus !== initialStatus) {
     setPrevInitialStatus(initialStatus)
-    if (initialStatus === "published" || initialStatus === "drafts") {
+    if (
+      initialStatus === "published" ||
+      initialStatus === "scheduled" ||
+      initialStatus === "drafts"
+    ) {
       setStatusFilter(initialStatus)
       setPage(1)
     }
@@ -131,7 +149,10 @@ function AdminPostsContent() {
 
   const filteredPosts = useMemo(() => {
     let result = posts
-    if (statusFilter === "published") result = result.filter((p) => !p.draft)
+    if (statusFilter === "published")
+      result = result.filter((p) => !p.draft && !isScheduled(p.publishAt))
+    if (statusFilter === "scheduled")
+      result = result.filter((p) => !p.draft && isScheduled(p.publishAt))
     if (statusFilter === "drafts") result = result.filter((p) => p.draft)
     if (topicFilter !== "all") {
       result = result.filter((p) =>
@@ -210,7 +231,15 @@ function AdminPostsContent() {
       if (res.ok) {
         setPosts((prev) =>
           prev.map((p) =>
-            p.slug === slug ? { ...p, draft: !currentDraft } : p
+            p.slug === slug
+              ? {
+                  ...p,
+                  draft: !currentDraft,
+                  // Mirror movePost: publishing now clears any pending
+                  // schedule, so the optimistic row matches the server.
+                  publishAt: currentDraft ? null : p.publishAt,
+                }
+              : p
           )
         )
         toast.success(
@@ -354,7 +383,7 @@ function AdminPostsContent() {
           <div className="flex shrink-0 items-center gap-3 flex-wrap">
             {/* Status tabs */}
             <div className="inline-flex rounded-lg border p-0.5 bg-muted/30">
-              {(["all", "published", "drafts"] as const).map((s) => (
+              {(["all", "published", "scheduled", "drafts"] as const).map((s) => (
                 <button
                   key={s}
                   onClick={() => {
@@ -378,6 +407,8 @@ function AdminPostsContent() {
                     ? (t("admin.all"))
                     : s === "published"
                     ? (t("admin.published"))
+                    : s === "scheduled"
+                    ? (t("admin.statusScheduled"))
                     : (t("admin.drafts"))}
                 </button>
               ))}
@@ -458,7 +489,7 @@ function AdminPostsContent() {
                     </div>
                   </div>
                   <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                    <StatusBadge draft={post.draft} />
+                    <StatusBadge post={post} />
                     {post.pinnedAt ? (
                       <Pin
                         className="size-3.5 text-foreground"
@@ -540,7 +571,7 @@ function AdminPostsContent() {
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <StatusBadge draft={post.draft} />
+                        <StatusBadge post={post} />
                       </TableCell>
                       <TableCell className="text-center">
                         {post.pinnedAt ? (

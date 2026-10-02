@@ -7,7 +7,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { apiFetch } from "@/lib/api-client"
+import { fromPublishAtUtc, isScheduled, toPublishAtUtc } from "@/lib/schedule"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
 import { computeReadingStats, type Post } from "@zlog/core"
@@ -137,6 +139,11 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
   const [tagInput, setTagInput] = useState("")
   const [cover, setCover] = useState(initialPost?.cover || "")
   const [draft, setDraft] = useState(initialPost?.draft ?? true)
+  // Local "YYYY-MM-DDTHH:mm" as the datetime-local input speaks it; the
+  // UTC <-> local conversion lives in lib/schedule.
+  const [publishAt, setPublishAt] = useState(
+    fromPublishAtUtc(initialPost?.publishAt)
+  )
   const [saving, setSaving] = useState(false)
   const [coverPickerOpen, setCoverPickerOpen] = useState(false)
   const [imagePickerOpen, setImagePickerOpen] = useState(false)
@@ -155,6 +162,7 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
     tags: string[]
     cover: string
     draft: boolean
+    publishAt: string
   } | null>(
     initialPost
       ? {
@@ -165,6 +173,7 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
           tags: initialPost.tags,
           cover: initialPost.cover || "",
           draft: initialPost.draft,
+          publishAt: fromPublishAtUtc(initialPost.publishAt),
         }
       : null
   )
@@ -190,9 +199,10 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
       content !== initial.content ||
       tags.join(",") !== initial.tags.join(",") ||
       cover !== (initial.cover || "") ||
-      draft !== initial.draft
+      draft !== initial.draft ||
+      publishAt !== initial.publishAt
     )
-  }, [title, slug, description, content, tags, cover, draft, isNew])
+  }, [title, slug, description, content, tags, cover, draft, publishAt, isNew])
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -498,6 +508,9 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
       tags,
       cover,
       draft: publish ? false : draft,
+      // A future value here + draft:false = scheduled publishing; the
+      // server re-validates the stored format.
+      publishAt: toPublishAtUtc(publishAt),
     }
 
     try {
@@ -515,7 +528,9 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
       if (res.ok) {
         const data = await res.json()
         const savedDraft = data.post.draft ?? draft
+        const savedPublishAt = fromPublishAtUtc(data.post.publishAt)
         setDraft(savedDraft)
+        setPublishAt(savedPublishAt)
         // Re-baseline: what was just persisted is now "clean", so the
         // auto-save interval and the beforeunload prompt stop firing
         // until the user actually edits something.
@@ -527,9 +542,14 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
           tags,
           cover: cover || "",
           draft: savedDraft,
+          publishAt: savedPublishAt,
         }
         if (publish) {
-          toast.success(t("admin.publishSuccess"))
+          toast.success(
+            isScheduled(data.post.publishAt)
+              ? t("admin.scheduleSuccess")
+              : t("admin.publishSuccess")
+          )
         } else if (!silent) {
           toast.success(
             savedDraft
@@ -575,11 +595,15 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
 
   const previewPanel = <MarkdownPreview content={content} />
 
+  // Draft wins; otherwise a future publish time means "scheduled" — the
+  // post is saved as published but hidden from every public surface.
+  const scheduled = !draft && isScheduled(toPublishAtUtc(publishAt))
+
   return (
     <div className="space-y-6">
       {/* Title lives in admin layout pageMeta; actions portal in. */}
       <HeaderActions>
-        {!isNew && !draft && (
+        {!isNew && !draft && !scheduled && (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -721,26 +745,48 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
         <span>{t("post.readTime")(readTime)}</span>
       </div>
 
-      {/* Status */}
-      <div className={cn("flex items-center gap-3 text-sm text-muted-foreground rounded-lg border bg-card p-3")}>
+      {/* Status + schedule */}
+      <div className={cn("flex flex-wrap items-center gap-3 text-sm text-muted-foreground rounded-lg border bg-card p-3")}>
         <Badge
           variant={draft ? "secondary" : "default"}
           className={
             draft
               ? "bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
-              : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400"
+              : scheduled
+                ? "bg-sky-100 text-sky-700 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-400"
+                : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400"
           }
         >
           {draft
             ? (t("admin.draft"))
-            : (t("admin.publishedStatus"))}
+            : scheduled
+              ? (t("admin.statusScheduled"))
+              : (t("admin.publishedStatus"))}
         </Badge>
         <span>
           {draft
             ? (t("admin.draftDesc"))
-            : (t("admin.publishedDesc"))}
+            : scheduled
+              ? (t("admin.statusScheduledDesc"))
+              : (t("admin.publishedDesc"))}
         </span>
+        <label
+          htmlFor="publish-at"
+          className="ml-auto flex items-center gap-2"
+        >
+          <span className="text-xs">{t("admin.scheduleLabel")}</span>
+          <Input
+            id="publish-at"
+            type="datetime-local"
+            value={publishAt}
+            onChange={(e) => setPublishAt(e.target.value)}
+            className="h-8 w-auto text-xs"
+          />
+        </label>
       </div>
+      <p className="-mt-3 text-xs text-muted-foreground">
+        {t("admin.scheduleHint")}
+      </p>
 
       <MediaPickerDialog
         open={coverPickerOpen}
