@@ -13,6 +13,15 @@ export {
   getPostsByTag,
   searchPublishedPosts,
 } from "./content"
+export {
+  insertPostRevision,
+  migratePostRevisions,
+  listPostRevisions,
+  getPostRevision,
+  samePostContent,
+  REVISION_LIMIT,
+} from "./revisions"
+export type { PostRevision, PostRevisionSummary } from "./revisions"
 export { getUserByUsername, setUserPassword, setUserRecoveryHash } from "./users"
 export {
   getLockoutState,

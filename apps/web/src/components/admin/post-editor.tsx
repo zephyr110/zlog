@@ -18,7 +18,8 @@ import { uploadImageFile, validateImageFile } from "@/lib/upload"
 import {
   HeaderActions,
 } from "@/components/admin/header-actions"
-import { ExternalLink } from "lucide-react"
+import { ExternalLink, History } from "lucide-react"
+import { PostHistoryDialog } from "@/components/admin/post-history-dialog"
 import {
   Tooltip,
   TooltipTrigger,
@@ -148,6 +149,10 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
   const [coverPickerOpen, setCoverPickerOpen] = useState(false)
   const [imagePickerOpen, setImagePickerOpen] = useState(false)
   const [previewCollapsed, setPreviewCollapsed] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  // 库里实际的 slug：改名保存后 URL 里的 ?slug= 仍是旧的，后续 PUT /
+  // 历史查询都要跟着已持久化的值走，而不是 initialPost 或 URL。
+  const [persistedSlug, setPersistedSlug] = useState(initialPost?.slug || "")
   const desktopContentRef = useRef<HTMLTextAreaElement>(null)
   const mobileContentRef = useRef<HTMLTextAreaElement>(null)
 
@@ -497,7 +502,8 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
     }
   }
 
-  async function savePost(publish = false, silent = false) {
+  /** 返回是否成功——恢复流程依赖它决定"先落盘再恢复"能否继续。 */
+  async function savePost(publish = false, silent = false): Promise<boolean> {
     setSaving(true)
 
     const postData = {
@@ -516,7 +522,7 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
     try {
       const url = isNew
         ? "/api/posts"
-        : `/api/posts?slug=${encodeURIComponent(initialPost?.slug || "")}`
+        : `/api/posts?slug=${encodeURIComponent(persistedSlug)}`
       const method = isNew ? "POST" : "PUT"
 
       const res = await apiFetch(url, {
@@ -544,6 +550,9 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
           draft: savedDraft,
           publishAt: savedPublishAt,
         }
+        // 改名保存：服务端已把行迁到新 slug，后续请求（自动保存、
+        // 历史列表）必须跟着新 slug，否则按旧 slug 查会 404。
+        setPersistedSlug(data.post.slug)
         if (publish) {
           toast.success(
             isScheduled(data.post.publishAt)
@@ -571,6 +580,7 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
           )
         }
         router.refresh()
+        return true
       } else {
         const err = await res.json()
         // Auto-save failures must NOT be silent: the user believes the
@@ -580,6 +590,7 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
             ? t("admin.autoSaveFailed")
             : (err.error || (t("admin.failedToSavePost")))
         )
+        return false
       }
     } catch {
       toast.error(
@@ -587,9 +598,63 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
           ? t("admin.autoSaveFailed")
           : t("admin.networkErrorSave")
       )
+      return false
     } finally {
       setSaving(false)
       autoSavedRef.current = false
+    }
+  }
+
+  /** 把恢复结果整体套用到编辑器（全字段 + clean 基线）。 */
+  function applyRestoredPost(post: Post) {
+    const restoredPublishAt = fromPublishAtUtc(post.publishAt)
+    setTitle(post.title)
+    setSlug(post.slug)
+    setDescription(post.description)
+    setContent(post.content)
+    setTags(post.tags)
+    setCover(post.cover || "")
+    setDraft(post.draft)
+    setPublishAt(restoredPublishAt)
+    setPersistedSlug(post.slug)
+    // 恢复本身就是一次服务端 savePost：编辑器状态此刻与库内一致，
+    // 重建基线，防止 30s 自动保存立刻再 PUT 一次。
+    savedSnapshotRef.current = {
+      title: post.title,
+      slug: post.slug,
+      description: post.description,
+      content: post.content,
+      tags: post.tags,
+      cover: post.cover || "",
+      draft: post.draft,
+      publishAt: restoredPublishAt,
+    }
+  }
+
+  /** 恢复到某一历史版本（PostHistoryDialog 的回调）。返回是否成功。 */
+  async function handleRestoreRevision(id: number): Promise<boolean> {
+    // 未保存的本地修改先静默落盘：恢复会用旧版覆盖当前行，先落盘
+    // 保证无论恢复成败，刚才的编辑都不会凭空消失（恢复成功时它
+    // 同样进了历史，随时能恢复回来）。落盘失败就中止恢复。
+    if (hasUnsavedChanges()) {
+      const saved = await savePost(false, true)
+      if (!saved) return false
+    }
+    try {
+      const res = await apiFetch("/api/posts/revisions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      applyRestoredPost(data.post)
+      router.refresh()
+      toast.success(t("admin.historyRestored"))
+      return true
+    } catch {
+      toast.error(t("admin.historyRestoreFailed"))
+      return false
     }
   }
 
@@ -603,6 +668,23 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
     <div className="space-y-6">
       {/* Title lives in admin layout pageMeta; actions portal in. */}
       <HeaderActions>
+        {!isNew && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t("admin.historyTitle")}
+                  onClick={() => setHistoryOpen(true)}
+                >
+                  <History size={14} />
+                </Button>
+              }
+            />
+            <TooltipContent>{t("admin.historyTitle")}</TooltipContent>
+          </Tooltip>
+        )}
         {!isNew && !draft && !scheduled && (
           <Tooltip>
             <TooltipTrigger
@@ -798,6 +880,14 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
         onOpenChange={setImagePickerOpen}
         onSelect={insertImage}
       />
+      {!isNew && (
+        <PostHistoryDialog
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          slug={persistedSlug}
+          onRestore={handleRestoreRevision}
+        />
+      )}
     </div>
   )
 }

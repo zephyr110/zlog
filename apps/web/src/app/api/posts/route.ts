@@ -154,7 +154,9 @@ export async function PUT(request: NextRequest) {
         { status: 409 }
       )
     }
-    await deletePost(slug)
+    // 旧行不在这里删：savePost(previousSlug) 要先给旧内容存历史快照、
+    // 把旧 slug 的历史迁到新 slug，然后才删旧行——这里先删会把两者
+    // 一起弄丢。
   }
 
   const content = body.content ?? existingPost.content

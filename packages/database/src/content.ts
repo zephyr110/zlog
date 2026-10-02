@@ -4,6 +4,13 @@ import { scheduleSync } from "./sync"
 import { type Post, type PostSummary } from "@zlog/core"
 import { toPostSummary } from "@zlog/core"
 import { safeSlug } from "@zlog/core"
+import { rowToPost, toParams } from "./post-row"
+import {
+  deletePostRevisions,
+  insertPostRevision,
+  migratePostRevisions,
+  samePostContent,
+} from "./revisions"
 
 // ── Schema ──────────────────────────────────────────────────────────────
 
@@ -57,49 +64,6 @@ async function ensureTable(db: Client): Promise<void> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToPost(row: any): Post {
-  let tags: string[] = []
-  try {
-    tags = JSON.parse(row.tags || "[]")
-  } catch {
-    tags = []
-  }
-
-  return {
-    slug: row.slug,
-    title: row.title,
-    date: row.date,
-    updated: row.updated ?? undefined,
-    tags,
-    description: row.description,
-    cover: row.cover ?? undefined,
-    draft: Boolean(row.draft),
-    pinnedAt: (row.pinned_at as string | null) ?? null,
-    publishAt: (row.publish_at as string | null) ?? null,
-    content: row.content,
-    wordCount: row.word_count,
-    readingTime: row.reading_time,
-  }
-}
-
-function toParams(post: Post) {
-  return {
-    slug: safeSlug(post.slug),
-    title: post.title,
-    date: post.date,
-    updated: post.updated ?? null,
-    tags: JSON.stringify(post.tags),
-    description: post.description,
-    cover: post.cover ?? null,
-    draft: post.draft ? 1 : 0,
-    pinned_at: post.pinnedAt,
-    publish_at: post.publishAt,
-    content: post.content,
-    word_count: post.wordCount,
-    reading_time: post.readingTime,
-  }
-}
-
 /** Escape LIKE wildcards so user input matches literally (paired with
  *  ESCAPE '\' in the query — escaping the backslash itself first). */
 function escapeLike(value: string): string {
@@ -223,11 +187,20 @@ export async function savePost(
 
   const clean = safeSlug(post.slug)
 
+  // 版本历史：改名先迁移旧 slug 的历史；被覆盖的旧行若内容确有变化，
+  // 整份存入 post_revisions（自动保存的幂等写入不产生快照）。
+  const oldSlug = previousSlug ? safeSlug(previousSlug) : clean
+  const existing = await getPostBySlug(oldSlug, true)
+  if (oldSlug !== clean) await migratePostRevisions(oldSlug, clean)
+  if (existing && !samePostContent(existing, post)) {
+    await insertPostRevision(existing, clean)
+  }
+
   // If the slug changed, remove the old row to avoid duplicates.
-  if (previousSlug && safeSlug(previousSlug) !== clean) {
+  if (oldSlug !== clean) {
     await db.execute({
       sql: "DELETE FROM posts WHERE slug = ?",
-      args: [safeSlug(previousSlug)],
+      args: [oldSlug],
     })
   }
 
@@ -276,7 +249,12 @@ export async function deletePost(slug: string): Promise<boolean> {
   })
 
   const deleted = result.rowsAffected > 0
-  if (deleted) scheduleSync()
+  if (deleted) {
+    // 历史快照一并删除：删除是永久性的，孤立的旧版本既无处可看，
+    // 又会被同 slug 的新文章"继承"。
+    await deletePostRevisions(clean)
+    scheduleSync()
+  }
   return deleted
 }
 

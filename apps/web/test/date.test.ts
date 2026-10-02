@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   formatLocalDate,
   formatUtcDateTime,
+  formatUtcTimestamp,
   groupPostsByUtcYear,
   parseUtcDate,
   toUtcTimestamp,
@@ -26,6 +27,18 @@ describe("formatUtcDateTime", () => {
     // 2026-06-15T23:30:00Z — same local date everywhere except extreme
     // timezones; assert it returns a YYYY-MM-DD string at least.
     expect(formatUtcDateTime("2026-06-15 23:30:00")).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it("formatUtcTimestamp adds local HH:MM", () => {
+    // UTC 23:30 — local date may roll over to the 16th in positive
+    // offsets, so only pin the date family and the time shape.
+    expect(formatUtcTimestamp("2026-06-15 23:30:00")).toMatch(
+      /^2026-06-(15|16) \d{2}:\d{2}$/
+    )
+  })
+
+  it("formatUtcTimestamp falls back to the raw string", () => {
+    expect(formatUtcTimestamp("garbage")).toBe("garbage")
   })
 
   it("falls back to the raw date portion for unparseable input", () => {

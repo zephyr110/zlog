@@ -29,6 +29,17 @@ export function formatUtcDateTime(utc: string): string {
   return formatLocalDate(d)
 }
 
+/** UTC datetime string (SQLite "YYYY-MM-DD HH:MM:SS") → local
+ *  "YYYY-MM-DD HH:MM" for display (version-history timestamps). Falls
+ *  back to the raw string's minute precision when it can't be parsed. */
+export function formatUtcTimestamp(utc: string): string {
+  const d = new Date(`${utc.replace(" ", "T")}Z`)
+  if (Number.isNaN(d.getTime())) return utc.slice(0, 16)
+  const hh = String(d.getHours()).padStart(2, "0")
+  const mm = String(d.getMinutes()).padStart(2, "0")
+  return `${formatLocalDate(d)} ${hh}:${mm}`
+}
+
 /** "YYYY-MM-DD" (the post/media wire format) → Date at UTC midnight.
  *  Dates are authored as UTC calendar dates (the API stores
  *  toISOString().split("T")[0]); parsing them as UTC keeps every
