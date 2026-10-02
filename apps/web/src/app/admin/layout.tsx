@@ -4,10 +4,12 @@ import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { AdminSidebar, AdminSidebarTrigger } from "@/components/admin/admin-sidebar"
 import { CommentUnreadProvider } from "@/components/admin/comment-unread"
+import { CommandPalette } from "@/components/admin/command-palette"
 import { apiFetch, clearToken } from "@/lib/api-client"
 import { PageLoader } from "@/components/ui/page-loader"
 import { useT } from "@/components/layout/trans"
 import { cn } from "@/lib/utils"
+import { Search } from "lucide-react"
 import { type AuthUser } from "@zlog/auth"
 import type { TranslationPath } from "@/lib/i18n"
 
@@ -40,6 +42,7 @@ export default function AdminLayout({
   const [loading, setLoading] = useState(!isLoginPage)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
 
   // One trigger, two behaviors: slide-in drawer below md, collapse toggle
   // on desktop. matchMedia is read at event time, so no hydration concern.
@@ -190,6 +193,21 @@ export default function AdminLayout({
               )}
             </div>
           )}
+          {/* ⌘K 命令面板触发（面板本体在页面底部挂载，全局监听快捷键） */}
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            aria-label={t("admin.commandSearch") as string}
+            className="ml-auto inline-flex h-8 shrink-0 items-center gap-2 rounded-lg border border-border bg-background pl-2.5 pr-2 text-sm text-muted-foreground transition-colors hover:bg-muted"
+          >
+            <Search size={14} />
+            <span className="hidden md:inline">
+              {t("admin.commandSearch") as string}
+            </span>
+            <kbd className="hidden rounded border border-border bg-muted/60 px-1.5 font-sans text-[10px] leading-5 md:inline">
+              ⌘K
+            </kbd>
+          </button>
           {/* Page primary actions portaled in via <HeaderActions /> */}
           <div
             id="admin-header-actions"
@@ -201,6 +219,7 @@ export default function AdminLayout({
             bottom via the bar's !mt-auto + sticky. */}
         <div className="flex min-h-[calc(100vh-3.5rem)] flex-col p-4 md:p-8">{children}</div>
       </div>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       </div>
     </CommentUnreadProvider>
   )
