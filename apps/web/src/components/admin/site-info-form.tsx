@@ -374,12 +374,12 @@ export function SiteInfoForm({
                 </span>
               )}
             </div>
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground pointer-coarse:py-1">
               <input
                 type="checkbox"
                 checked={form.logoInvertInDark}
                 onChange={(e) => patch("logoInvertInDark", e.target.checked)}
-                className="size-3.5 accent-primary"
+                className="size-3.5 shrink-0 accent-primary pointer-coarse:size-5"
               />
               <span>
                 {t("admin.logoInvertDark")}
@@ -393,12 +393,12 @@ export function SiteInfoForm({
       </div>
 
       {/* Comments master switch — kill-switch when spam hits. */}
-      <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+      <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground pointer-coarse:py-1">
         <input
           type="checkbox"
           checked={form.commentEnabled}
           onChange={(e) => patch("commentEnabled", e.target.checked)}
-          className="size-3.5 accent-primary"
+          className="size-3.5 shrink-0 accent-primary pointer-coarse:size-5"
         />
         <span>{t("admin.allowComments")}</span>
       </label>

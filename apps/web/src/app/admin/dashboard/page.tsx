@@ -90,12 +90,13 @@ export default function AdminDashboardPage() {
         <section className="flex flex-col gap-5 md:gap-6">
           <Skeleton className="h-7 w-32" />
 
-          {/* Stat cards — same 5-up grid as the loaded view */}
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-5">
+          {/* Stat cards — same grid as the loaded view (2-up on phones;
+              the odd last card spans both columns there). */}
+          <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-5">
             {Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
-                className="flex flex-col gap-4 rounded-xl bg-card py-4 ring-1 ring-foreground/10"
+                className="flex flex-col gap-4 rounded-xl bg-card py-4 ring-1 ring-foreground/10 max-lg:last:col-span-2"
               >
                 <div className="flex items-start justify-between px-4">
                   <Skeleton className="h-4 w-16" />
@@ -227,7 +228,9 @@ export default function AdminDashboardPage() {
         <h2 className="text-xl font-semibold tracking-tight">
           {t("admin.statistics")}
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-5">
+        {/* 2-up on phones — five stacked cards burned ~2.5 screens of
+            scroll; the odd 5th card spans the row below lg. */}
+        <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-5">
           {stats.map((stat) => {
             const Icon = stat.icon
             const inner = (
@@ -258,7 +261,7 @@ export default function AdminDashboardPage() {
               <Link
                 key={stat.label}
                 href={stat.href}
-                className="block rounded-xl transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="block rounded-xl transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-lg:last:col-span-2"
               >
                 <Card className="h-full transition-all hover:border-primary/20 hover:shadow-md hover:shadow-foreground/[0.04]">
                   {inner}
@@ -267,7 +270,7 @@ export default function AdminDashboardPage() {
             ) : (
               <Card
                 key={stat.label}
-                className="transition-all hover:border-primary/10 hover:shadow-md hover:shadow-foreground/[0.04]"
+                className="transition-all hover:border-primary/10 hover:shadow-md hover:shadow-foreground/[0.04] max-lg:last:col-span-2"
               >
                 {inner}
               </Card>

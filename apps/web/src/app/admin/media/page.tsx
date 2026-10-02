@@ -369,13 +369,13 @@ export default function AdminMediaPage() {
           <div
             role="group"
             aria-label={t("admin.viewMode")}
-            className="flex h-8 items-center rounded-lg border border-border bg-background p-0.5"
+            className="flex h-8 items-center rounded-lg border border-border bg-background p-0.5 pointer-coarse:min-h-10"
           >
             <IconButton
               size="sm"
               aria-label={t("admin.gridView")}
               aria-pressed={viewMode === "grid"}
-              className={cn("h-full w-7", viewMode === "grid" && "bg-muted text-foreground")}
+              className={cn("h-full w-7 pointer-coarse:min-w-9", viewMode === "grid" && "bg-muted text-foreground")}
               onClick={() => switchView("grid")}
             >
               <LayoutGrid size={14} />
@@ -384,20 +384,21 @@ export default function AdminMediaPage() {
               size="sm"
               aria-label={t("admin.listView")}
               aria-pressed={viewMode === "list"}
-              className={cn("h-full w-7", viewMode === "list" && "bg-muted text-foreground")}
+              className={cn("h-full w-7 pointer-coarse:min-w-9", viewMode === "list" && "bg-muted text-foreground")}
               onClick={() => switchView("list")}
             >
               <List size={14} />
             </IconButton>
           </div>
-          {/* All mobile header controls share h-8 / size-sm so the
-              segmented toggle, upload CTA, and filter trigger align. */}
+          {/* Mobile header controls share h-8 / size-sm — comfortable
+              with a mouse, but tight under a thumb, so touch-primary
+              devices get 40px controls instead. */}
           <IconButton
             size="sm"
             aria-label={t("admin.uploadImage")}
             disabled={isUploading}
             onClick={openFileInput}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 pointer-coarse:size-10"
           >
             {isUploading ? <Spinner className="size-3.5" /> : <Upload size={14} />}
           </IconButton>
@@ -407,7 +408,7 @@ export default function AdminMediaPage() {
                 <IconButton
                   size="sm"
                   aria-label={t("admin.filters")}
-                  className="relative bg-muted transition-colors duration-200 hover:bg-muted/80 data-popup-open:bg-accent data-popup-open:text-accent-foreground [&_svg]:transition-transform [&_svg]:duration-200 data-popup-open:[&_svg]:rotate-90"
+                  className="relative bg-muted transition-colors duration-200 hover:bg-muted/80 data-popup-open:bg-accent data-popup-open:text-accent-foreground [&_svg]:transition-transform [&_svg]:duration-200 data-popup-open:[&_svg]:rotate-90 pointer-coarse:size-10"
                 >
                   <SlidersHorizontal size={14} />
                   {/* Active-filter dot — the controls live behind this

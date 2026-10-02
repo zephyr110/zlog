@@ -407,7 +407,7 @@ function AdminPostsContent() {
                         : `/admin/posts?status=${s}`
                     )
                   }}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all pointer-coarse:min-h-8 ${
                     statusFilter === s
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
