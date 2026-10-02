@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { formatLocalDate } from "@/lib/date"
+import { publishingStreaks } from "@/lib/streak"
+import { Flame, Trophy, CalendarCheck } from "lucide-react"
 
 interface ContributionCalendarProps {
   posts: { date: string }[]
@@ -165,6 +167,19 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
   const weeks = useMemo(
     () => buildWeeks(countsByDay, selectedYear),
     [countsByDay, selectedYear]
+  )
+
+  // Streak stats are a property of the writing habit, not of the viewed
+  // window — computed over ALL posts (drafts included, matching the
+  // heatmap's own counting), independent of the year filter. `today` is
+  // the local date, the same clock formatLocalDate feeds the cells.
+  const streaks = useMemo(
+    () =>
+      publishingStreaks(
+        posts.map((p) => p.date),
+        formatLocalDate(new Date())
+      ),
+    [posts]
   )
 
   const fmt = useMemo(
@@ -341,10 +356,12 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
           <CardAction>{yearFilter}</CardAction>
         </CardHeader>
         <CardContent>
-          {/* Match dashboard page skeleton totals (month-label row +
-              heatmap): phones ~90px grid, md+ ~118px, so hydrate doesn't
-              collapse under the page-level placeholder. */}
+          {/* Match dashboard page skeleton totals (streak row +
+              month-label row + heatmap): phones ~90px grid, md+ ~118px,
+              so hydrate doesn't collapse under the page-level
+              placeholder. */}
           <div className="flex flex-col gap-1.5">
+            <div className="mb-3 h-4 w-64 animate-pulse rounded-sm bg-muted/70" />
             <div className="h-3.5 animate-pulse rounded-sm bg-muted/70" />
             <div className="h-[90px] animate-pulse rounded-md bg-muted md:h-[118px]" />
           </div>
@@ -362,6 +379,22 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
         <CardAction>{yearFilter}</CardAction>
       </CardHeader>
       <CardContent>
+      {/* Writing streak — current / longest / active-day counts derived
+          from the same posts array the grid counts. */}
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          <Flame size={14} className="text-orange-500" />
+          {t("admin.streakCurrent")(streaks.current)}
+        </span>
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          <Trophy size={14} className="text-amber-500" />
+          {t("admin.streakLongest")(streaks.longest)}
+        </span>
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          <CalendarCheck size={14} className="text-(--chart-2)" />
+          {t("admin.streakActive")(streaks.activeDays)}
+        </span>
+      </div>
       {/* Scrollport — phones get a swipeable year; wide cards still fill.
           Edge fades replace the hidden scrollbar as a scroll affordance. */}
       <div className="relative">

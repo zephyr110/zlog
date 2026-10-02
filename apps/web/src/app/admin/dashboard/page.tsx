@@ -118,6 +118,8 @@ export default function AdminDashboardPage() {
               <Skeleton className="h-8 w-36 shrink-0 rounded-md" />
             </div>
             <div className="flex flex-col gap-3 px-4">
+              {/* Streak row — matches the real card's strip. */}
+              <Skeleton className="h-4 w-64" />
               {/* Mobile — ~24 weeks visible + left fade (scroll affordance). */}
               <div className="relative overflow-hidden md:hidden">
                 <div

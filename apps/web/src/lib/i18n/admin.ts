@@ -216,6 +216,9 @@ analyticsVercelPermissionDesc:
 insights: "数据洞察",
 postsCalendar: "发布日历",
 calendarRecent: "最近一年",
+streakCurrent: (n: number) => `当前连续 ${n} 天`,
+streakLongest: (n: number) => `最长连续 ${n} 天`,
+streakActive: (n: number) => `累计活跃 ${n} 天`,
 contributionLess: "少",
 contributionMore: "多",
 postsOverTime: "文章发布趋势",
@@ -576,6 +579,11 @@ analyticsVercelPermissionDesc:
 insights: "Insights",
 postsCalendar: "Post Calendar",
 calendarRecent: "Past year",
+streakCurrent: (n: number) =>
+  n === 1 ? "Current streak 1 day" : `Current streak ${n} days`,
+streakLongest: (n: number) =>
+  n === 1 ? "Longest streak 1 day" : `Longest streak ${n} days`,
+streakActive: (n: number) => (n === 1 ? "Active 1 day" : `Active ${n} days`),
 contributionLess: "Less",
 contributionMore: "More",
 postsOverTime: "Posts Over Time",
