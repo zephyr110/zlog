@@ -42,9 +42,11 @@ export async function generateMetadata({
   const ogImageUrl = (path: string) =>
     path.startsWith("http") ? path : `${site.siteUrl}${path}`
 
+  // A real cover beats a generated card; posts without one get a
+  // per-post card (title, date, reading time, tags) from /api/og.
   const postImage = post.cover
     ? ogImageUrl(post.cover)
-    : `${site.siteUrl}${site.ogImage}`
+    : `${site.siteUrl}/api/og/${post.slug}`
 
   return {
     title: post.title,
