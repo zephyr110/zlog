@@ -12,6 +12,7 @@ import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
 import { computeReadingStats, type Post } from "@zlog/core"
 import { MediaPickerDialog } from "@/components/admin/media-picker-dialog"
+import { uploadImageFile, validateImageFile } from "@/lib/upload"
 import {
   HeaderActions,
 } from "@/components/admin/header-actions"
@@ -28,6 +29,96 @@ import {
 } from "@/components/admin/editor-toolbar"
 import { MarkdownPreview } from "@/components/admin/markdown-preview"
 import { PostMetaFields } from "@/components/admin/post-meta-fields"
+
+/** localStorage key for the in-progress NEW post draft. New posts are
+ *  excluded from the 30s server auto-save (it would create the post
+ *  early), so a closed tab used to lose the whole article — this key
+ *  keeps the content itself. Cleared on successful create. */
+const NEW_POST_DRAFT_KEY = "zlog:new-post-draft"
+
+interface NewPostDraft {
+  title: string
+  slug: string
+  description: string
+  content: string
+  tags: string[]
+  cover: string
+  savedAt: number
+}
+
+/** Content textarea with image paste / drag-drop upload. Both entry
+ *  points funnel `File[]` to the parent, which uploads via /api/upload
+ *  and inserts the markdown at the cursor. */
+function ContentTextarea({
+  textareaRef,
+  value,
+  onChange,
+  onImageFiles,
+  placeholder,
+  className,
+  dragHint,
+}: {
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
+  onImageFiles: (files: File[]) => void
+  placeholder?: string
+  className?: string
+  dragHint: string
+}) {
+  const [dragActive, setDragActive] = useState(false)
+
+  return (
+    <div className="relative">
+      <Textarea
+        ref={textareaRef}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={className}
+        onPaste={(e) => {
+          const files = Array.from(e.clipboardData?.items ?? [])
+            .filter(
+              (item) => item.kind === "file" && item.type.startsWith("image/")
+            )
+            .map((item) => item.getAsFile())
+            .filter((f): f is File => f !== null)
+          if (!files.length) return
+          // Swallow the paste: the image is uploaded and inserted as
+          // markdown instead of pasting a broken blob/HTML fragment.
+          e.preventDefault()
+          onImageFiles(files)
+        }}
+        onDragOver={(e) => {
+          // Only claim file drags — text drags keep the default behavior.
+          if (!Array.from(e.dataTransfer.types).includes("Files")) return
+          e.preventDefault()
+          e.dataTransfer.dropEffect = "copy"
+          if (!dragActive) setDragActive(true)
+        }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={(e) => {
+          setDragActive(false)
+          const files = Array.from(e.dataTransfer.files ?? []).filter((f) =>
+            f.type.startsWith("image/")
+          )
+          if (!files.length) return
+          // Must preventDefault: the browser default for a dropped file
+          // is to navigate away and lose the editor state.
+          e.preventDefault()
+          onImageFiles(files)
+        }}
+      />
+      {dragActive && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md bg-primary/5 ring-2 ring-primary">
+          <span className="rounded-md border bg-background/95 px-3 py-1 text-xs shadow-sm">
+            {dragHint}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface PostEditorProps {
   initialPost?: Post
@@ -161,6 +252,109 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
     return () => clearInterval(interval)
   }, [isNew])
 
+  // New-post anti-loss: mirror the in-progress draft to localStorage
+  // (debounced, in the effect below) and offer to restore it on the next
+  // visit. This effect is declared BEFORE the persist effect so the
+  // restore's setState lands first — otherwise the persist effect's
+  // first empty-state timer could clear the stored draft before it is
+  // ever read.
+  const draftRestoreCheckedRef = useRef(false)
+  useEffect(() => {
+    if (!isNew || draftRestoreCheckedRef.current) return
+    draftRestoreCheckedRef.current = true
+    let draft: Partial<NewPostDraft> | null = null
+    try {
+      const raw = localStorage.getItem(NEW_POST_DRAFT_KEY)
+      draft = raw ? (JSON.parse(raw) as Partial<NewPostDraft>) : null
+    } catch {
+      draft = null
+    }
+    if (!draft || typeof draft !== "object") return
+    const tags = Array.isArray(draft.tags)
+      ? draft.tags.filter((x): x is string => typeof x === "string")
+      : []
+    const hasContent =
+      [draft.title, draft.slug, draft.description, draft.content, draft.cover].some(
+        (v) => typeof v === "string" && v.trim() !== ""
+      ) || tags.length > 0
+    if (!hasContent) {
+      try {
+        localStorage.removeItem(NEW_POST_DRAFT_KEY)
+      } catch {
+        // ignore
+      }
+      return
+    }
+    setTitle(draft.title ?? "") // eslint-disable-line react-hooks/set-state-in-effect -- one-time restore from localStorage
+    setSlug(draft.slug ?? "")
+    setDescription(draft.description ?? "")
+    setContent(draft.content ?? "")
+    setTags(tags)
+    setCover(draft.cover ?? "")
+    toast(t("admin.draftRestored"), {
+      action: {
+        label: t("admin.draftDiscard"),
+        onClick: () => {
+          try {
+            localStorage.removeItem(NEW_POST_DRAFT_KEY)
+          } catch {
+            // ignore
+          }
+          setTitle("")
+          setSlug("")
+          setDescription("")
+          setContent("")
+          setTags([])
+          setCover("")
+        },
+      },
+    })
+    // The discard action is inlined above so this effect needs no extra
+    // dependency — and stays a one-time restore keyed on isNew only.
+  }, [isNew, t])
+
+  // Persist the new-post draft: trailing debounce (800ms after a pause)
+  // PLUS a max-wait — a pure debounce never fires while the user types
+  // continuously, so a crash mid-burst would lose everything written
+  // since the burst began. The max-wait caps that window at 5s.
+  // Seeded with mount time: a 0 would make the max-wait fire on the very
+  // first effect run (empty state → removeItem) and wipe a stored draft
+  // before the restore effect above ever reads it.
+  const lastDraftWriteRef = useRef(Date.now())
+  useEffect(() => {
+    if (!isNew) return
+    const write = () => {
+      lastDraftWriteRef.current = Date.now()
+      const hasContent =
+        [title, slug, description, content, cover].some(
+          (v) => v.trim() !== ""
+        ) || tags.length > 0
+      try {
+        if (!hasContent) {
+          localStorage.removeItem(NEW_POST_DRAFT_KEY)
+          return
+        }
+        const draft: NewPostDraft = {
+          title,
+          slug,
+          description,
+          content,
+          tags,
+          cover,
+          savedAt: Date.now(),
+        }
+        localStorage.setItem(NEW_POST_DRAFT_KEY, JSON.stringify(draft))
+      } catch {
+        // Quota / private mode: the beforeunload prompt still protects
+        // the session — never break the editor over a storage failure.
+      }
+    }
+    const MAX_WAIT_MS = 5_000
+    if (Date.now() - lastDraftWriteRef.current >= MAX_WAIT_MS) write()
+    const id = setTimeout(write, 800)
+    return () => clearTimeout(id)
+  }, [isNew, title, slug, description, content, tags, cover])
+
   // Word / char count — shared CJK-aware stats (same as API persist path)
   const { wordCount, readingTime: readTime } = computeReadingStats(content)
   const charCount = content.length
@@ -214,12 +408,16 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
     return isDesktop ? desktopContentRef.current : mobileContentRef.current
   }
 
-  /** Insert markdown at the current textarea cursor position. */
+  /** Insert markdown at the current textarea cursor position. Reads the
+   *  LIVE DOM value instead of the closure's `content`: image uploads are
+   *  async and can run for a while — stitching from a stale snapshot
+   *  would drop whatever the user typed in the meantime. */
   function insertAtCursor(text: string) {
     const textarea = getActiveTextarea()
-    const start = textarea?.selectionStart ?? content.length
-    const end = textarea?.selectionEnd ?? content.length
-    const next = content.slice(0, start) + text + content.slice(end)
+    const current = textarea ? textarea.value : content
+    const start = textarea?.selectionStart ?? current.length
+    const end = textarea?.selectionEnd ?? current.length
+    const next = current.slice(0, start) + text + current.slice(end)
     setContent(next)
     requestAnimationFrame(() => {
       if (!textarea) return
@@ -246,6 +444,47 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
 
   function insertImage(url: string) {
     insertAtCursor(`![${t("admin.uploadedImageAlt")}](${url})`)
+  }
+
+  /** Upload pasted/dropped images sequentially, then insert all markdown
+   *  in one shot (avoids cursor juggling between async inserts). */
+  async function uploadImagesAtCursor(files: File[]) {
+    const toastId = toast.loading(t("admin.imageUploading"))
+    const urls: string[] = []
+    let failure: string | null = null
+    for (const file of files) {
+      const check = validateImageFile(file)
+      if (check === "size") {
+        failure = t("admin.fileTooLarge")
+        continue
+      }
+      if (check === "type") {
+        failure = t("admin.uploadFailed")
+        continue
+      }
+      const result = await uploadImageFile(file)
+      if (result.ok) {
+        urls.push(result.url)
+      } else {
+        failure =
+          result.reason === "network"
+            ? t("admin.networkErrorSave")
+            : result.message || t("admin.uploadFailed")
+      }
+    }
+    if (urls.length) {
+      insertAtCursor(
+        urls
+          .map((url) => `![${t("admin.uploadedImageAlt")}](${url})`)
+          .join("\n")
+      )
+      toast.success(t("admin.imageInserted"), { id: toastId })
+      // Partial failure: the success toast already replaced the loading
+      // one — surface the failure as its own toast so both stay visible.
+      if (failure) toast.error(failure)
+    } else {
+      toast.error(failure ?? t("admin.uploadFailed"), { id: toastId })
+    }
   }
 
   async function savePost(publish = false, silent = false) {
@@ -302,6 +541,11 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
           toast.success(t("admin.autoSaved"))
         }
         if (isNew) {
+          try {
+            localStorage.removeItem(NEW_POST_DRAFT_KEY)
+          } catch {
+            // ignore
+          }
           router.push(
             `/admin/posts/edit?slug=${encodeURIComponent(data.post.slug)}`
           )
@@ -309,14 +553,20 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
         router.refresh()
       } else {
         const err = await res.json()
-        if (!silent) {
-          toast.error(err.error || (t("admin.failedToSavePost")))
-        }
+        // Auto-save failures must NOT be silent: the user believes the
+        // draft is safe while nothing was persisted.
+        toast.error(
+          autoSavedRef.current
+            ? t("admin.autoSaveFailed")
+            : (err.error || (t("admin.failedToSavePost")))
+        )
       }
     } catch {
-      if (!silent) {
-        toast.error(t("admin.networkErrorSave"))
-      }
+      toast.error(
+        autoSavedRef.current
+          ? t("admin.autoSaveFailed")
+          : t("admin.networkErrorSave")
+      )
     } finally {
       setSaving(false)
       autoSavedRef.current = false
@@ -427,12 +677,14 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
             >
               {previewPanel}
             </div>
-            <Textarea
-              ref={desktopContentRef}
+            <ContentTextarea
+              textareaRef={desktopContentRef}
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              onImageFiles={uploadImagesAtCursor}
               placeholder={t("admin.contentPlaceholder")}
               className="font-mono min-h-[400px] lg:min-h-[calc(100vh-24rem)] resize-y"
+              dragHint={t("admin.dropImageHint")}
             />
           </div>
 
@@ -443,12 +695,14 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
               <TabsTrigger value="preview">{t("admin.previewTab")}</TabsTrigger>
             </TabsList>
             <TabsContent value="edit">
-              <Textarea
-                ref={mobileContentRef}
+              <ContentTextarea
+                textareaRef={mobileContentRef}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
+                onImageFiles={uploadImagesAtCursor}
                 placeholder={t("admin.contentPlaceholder")}
                 className="font-mono min-h-[400px]"
+                dragHint={t("admin.dropImageHint")}
               />
             </TabsContent>
             <TabsContent value="preview">{previewPanel}</TabsContent>
