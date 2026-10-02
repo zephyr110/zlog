@@ -24,6 +24,12 @@ export async function generateStaticParams() {
   // 运行时按需渲染（与 posts/[slug]、tags/[tag] 同款处理）。
   if (process.env.NEXT_DESKTOP === "true") return []
   const series = listSeries(await getSeriesSource())
+  // 导出构建要求动态路由至少产出一个路径——空数组会被判 "missing
+  // generateStaticParams()" 直接终止构建（Next 16 实测：判定条件是
+  // prerenderedRoutes.length > 0，而非函数是否存在）。尚无系列文章
+  // 时给一个占位：该路径预渲染时成员为空 → 页面 notFound()，导出成
+  // 404 内容页；日后有系列后被真实路径自然覆盖。
+  if (series.length === 0) return [{ name: "_" }]
   return series.map((entry) => ({ name: entry.name.toLowerCase() }))
 }
 

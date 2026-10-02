@@ -23,6 +23,11 @@ export async function generateStaticParams() {
   // 导出成跳转 HTML（与 category/[name] 同款兜底），否则导出构建里旧的
   // /tags/series-* 链接会落到 404.html。运行时构建由 next.config 的
   // redirects 先行处理，不经过页面。
+  // 导出构建要求动态路由至少产出一个路径（空数组会被判 "missing
+  // generateStaticParams()"，Next 16 实测判定条件是参数个数而非函数
+  // 是否存在）；一个 tag 都没有时给占位——该路径预渲染为 notFound 的
+  // 404 内容页。
+  if (tags.length === 0) return [{ tag: "_" }]
   return tags.map((tag) => ({ tag }))
 }
 
