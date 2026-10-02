@@ -93,6 +93,30 @@ export async function earliestArchivedMonth(
   return months[0] ?? null
 }
 
+/** 单维度逐月明细（不聚合）：dimension='pages' 供内容级归因画趋势。
+ *  返回按 month 升序（同月内 views 降序），调用方自行分组/截断。 */
+export async function monthlyDimensionRows(
+  source: "ga" | "vercel",
+  dimension: string,
+  fromMonth: string,
+  toMonth: string
+): Promise<{ month: string; itemKey: string; users: number; views: number }[]> {
+  const db = requireDb()
+  await ensureTable(db)
+  const res = await db.execute({
+    sql: `SELECT month, item_key, users, views FROM analytics_monthly
+          WHERE source = ? AND dimension = ? AND month >= ? AND month <= ?
+          ORDER BY month ASC, views DESC`,
+    args: [source, dimension, fromMonth, toMonth],
+  })
+  return res.rows.map((r) => ({
+    month: String(r.month),
+    itemKey: String(r.item_key),
+    users: Number(r.users),
+    views: Number(r.views),
+  }))
+}
+
 /** 区间内各维度的月度聚合（users/views 求和），条目按 users 降序。
  *  返回 dimension → 条目列表（未按用户数截断，调用方自行 cap）。 */
 export async function aggregateMonthlyAnalytics(

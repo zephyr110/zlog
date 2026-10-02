@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Card, CardAction, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { PostStats } from "@/components/admin/post-stats"
 import { TrafficAnalytics, TrafficSkeleton } from "@/components/admin/traffic-analytics"
+import { PostTrafficPanel } from "@/components/admin/post-traffic-panel"
 import { ContributionCalendar } from "@/components/admin/contribution-calendar"
 import { FormattedDate } from "@/components/blog/formatted-date"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -286,6 +287,9 @@ export default function AdminDashboardPage() {
       </section>
 
       <TrafficAnalytics />
+
+      {/* Content attribution — which posts the traffic actually goes to */}
+      <PostTrafficPanel />
 
       {/* Recent Posts */}
       <div className="flex flex-col gap-5">

@@ -66,5 +66,6 @@ export {
   listArchivedMonths,
   earliestArchivedMonth,
   aggregateMonthlyAnalytics,
+  monthlyDimensionRows,
 } from "./analytics"
 export type { AnalyticsDimensionRows } from "./analytics"
