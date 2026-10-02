@@ -7,6 +7,7 @@ import { gradientPairs } from "@/components/blog/post-card"
 import { useT } from "@/components/layout/trans"
 import { type PostSummary } from "@zlog/database"
 import { parseUtcDate } from "@/lib/date"
+import { publicTags } from "@/lib/series"
 
 /** Editorial "hero" card for the newest post on the home page — wide
  *  horizontal layout (stacked on mobile) with an oversized cover/gradient
@@ -19,6 +20,8 @@ export function FeaturedPostCard({ post }: { post: PostSummary }) {
     parseUtcDate(post.date)
   )
   const minReadLabel = t("post.minRead") as (n: number) => string
+  // 系列 tag 是连载元数据，不占卡片标签位。
+  const visibleTags = publicTags(post.tags)
 
   return (
     <Link
@@ -92,14 +95,14 @@ export function FeaturedPostCard({ post }: { post: PostSummary }) {
             {post.description}
           </p>
 
-          {post.tags.length > 0 && (
+          {visibleTags.length > 0 && (
             <div className="mb-6 flex flex-wrap gap-1.5">
-              {post.tags.slice(0, 3).map((tag) => (
+              {visibleTags.slice(0, 3).map((tag) => (
                 <TagBadge key={tag} tag={tag} />
               ))}
-              {post.tags.length > 3 && (
+              {visibleTags.length > 3 && (
                 <span className="ml-0.5 self-center text-xs text-muted-foreground">
-                  +{post.tags.length - 3}
+                  +{visibleTags.length - 3}
                 </span>
               )}
             </div>

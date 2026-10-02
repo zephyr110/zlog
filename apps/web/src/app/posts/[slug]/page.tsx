@@ -14,7 +14,9 @@ import { CommentSection } from "@/components/blog/comment-section"
 import { HeroGlow } from "@/components/layout/hero-glow"
 import { Trans } from "@/components/layout/trans"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Calendar, Clock } from "lucide-react"
+import { Calendar, ChevronLeft, ChevronRight, Clock, Layers } from "lucide-react"
+import { rankRelatedPosts } from "@/lib/related"
+import { buildSeriesNav, publicTags, sameSeries } from "@/lib/series"
 import { POST_PROSE_CLASSES } from "@/lib/prose"
 
 interface PostPageProps {
@@ -85,9 +87,15 @@ export default async function PostPage({ params }: PostPageProps) {
 
   if (!post || post.draft) notFound()
 
-  const relatedPosts = (await getPublishedPosts())
-    .filter((p) => p.slug !== slug && p.tags.some((t) => post.tags.includes(t)))
-    .slice(0, 3)
+  // 相关推荐与系列导航共用同一份已发布列表；相关推荐排除同系列
+  // （系列成员有自己的上下篇导航，不占推荐位）。
+  const allPosts = await getPublishedPosts()
+  const seriesNav = buildSeriesNav(allPosts, slug)
+  const relatedPosts = rankRelatedPosts(
+    post,
+    allPosts.filter((candidate) => !sameSeries(candidate.tags, post.tags)),
+    3
+  )
 
   return (
     <>
@@ -169,12 +177,12 @@ export default async function PostPage({ params }: PostPageProps) {
                 </div>
               </div>
 
-              {/* Tags */}
-              {post.tags.length > 0 && (
+              {/* Tags（系列 tag 是元数据，单独走系列入口，不混在标签行） */}
+              {publicTags(post.tags).length > 0 && (
                 <>
                   <span className="hidden md:block opacity-20">|</span>
                   <div className="flex flex-wrap gap-1.5">
-                    {post.tags.map((tag) => (
+                    {publicTags(post.tags).map((tag) => (
                       <TagBadge
                         key={tag}
                         tag={tag}
@@ -195,6 +203,51 @@ export default async function PostPage({ params }: PostPageProps) {
 
         {/* Content */}
         <Container size="md">
+          {seriesNav && (
+            <div className="mb-8 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border bg-card/60 px-4 py-3">
+              <Link
+                href={`/series/${encodeURIComponent(seriesNav.name.toLowerCase())}`}
+                className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+              >
+                <Layers size={14} className="shrink-0" />
+                <span className="shrink-0">
+                  <Trans k="post.seriesLabel" />
+                </span>
+                <span className="truncate font-semibold text-foreground">
+                  {seriesNav.name}
+                </span>
+              </Link>
+              <span className="text-xs text-muted-foreground">
+                <Trans
+                  k="post.seriesPosition"
+                  args={[seriesNav.position, seriesNav.total]}
+                />
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                {seriesNav.prev && (
+                  <Link
+                    href={`/posts/${encodeURIComponent(seriesNav.prev.slug)}`}
+                    title={seriesNav.prev.title}
+                    className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-foreground"
+                  >
+                    <ChevronLeft size={12} />
+                    <Trans k="post.seriesPrev" />
+                  </Link>
+                )}
+                {seriesNav.next && (
+                  <Link
+                    href={`/posts/${encodeURIComponent(seriesNav.next.slug)}`}
+                    title={seriesNav.next.title}
+                    className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-foreground"
+                  >
+                    <Trans k="post.seriesNext" />
+                    <ChevronRight size={12} />
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className={POST_PROSE_CLASSES}>
             <MDXRenderer post={post} />
           </div>
@@ -203,19 +256,23 @@ export default async function PostPage({ params }: PostPageProps) {
           <div className="my-12 rounded-2xl border bg-card p-5 md:p-6">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex flex-col gap-3">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">
-                  <Trans k="post.tagsLabel" />
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {post.tags.map((tag) => (
-                    <TagBadge
-                      key={tag}
-                      tag={tag}
-                      href={`/tags/${encodeURIComponent(tag.toLowerCase())}`}
-                      className="bg-muted/50 text-foreground hover:bg-muted"
-                    />
-                  ))}
-                </div>
+                {publicTags(post.tags).length > 0 && (
+                  <>
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">
+                      <Trans k="post.tagsLabel" />
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {publicTags(post.tags).map((tag) => (
+                        <TagBadge
+                          key={tag}
+                          tag={tag}
+                          href={`/tags/${encodeURIComponent(tag.toLowerCase())}`}
+                          className="bg-muted/50 text-foreground hover:bg-muted"
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-2 sm:pt-6">
                 <CopyLinkButton

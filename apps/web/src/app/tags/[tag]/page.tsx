@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
 import { type Metadata } from "next"
 import Link from "next/link"
 import { getPostsByTag, getAllTags } from "@zlog/database"
@@ -7,6 +7,7 @@ import { Trans } from "@/components/layout/trans"
 import { PageHeader } from "@/components/layout/page-header"
 import { Container } from "@/components/ui/container"
 import { defaultLocale, t } from "@/lib/i18n"
+import { isSeriesTag, seriesName } from "@/lib/series"
 import { EmptyState } from "@/components/ui/empty-state"
 
 interface TagPageProps {
@@ -18,7 +19,9 @@ export async function generateStaticParams() {
   // 运行时按需渲染（force-dynamic 不跳过 generateStaticParams，Task 12 CI 实测）
   if (process.env.NEXT_DESKTOP === "true") return []
   const tags = await getAllTags()
-  return tags.map((tag) => ({ tag }))
+  // 系列 tag 不是普通标签（/tags/series-x 由页面重定向到 /series/x），
+  // 不为其生成静态路径——预渲染期抛重定向没有意义。
+  return tags.filter((tag) => !isSeriesTag(tag)).map((tag) => ({ tag }))
 }
 
 export async function generateMetadata({
@@ -37,11 +40,22 @@ export async function generateMetadata({
 export default async function TagPage({ params }: TagPageProps) {
   const { tag } = await params
   const decodedTag = decodeURIComponent(tag)
+
+  // 系列 tag 有专门的连载视图——永久重定向（tag 名 → 系列页映射稳定）。
+  if (isSeriesTag(decodedTag)) {
+    permanentRedirect(
+      `/series/${encodeURIComponent(seriesName(decodedTag).toLowerCase())}`
+    )
+  }
+
   const allTags = await getAllTags()
 
   if (!allTags.some((t) => t.toLowerCase() === decodedTag.toLowerCase())) {
     notFound()
   }
+
+  // 标签云不含系列 tag（它是系列入口的元数据，不是可浏览标签）。
+  const visibleTags = allTags.filter((t) => !isSeriesTag(t))
 
   const posts = await getPostsByTag(decodedTag)
 
@@ -65,7 +79,7 @@ export default async function TagPage({ params }: TagPageProps) {
       {/* Tags bar */}
       <Container size="sm">
         <div className="flex flex-wrap items-center gap-2">
-          {allTags.map((t) => {
+          {visibleTags.map((t) => {
             const isActive = t.toLowerCase() === decodedTag.toLowerCase()
             return (
               <Link

@@ -3,6 +3,7 @@ import { getPostBySlug } from "@zlog/database"
 import { getSiteConfig } from "@/lib/get-site-config"
 import { t } from "@/lib/i18n"
 import { fitOgTitle, inferOgLocale, ogSubsetText, OG_SIZE } from "@/lib/og"
+import { publicTags } from "@/lib/series"
 
 /** Posters are data-dependent: without this, a build-time prerender (the
  *  build machine has DB access) could bake one post's card into the
@@ -72,7 +73,8 @@ export async function GET(
   const locale = inferOgLocale(post.title, post.description)
   const minRead = t(locale, "post.minRead")(post.readingTime)
   const host = hostOf(site.siteUrl)
-  const tags = post.tags.slice(0, 3)
+  // 系列 tag 不上分享卡（连载元数据，对卡片读者无信息量）。
+  const tags = publicTags(post.tags).slice(0, 3)
   const title = fitOgTitle(post.title)
   const separator = "·"
 

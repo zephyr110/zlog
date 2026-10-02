@@ -6,6 +6,11 @@
       "source": "/category/:name",
       "destination": "/topics/:name",
       "permanent": true
+    },
+    {
+      "source": "/tags/series-:name",
+      "destination": "/series/:name",
+      "permanent": true
     }
   ],
   "headers": [

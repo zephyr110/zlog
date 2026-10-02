@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { Container } from "@/components/ui/container"
 import { ArchiveFeed } from "./archive-feed"
 import { ArchiveFeedSkeleton } from "./loading"
+import { isSeriesTag } from "@/lib/series"
 
 export const metadata: Metadata = {
   title: t(defaultLocale, "archive.title") as string,
@@ -18,7 +19,10 @@ export default async function ArchivePage() {
   const posts = await getPublishedPosts()
   // Tags derived from the published posts themselves — getAllTags() also
   // read draft rows, leaking draft-only categories into the filter pills.
-  const allTags = [...new Set(posts.flatMap((p) => p.tags))]
+  // 系列 tag 不是筛选维度（它是系列连载的元数据），不进筛选药丸。
+  const allTags = [...new Set(posts.flatMap((p) => p.tags))].filter(
+    (tag) => !isSeriesTag(tag)
+  )
 
   return (
     <div className="min-h-[calc(100vh-4rem)]">

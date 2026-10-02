@@ -28,6 +28,14 @@ const nextConfig: NextConfig = {
               permanent: true,
             },
             {
+              // 系列 tag（series-*）只是连载的元数据入口——旧的标签页
+              // 链接一律永久搬到系列页。三处一致：这里 + vercel.json +
+              // tags/[tag] 页面的 permanentRedirect 兜底（桌面/导出构建）。
+              source: "/tags/series-:name",
+              destination: "/series/:name",
+              permanent: true,
+            },
+            {
               source: "/admin",
               destination: "/admin/login",
               permanent: false,

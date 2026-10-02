@@ -1,5 +1,6 @@
 import { getSiteConfig } from "@/lib/get-site-config"
 import { getPublishedPosts } from "@zlog/database"
+import { listSeries } from "@/lib/series"
 
 function escapeXml(s: string) {
   return s
@@ -31,7 +32,26 @@ export async function GET() {
     priority: "0.6",
   }))
 
-  const allUrls = [...urls, ...postUrls]
+  // 系列页：成员按连载顺序（日期升序），末位即最新一篇——lastmod 取它。
+  const seriesUrls = listSeries(posts).map((entry) => {
+    const latest = entry.posts[entry.posts.length - 1]
+    return {
+      url: `${siteUrl}/series/${encodeURIComponent(entry.name.toLowerCase())}`,
+      lastmod: (latest.updated || latest.date).slice(0, 10),
+      changefreq: "weekly",
+      priority: "0.5",
+    }
+  })
+  if (seriesUrls.length > 0) {
+    urls.push({
+      url: `${siteUrl}/series`,
+      changefreq: "weekly",
+      priority: "0.6",
+      lastmod: today,
+    })
+  }
+
+  const allUrls = [...urls, ...postUrls, ...seriesUrls]
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

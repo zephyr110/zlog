@@ -10,6 +10,7 @@ import { TagBadge } from "@/components/blog/tag-badge"
 import { useT } from "@/components/layout/trans"
 import { Input } from "@/components/ui/input"
 import { resolveCategory, getCategoryLabel } from "@/lib/categories"
+import { publicTags } from "@/lib/series"
 import { parseUtcDate, groupPostsByUtcYear } from "@/lib/date"
 import { cn } from "@/lib/utils"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -574,9 +575,10 @@ export function ArchiveFeed({ posts, allTags }: ArchiveFeedProps) {
                           <span className="min-w-0 flex-1 text-sm font-medium leading-relaxed transition-colors group-hover:text-primary">
                             {post.title}
                           </span>
-                          {post.tags.length > 0 && (
+                          {/* 系列 tag 是连载元数据，不进年份列表的标签位 */}
+                          {publicTags(post.tags).length > 0 && (
                             <span className="hidden shrink-0 gap-1.5 md:flex">
-                              {post.tags.slice(0, 2).map((tag) => (
+                              {publicTags(post.tags).slice(0, 2).map((tag) => (
                                 <TagBadge key={tag} tag={tag} />
                               ))}
                             </span>

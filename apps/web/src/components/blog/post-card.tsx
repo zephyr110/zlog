@@ -5,6 +5,7 @@ import { TagBadge } from "@/components/blog/tag-badge"
 import { useT } from "@/components/layout/trans"
 import { type PostSummary } from "@zlog/database"
 import { parseUtcDate } from "@/lib/date"
+import { publicTags } from "@/lib/series"
 import { Calendar, ArrowUpToLine } from "lucide-react"
 
 /** Cover-less posts get a deterministic gradient picked from the title —
@@ -36,6 +37,8 @@ export function PostCard({
   )
   const minReadLabel = t("post.minRead") as (n: number) => string
   const gradient = gradientPairs[post.title.length % gradientPairs.length]
+  // 系列 tag 是连载元数据，不占卡片标签位（详情页有系列横幅入口）。
+  const visibleTags = publicTags(post.tags)
 
   return (
     <Link href={`/posts/${encodeURIComponent(post.slug)}`} className="group block h-full">
@@ -105,14 +108,14 @@ export function PostCard({
           </p>
 
           {/* Tags */}
-          {post.tags.length > 0 && (
+          {visibleTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {post.tags.slice(0, 3).map((tag) => (
+              {visibleTags.slice(0, 3).map((tag) => (
                 <TagBadge key={tag} tag={tag} />
               ))}
-              {post.tags.length > 3 && (
+              {visibleTags.length > 3 && (
                 <span className="text-xs text-muted-foreground self-center ml-0.5">
-                  +{post.tags.length - 3}
+                  +{visibleTags.length - 3}
                 </span>
               )}
             </div>
