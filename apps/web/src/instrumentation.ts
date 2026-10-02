@@ -1,5 +1,3 @@
-import { backgroundArchiveAllSoon } from "@/lib/analytics-archiver"
-
 /**
  * Next.js 启动钩子。
  *
@@ -9,7 +7,17 @@ import { backgroundArchiveAllSoon } from "@/lib/analytics-archiver"
  * 由 API 请求内的内联回填（每次 ≤3 个月）渐进补齐。
  */
 export async function register() {
-  if (process.env.TURSO_SYNC_URL && process.env.TURSO_DATABASE_URL) {
+  // NEXT_RUNTIME 守卫是剪枝的关键：instrumentation 会被 Next 同时编译进
+  // Node 与 Edge（Proxy/middleware）两个启动上下文，Turbopack 在 Edge 构建
+  // 时会把 `NEXT_RUNTIME === "nodejs"` 整支替换为 false 并消除——动态
+  // import 本身不剪枝（字面量路径仍被静态追踪进 Edge 依赖图，触发
+  // node:fs/net/crypto、process.cwd 的 Edge Runtime warnings）。
+  if (
+    process.env.NEXT_RUNTIME === "nodejs" &&
+    process.env.TURSO_SYNC_URL &&
+    process.env.TURSO_DATABASE_URL
+  ) {
+    const { backgroundArchiveAllSoon } = await import("@/lib/analytics-archiver")
     backgroundArchiveAllSoon()
   }
 }

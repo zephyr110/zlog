@@ -461,7 +461,11 @@ async function fetchVercelMergedReport(
   const current = currentMonthKey()
   const availableFrom = await vercelAvailableFrom()
   const dbFrom = monthOfDay(effective.start)
-  const dbTo = addMonths(current, -1)
+  // 归档区间终点取 min(请求终点月, 上个月)：写死"上个月"时，查任意
+  // 更早的 custom 月份都会把终点之后的归档月份并进窗口（维度行溢出、
+  // 与精确区间查询的 totals 自相矛盾）。
+  const endMonth = monthOfDay(effective.end)
+  const dbTo = endMonth < current ? endMonth : addMonths(current, -1)
   const dbAgg =
     dbFrom <= dbTo
       ? await aggregateMonthlyAnalytics("vercel", dbFrom, dbTo)
