@@ -11,6 +11,7 @@ export {
   getAllTags,
   getPostsByCategory,
   getPostsByTag,
+  searchPublishedPosts,
 } from "./content"
 export { getUserByUsername, setUserPassword, setUserRecoveryHash } from "./users"
 export {

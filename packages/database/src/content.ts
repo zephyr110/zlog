@@ -95,6 +95,12 @@ function toParams(post: Post) {
   }
 }
 
+/** Escape LIKE wildcards so user input matches literally (paired with
+ *  ESCAPE '\' in the query — escaping the backslash itself first). */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (match) => `\\${match}`)
+}
+
 // ── Public API ──────────────────────────────────────────────────────────
 
 export async function getAllPosts(
@@ -131,6 +137,44 @@ export async function getPublishedCount(): Promise<number> {
     "SELECT COUNT(*) AS count FROM posts WHERE draft = 0"
   )
   return Number(result.rows[0]?.count ?? 0)
+}
+
+/** Full-text-ish search over published posts: every term must hit at
+ *  least one of title / description / content (AND semantics).
+ *
+ *  LIKE, not FTS5 — deliberately: the desktop app runs against an
+ *  embedded replica, and FTS5 shadow tables rebuilt locally would churn
+ *  against cloud-replicated state (this project has already been bitten
+ *  by WalConflict on concurrent frame writes). At blog scale a full-table
+ *  LIKE is milliseconds. Ranking + snippets live in the web layer's pure
+ *  functions; the candidate set is date-capped so a huge result set can't
+ *  drag whole articles back over the wire. */
+export async function searchPublishedPosts(
+  terms: string[],
+  candidateLimit = 200
+): Promise<Post[]> {
+  const db = requireDb()
+  await ensureTable(db)
+
+  const clean = terms.map((term) => term.trim()).filter(Boolean).slice(0, 6)
+  if (clean.length === 0) return []
+
+  const clauses: string[] = []
+  const args: Array<string | number> = []
+  for (const term of clean) {
+    const pattern = `%${escapeLike(term)}%`
+    clauses.push(
+      "(title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\')"
+    )
+    args.push(pattern, pattern, pattern)
+  }
+  args.push(candidateLimit)
+
+  const result = await db.execute({
+    sql: `SELECT * FROM posts WHERE draft = 0 AND ${clauses.join(" AND ")} ORDER BY date DESC LIMIT ?`,
+    args,
+  })
+  return result.rows.map(rowToPost)
 }
 
 export async function getPostBySlug(

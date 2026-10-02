@@ -13,6 +13,7 @@ import { resolveCategory, getCategoryLabel } from "@/lib/categories"
 import { parseUtcDate, groupPostsByUtcYear } from "@/lib/date"
 import { cn } from "@/lib/utils"
 import { EmptyState } from "@/components/ui/empty-state"
+import { type SearchHit } from "@/lib/search"
 
 interface ArchiveFeedProps {
   posts: PostSummary[]
@@ -60,7 +61,17 @@ export function ArchiveFeed({ posts, allTags }: ArchiveFeedProps) {
   // (X, Escape, clear-filter) collapses as soon as focus is gone, with
   // no blur-vs-click timing to get wrong.
   const [isFocused, setIsFocused] = useState(false)
-  const searchOpen = isFocused || searchQuery.trim() !== ""
+  const trimmedQuery = searchQuery.trim()
+  const searchOpen = isFocused || trimmedQuery !== ""
+
+  // Server-side content search (title/description filter locally and
+  // instantly above; body text needs a round-trip). Results are tagged
+  // with the query they belong to, so a slow response for an older query
+  // can never render under the current one.
+  const [contentResult, setContentResult] = useState<{
+    query: string
+    hits: SearchHit[]
+  } | null>(null)
 
   // Sync from URL changes (header search, browser back/forward).
   useEffect(() => {
@@ -98,6 +109,30 @@ export function ArchiveFeed({ posts, allTags }: ArchiveFeedProps) {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
   }, [])
+
+  // Content search: fetch body matches once the (debounced) query
+  // settles. Single-character queries are cheap locally and too noisy to
+  // search server-side. State is only written from the async callback —
+  // no flicker while typing, no stale hits (see the query tag above).
+  useEffect(() => {
+    if (trimmedQuery.length < 2) return
+    const controller = new AbortController()
+    fetch(`/api/search?q=${encodeURIComponent(trimmedQuery)}`, {
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : { results: [] }))
+      .then((data: { results?: SearchHit[] }) => {
+        setContentResult({
+          query: trimmedQuery,
+          hits: Array.isArray(data.results) ? data.results : [],
+        })
+      })
+      .catch(() => {
+        // Aborted (query changed) or network failure — keep the previous
+        // hits; the local title/description filter still works.
+      })
+    return () => controller.abort()
+  }, [trimmedQuery])
 
   function onSearchChange(value: string) {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -140,6 +175,26 @@ export function ArchiveFeed({ posts, allTags }: ArchiveFeedProps) {
     }
     return result
   }, [posts, activeTag, searchQuery])
+
+  // Content hits for the CURRENT query, minus posts already visible in
+  // the local (title/description) results — no duplicates on screen. An
+  // active tag pill constrains content hits the same way it constrains
+  // the local filter (the server doesn't know about the tag selection).
+  const contentHits =
+    contentResult &&
+    contentResult.query === trimmedQuery &&
+    trimmedQuery.length >= 2
+      ? contentResult.hits.filter(
+          (hit) =>
+            (activeTag === null ||
+              hit.tags.some(
+                (tag) =>
+                  resolveCategory(tag).toLowerCase() === activeTag.toLowerCase()
+              )) &&
+            !filteredPosts.some((post) => post.slug === hit.slug)
+        )
+      : []
+  const totalMatches = filteredPosts.length + contentHits.length
 
   // Year groups (newest first) — the sticky YearNavBar jumps between
   // them, and an IntersectionObserver keeps the bar's highlight on the
@@ -346,9 +401,47 @@ export function ArchiveFeed({ posts, allTags }: ArchiveFeedProps) {
           </button>
           <span className="text-xs text-muted-foreground">
             {t("site.articlesPublished")(
-              filteredPosts.length
+              totalMatches
             )}
           </span>
+        </div>
+      )}
+
+      {/* Body-text matches (server-side search) — the year index below
+          only covers title/description matches. */}
+      {contentHits.length > 0 && (
+        <div className="mb-8 animate-in fade-in duration-300">
+          <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <FileText size={13} />
+            {t("site.contentHits")(contentHits.length)}
+          </h2>
+          <ul className="divide-y divide-border/50 border-y border-border/50">
+            {contentHits.map((hit) => (
+              <li key={hit.slug}>
+                <Link
+                  href={`/posts/${encodeURIComponent(hit.slug)}`}
+                  className="group block px-2 py-3.5 -mx-2 rounded-md transition-colors hover:bg-muted/50"
+                >
+                  <div className="flex items-baseline gap-3 sm:gap-4">
+                    <time
+                      dateTime={hit.date}
+                      className="w-14 shrink-0 text-xs tabular-nums text-muted-foreground"
+                    >
+                      {formatMonthDay(hit.date, locale)}
+                    </time>
+                    <span className="min-w-0 flex-1 text-sm font-medium leading-relaxed transition-colors group-hover:text-primary">
+                      {hit.title}
+                    </span>
+                  </div>
+                  {hit.snippet && (
+                    <p className="mt-1 line-clamp-2 pl-[4.25rem] text-xs leading-relaxed text-muted-foreground sm:pl-[4.5rem]">
+                      {hit.snippet}
+                    </p>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -381,8 +474,9 @@ export function ArchiveFeed({ posts, allTags }: ArchiveFeedProps) {
         )}
       </YearNavBar>
 
-      {/* Dense year-grouped index */}
-      {filteredPosts.length === 0 ? (
+      {/* Dense year-grouped index — only truly empty when there are no
+          content hits either (those render in their own panel above). */}
+      {filteredPosts.length === 0 && contentHits.length === 0 ? (
         <EmptyState
           size="lg"
           titleAs="h2"

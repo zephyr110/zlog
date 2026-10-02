@@ -30,6 +30,7 @@ noMatchPostsDesc: (tag: string) =>
   `没有标记为「${tag}」的文章，请尝试选择其他主题。`,
 noSearchMatchDesc: (q: string) =>
   `没有找到匹配「${q}」的文章，换个关键词试试。`,
+contentHits: (n: number) => `正文命中 ${n} 篇`,
 postsCount: (n: number) => `${n} 篇文章`,
 postsTagged: (tag: string) => `标签为「${tag}」的文章`,
 postsTaggedDesc: (tag: string) => `所有标记为「${tag}」的博客文章。`,
@@ -74,6 +75,8 @@ noMatchPostsDesc: (tag: string) =>
   `No posts tagged with "${tag}". Try selecting a different topic.`,
 noSearchMatchDesc: (q: string) =>
   `No articles match "${q}". Try a different keyword.`,
+contentHits: (n: number) =>
+  `${n} ${n === 1 ? "post" : "posts"} found in content`,
 postsCount: (n: number) => `${n} ${n === 1 ? "post" : "posts"}`,
 postsTagged: (tag: string) => `Posts tagged "${tag}"`,
 postsTaggedDesc: (tag: string) => `All blog posts tagged with "${tag}".`,
