@@ -48,9 +48,11 @@ const createSchema = z.object({
   // Token from the Turnstile widget (client-side) — optional only when
   // Turnstile is not configured on the server.
   turnstileToken: z.string().min(1).max(3000).optional(),
-  // Honeypot — real visitors never see this field.
-  website: z.string().max(500).optional(),
 })
+// NOTE: no `website` field here — the honeypot is checked on the raw
+// body BEFORE this schema runs (see POST step 1). Validating it here
+// would hand bots a distinguishing 400 (e.g. an over-long value) that
+// reveals whether the rest of the payload parsed.
 
 /** Anonymous fallback for nameless visitors — Anonymous_ + 8 random
  *  hex chars (collision odds are negligible at comment volume). */
@@ -118,26 +120,38 @@ export async function GET(request: NextRequest) {
 /** Guest comment submission — the full anti-spam pipeline. Order is
  *  deliberate: cheap server checks first, then the paid ones. */
 export async function POST(request: NextRequest) {
-  // 0. Shape
+  // 1. Honeypot — robots fill hidden fields; silently succeed so the
+  //    script gets no feedback, but never store the comment. Checked on
+  //    the RAW body, before schema validation: a honeypot-filled probe
+  //    must not be told — via a distinguishing 400 — whether its other
+  //    fields were valid, and any non-empty string counts regardless of
+  //    length or shape (the schema would reject an over-long value).
+  let raw: unknown
+  try {
+    raw = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid comment" }, { status: 400 })
+  }
+  if (
+    typeof raw === "object" &&
+    raw !== null &&
+    typeof (raw as { website?: unknown }).website === "string" &&
+    (raw as { website: string }).website.length > 0
+  ) {
+    return NextResponse.json({ ok: true })
+  }
+
+  // 2. Shape
   let body: z.infer<typeof createSchema>
   try {
-    body = createSchema.parse(await request.json())
+    body = createSchema.parse(raw)
   } catch {
     return NextResponse.json({ error: "Invalid comment" }, { status: 400 })
   }
   const ip = getClientIp(request)
   const ipHash = hashIp(ip)
 
-  // 1. Honeypot — robots fill hidden fields; silently succeed so the
-  //    script gets no feedback, but never store the comment. First
-  //    check (zero dependencies, no DB): a honeypot-filled probe must
-  //    not pay a query nor be told — via a distinguishing error —
-  //    whether its payload was valid.
-  if (body.website) {
-    return NextResponse.json({ ok: true })
-  }
-
-  // 2. Master switch (settings) — spam kill-switch. Read straight from
+  // 3. Master switch (settings) — spam kill-switch. Read straight from
   //    the DB (not getSiteConfig's 1h cache): a multi-instance self-host
   //    without a shared cache store would otherwise keep accepting
   //    comments for up to an hour after the admin flips the switch.
@@ -146,17 +160,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Comments are closed" }, { status: 503 })
   }
 
-  // 3. Signed session token — script POSTs without a session are
+  // 4. Signed session token — script POSTs without a session are
   //    rejected before any state is touched.
   const session = await verifyCommentSession(body.token)
   if (!session) {
     return NextResponse.json({ error: "Invalid session" }, { status: 401 })
   }
-  // 4. Token must match this request (post + visitor IP).
+  // 5. Token must match this request (post + visitor IP).
   if (session.postSlug !== body.postSlug || session.ipHash !== ipHash) {
     return NextResponse.json({ error: "Session mismatch" }, { status: 401 })
   }
-  // 5. The post must actually exist and be published — comments for
+  // 6. The post must actually exist and be published — comments for
   //    arbitrary slugs would otherwise land in the admin inbox with a
   //    404 link (an open channel when Turnstile is unconfigured).
   //    A scheduled post is not public yet, so it accepts no comments.
@@ -167,7 +181,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 6. Time-trap — a script that fetched the session and POSTs
+  // 7. Time-trap — a script that fetched the session and POSTs
   //    immediately is rejected; humans take longer than 2 s.
   if (isBeforeMinSubmitDelay(session)) {
     return NextResponse.json(
@@ -176,7 +190,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 7. Reply target — must exist, belong to THIS post, and be a root
+  // 8. Reply target — must exist, belong to THIS post, and be a root
   //     comment (single-level nesting: a reply can't reply to a reply).
   //     Runs after the free checks (honeypot, time-trap) but before
   //     Turnstile/rate limits so a bad target burns nothing. The
@@ -198,7 +212,7 @@ export async function POST(request: NextRequest) {
     parentId = body.parentId
   }
 
-  // 8. Content sanity — cheap string checks before the paid ones.
+  // 9. Content sanity — cheap string checks before the paid ones.
   if (countUrls(body.content) > 2) {
     return NextResponse.json(
       { error: "Too many links", code: "invalid_content" },
@@ -212,7 +226,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 9. Turnstile — BEFORE the rate limits: a siteverify failure (or a
+  // 10. Turnstile — BEFORE the rate limits: a siteverify failure (or a
   //    Cloudflare outage) must not burn the visitor's IP/post/global
   //    budget, or five transient failures would lock a legit user out
   //    for 15 minutes. The widget token IS single-use, so the client
@@ -226,7 +240,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 10. Rate limits — IP, then per-post, then global (all DB-backed:
+  // 11. Rate limits — IP, then per-post, then global (all DB-backed:
   //    serverless instances share no memory).
   const limited = [
     [ipRateScope(ipHash), RATE_LIMIT_IP_WINDOW_MS, RATE_LIMIT_IP_MAX, "Too many comments"],
@@ -239,9 +253,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 11. Store. A nameless visitor gets an Anonymous_ name server-side
+  // 12. Store. A nameless visitor gets an Anonymous_ name server-side
   //     (never trust the client to pick one). Replies go through
-  //     createReply, which atomically re-verifies the parent (step 7)
+  //     createReply, which atomically re-verifies the parent (step 8)
   //     so a parent deleted mid-submit can't orphan a reply.
   const comment =
     parentId != null

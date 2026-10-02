@@ -7,17 +7,15 @@ import { useSiteConfig } from "@/components/layout/site-config-provider"
 import { Button } from "@/components/ui/button"
 import {
   COMMENT_MIN_SUBMIT_DELAY_MS,
+  STATIC_MIRROR,
   type PublicComment,
 } from "@/lib/comment-shared"
+import { recordMyComment } from "@/lib/my-comments"
 import { CommentCard } from "@/components/blog/comment-card"
 import { CommentForm } from "@/components/blog/comment-form"
 import { useStaleRequest } from "@/hooks/use-stale-request"
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
-// The GitHub Pages mirror (static export) has no API routes — comments
-// cannot work there. Build-time flag from the CI-injected site URL:
-// deploy.yml sets NEXT_PUBLIC_SITE_URL=https://zephyr110.github.io.
-const STATIC_MIRROR = !!process.env.NEXT_PUBLIC_SITE_URL?.includes("github.io")
 
 /** Guest comments, self-hosted (replaces giscus): no login, immediate
  *  display, spam-gated server-side (signed session token + Turnstile +
@@ -219,6 +217,18 @@ export function CommentSection({ slug }: { slug: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/permalink-only: reloads fetch both fresh
   }, [slug])
 
+  // Deep link to one comment (#comment-<id>) — the reply-notification
+  // banner's "View" target. Runs after the list renders (the anchor
+  // does not exist while loading); a deleted/unknown id is a no-op.
+  useEffect(() => {
+    if (loading) return
+    const match = /^#comment-(\d+)$/.exec(window.location.hash)
+    if (!match) return
+    document
+      .getElementById(`comment-${match[1]}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [loading])
+
   function resetTurnstile() {
     setTurnstileToken(null)
     setTurnstileRound((r) => r + 1)
@@ -270,6 +280,9 @@ export function CommentSection({ slug }: { slug: string }) {
         } | null
         const newComment = data?.comment
         if (newComment) {
+          // Track it for the reply-notification banner (this browser
+          // "owns" the comment, so replies to it are its business).
+          recordMyComment(newComment.id, newComment.postSlug)
           setComments((prev) => [...prev, newComment])
         } else {
           // Response parsing should not fail on 201 — but if it ever

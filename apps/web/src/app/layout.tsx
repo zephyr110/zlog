@@ -7,6 +7,7 @@ import { I18nProvider } from "@/components/layout/i18n-provider"
 import { SiteConfigProvider } from "@/components/layout/site-config-provider"
 import { DocumentTitle } from "@/components/layout/document-title"
 import { SiteAnalytics } from "@/components/layout/site-analytics"
+import { ReplyNotifications } from "@/components/blog/reply-notifications"
 import { getSiteConfig } from "@/lib/get-site-config"
 import { DEFAULT_FAVICON } from "@/lib/site-config"
 import { defaultLocale } from "@/lib/i18n"
@@ -122,6 +123,7 @@ export default async function RootLayout({
               <main className="flex-1">{children}</main>
               <Footer />
               <Toaster />
+              <ReplyNotifications />
             </SiteConfigProvider>
           </I18nProvider>
         </ThemeProvider>

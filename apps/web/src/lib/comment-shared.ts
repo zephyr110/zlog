@@ -27,3 +27,9 @@ export function displayName(authorName: string): string {
  *  client so the submit button stays disabled until the token is old
  *  enough — keep the two in lockstep by importing this constant. */
 export const COMMENT_MIN_SUBMIT_DELAY_MS = 2_000
+
+/** The GitHub Pages mirror (static export) has no API routes — anything
+ *  comment-API-shaped must render a notice instead of calling. Build-time
+ *  flag from the CI-injected site URL: deploy.yml sets
+ *  NEXT_PUBLIC_SITE_URL=https://zephyr110.github.io. */
+export const STATIC_MIRROR = !!process.env.NEXT_PUBLIC_SITE_URL?.includes("github.io")

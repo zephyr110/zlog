@@ -18,7 +18,13 @@ export function CommentCard({
   const { t } = useT()
   const name = displayName(comment.authorName)
   return (
-    <div className="rounded-xl border bg-muted/20 p-4">
+    // id + scroll-mt-24: deep-link anchor for reply notifications
+    // (#comment-<id>) — the top margin clears the sticky header when
+    // scrollIntoView centers the card.
+    <div
+      id={`comment-${comment.id}`}
+      className="rounded-xl border bg-muted/20 p-4 scroll-mt-24"
+    >
       <div className="mb-1 flex items-center gap-2">
         <span className="font-mono text-xs text-muted-foreground">#{no}</span>
         <CommentAvatar commentId={comment.id} name={name} />

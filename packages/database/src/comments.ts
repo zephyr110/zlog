@@ -168,6 +168,25 @@ export async function getReplyTarget(
   }
 }
 
+/** Replies under a set of root comments — the guest reply-notification
+ *  lookup (GET /api/comments/replies). Callers validate and cap the id
+ *  list; placeholders are built from it. Oldest-first, matching the
+ *  public thread order. */
+export async function getRepliesToComments(
+  parentIds: number[]
+): Promise<CommentRecord[]> {
+  if (parentIds.length === 0) return []
+  const db = requireDb()
+  await ensureTables()
+  const placeholders = parentIds.map(() => "?").join(", ")
+  const result = await db.execute(
+    `SELECT id, post_slug, author_name, author_email, content, ip_hash, is_read, parent_id, created_at
+     FROM comments WHERE parent_id IN (${placeholders}) ORDER BY created_at ASC`,
+    parentIds
+  )
+  return result.rows.map((r) => rowToComment(r as unknown as Record<string, unknown>))
+}
+
 export async function createComment(input: {
   postSlug: string
   authorName: string

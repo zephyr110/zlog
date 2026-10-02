@@ -43,6 +43,7 @@ export type { SiteSettingsRecord, SiteSettingsUpdate } from "./site-settings"
 export {
   getCommentsByPost,
   getReplyTarget,
+  getRepliesToComments,
   createComment,
   createReply,
   listAdminComments,
