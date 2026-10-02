@@ -34,6 +34,12 @@ import {
   shouldReloadMainWindow,
 } from "./window-lifecycle"
 import { createTray, updateTrayLanguage, updateTraySyncStatus, type TrayActions } from "./tray"
+import {
+  COMMENT_NOTIFY_COPY,
+  dockBadgeFor,
+  isCommentsPageUrl,
+  shouldNotifyNewComments,
+} from "./comment-notify"
 
 /** 设置类窗口标题（跟随生效语言；语言切换时由 setWindowTitles 更新）。 */
 const WINDOW_TITLES: Record<ResolvedLang, { settings: string; firstRun: string }> = {
@@ -337,6 +343,52 @@ async function main() {
       return await res.json()
     } catch {
       return { configured: false, error: "server-down" }
+    }
+  }
+
+  // ── 评论未读轮询 → 系统通知 / Dock 角标 ──
+  // 未读数走桌面密钥接口（主进程没有 admin 会话）；数值随本地副本同步
+  // 变化（线上评论最长 ~5 分钟滞后），60s 轮询足够及时。
+  // lastUnread === null 表示尚未建立基线：启动时的历史积压不弹通知。
+  let lastUnread: number | null = null
+  async function pollCommentUnread(): Promise<void> {
+    if (serverManager.port <= 0) return
+    try {
+      const res = await fetch(`${serverManager.url}/api/desktop/comment-unread`, {
+        headers: { "X-Zlog-Desktop-Key": config?.desktopKey ?? "" },
+      })
+      if (!res.ok) return
+      const body = (await res.json()) as { unread?: unknown }
+      const unread = typeof body.unread === "number" ? body.unread : null
+      if (unread === null) return
+      app.dock?.setBadge(dockBadgeFor(unread))
+      // 正在评论页上看着（窗口聚焦）：上涨的数字本身已可见，不弹通知。
+      const focusedOnComments =
+        !!mainWindow &&
+        !mainWindow.isDestroyed() &&
+        mainWindow.isFocused() &&
+        isCommentsPageUrl(mainWindow.webContents.getURL())
+      if (shouldNotifyNewComments(lastUnread, unread) && !focusedOnComments) {
+        const copy = COMMENT_NOTIFY_COPY[currentLang]
+        try {
+          const notification = new Notification({
+            title: copy.title,
+            body: copy.body(unread),
+          })
+          notification.on("click", () => {
+            showMainWindow()
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              void mainWindow.loadURL(`${serverManager.url}/admin/comments`)
+            }
+          })
+          notification.show()
+        } catch {
+          // 通知权限被拒 / 平台不支持：Dock 角标仍已更新
+        }
+      }
+      lastUnread = unread
+    } catch {
+      // 服务器未就绪 / 瞬时网络失败：保留旧基线，下个周期重试
     }
   }
 
@@ -831,4 +883,9 @@ async function main() {
       maybeNotifySyncError(s)
     })
   }, 30_000)
+
+  // 评论未读：5s 后首轮（此时服务器已起来，先建基线不通知历史积压），
+  // 此后每 60s 一轮——未读数受本地副本同步节流，更密的轮询没有意义。
+  setTimeout(() => void pollCommentUnread(), 5_000)
+  setInterval(() => void pollCommentUnread(), 60_000)
 }

@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
-import { timingSafeEqual } from "node:crypto"
 import { runSync, getSyncStatus, isSyncConfigured } from "@zlog/database"
 import { requireAuth } from "@/lib/api-auth"
+import { validateDesktopKey } from "@/lib/desktop-auth"
 
 export async function POST(request: NextRequest) {
   const user = await requireAuth(request)
 
   // Desktop shell 调用：本地环回地址 + 每次启动随机生成的密钥头。
-  const key = process.env.ZLOG_DESKTOP_KEY
-  const supplied = request.headers.get("x-zlog-desktop-key")
-  const keyOk =
-    !!key &&
-    !!supplied &&
-    supplied.length === key.length &&
-    timingSafeEqual(Buffer.from(supplied), Buffer.from(key))
+  const keyOk = validateDesktopKey(
+    request.headers.get("x-zlog-desktop-key"),
+    process.env.ZLOG_DESKTOP_KEY
+  )
 
   if (!user && !keyOk) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
