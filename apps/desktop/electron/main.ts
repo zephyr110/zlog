@@ -1,4 +1,12 @@
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron"
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Notification,
+  session,
+  shell,
+} from "electron"
 import { randomBytes } from "node:crypto"
 import { appendFileSync, mkdirSync } from "node:fs"
 import bcrypt from "bcryptjs"
@@ -31,6 +39,24 @@ import { createTray, updateTrayLanguage, updateTraySyncStatus, type TrayActions 
 const WINDOW_TITLES: Record<ResolvedLang, { settings: string; firstRun: string }> = {
   zh: { settings: "Zlog 设置", firstRun: "Zlog 首次设置" },
   en: { settings: "Zlog Settings", firstRun: "Zlog First-Time Setup" },
+}
+
+/** 同步异常的主动告警文案（系统通知；点击打开设置 → 同步面板）。
+ *  本地数据始终安全：正文给"怎么做"，原始错误截断附在末尾。 */
+const SYNC_ALERT_COPY: Record<
+  ResolvedLang,
+  { title: string; body: (err: string) => string }
+> = {
+  zh: {
+    title: "Zlog 同步异常",
+    body: (err) =>
+      `本地数据安全。点「立即同步」重试；若持续出现，重启应用即可恢复。\n${err.slice(0, 160)}`,
+  },
+  en: {
+    title: "Zlog sync error",
+    body: (err) =>
+      `Your local data is safe. Click "Sync Now" to retry; if it persists, restart the app.\n${err.slice(0, 160)}`,
+  },
 }
 
 // 测试与 CI：可覆盖 userData 目录（Playwright 冒烟测试使用）。
@@ -93,6 +119,36 @@ async function main() {
     onQuit: () => app.quit(),
   }
   const tray = createTray(trayActions, currentLang)
+
+  // 同步异常主动告警：lastSyncError 会在下次成功同步前持续存在，
+  // 因此只在"新错误出现"时通知一次（同一错误被成功清除后再次出现
+  // 会重新通知），避免 30s 轮询退化成通知轰炸。系统通知不可用时
+  // 静默——托盘 tooltip 的 ⚠ 仍会持续显示。
+  let lastNotifiedSyncError: string | null = null
+  function maybeNotifySyncError(status: unknown): void {
+    const raw =
+      status && typeof status === "object" && "lastSyncError" in status
+        ? (status as { lastSyncError?: unknown }).lastSyncError
+        : null
+    const message = typeof raw === "string" && raw ? raw : null
+    if (!message) {
+      lastNotifiedSyncError = null
+      return
+    }
+    if (message === lastNotifiedSyncError) return
+    lastNotifiedSyncError = message
+    const copy = SYNC_ALERT_COPY[currentLang]
+    try {
+      const notification = new Notification({
+        title: copy.title,
+        body: copy.body(message),
+      })
+      notification.on("click", () => openSettingsWindow("sync"))
+      notification.show()
+    } catch {
+      // 通知权限被拒 / 平台不支持：不打断任何流程
+    }
+  }
 
   // 崩溃处理：自动重启一次（spec §6），再次崩溃只弹窗提示，不循环。
   let crashRestarts = 0
@@ -266,7 +322,8 @@ async function main() {
         headers: { "X-Zlog-Desktop-Key": config?.desktopKey ?? "" },
       })
       const body = (await res.json()) as { status?: unknown }
-      updateTraySyncStatus(tray, res.ok ? "synced" : "error", undefined, currentLang)
+      updateTraySyncStatus(tray, res.ok ? "synced" : "error", body.status, currentLang)
+      maybeNotifySyncError(body.status)
       return body.status as Promise<unknown> as unknown as void
     } catch {
       updateTraySyncStatus(tray, "error", undefined, currentLang)
@@ -769,6 +826,9 @@ async function main() {
   setInterval(() => {
     currentLang = langFile.loadOrInit(systemLocale).resolved
     updateTrayLanguage(tray, currentLang, trayActions)
-    void getSyncStatus().then((s) => updateTraySyncStatus(tray, "idle", s, currentLang))
+    void getSyncStatus().then((s) => {
+      updateTraySyncStatus(tray, "idle", s, currentLang)
+      maybeNotifySyncError(s)
+    })
   }, 30_000)
 }

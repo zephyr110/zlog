@@ -31,9 +31,12 @@ const TRAY_LABELS: Record<
   },
 }
 
-const SYNC_SUFFIX: Record<ResolvedLang, { synced: string; error: string }> = {
-  zh: { synced: "✓ 已同步", error: "⚠ 同步异常" },
-  en: { synced: "✓ Synced", error: "⚠ Sync error" },
+const SYNC_SUFFIX: Record<
+  ResolvedLang,
+  { synced: string; error: string; syncing: string }
+> = {
+  zh: { synced: "✓ 已同步", error: "⚠ 同步异常", syncing: "…同步中" },
+  en: { synced: "✓ Synced", error: "⚠ Sync error", syncing: "…Syncing" },
 }
 
 /**
@@ -123,18 +126,45 @@ export function updateTrayLanguage(tray: Tray, lang: ResolvedLang, actions: Tray
   tray.setContextMenu(buildMenu(lang, actions))
 }
 
+type SyncStatusDetail = {
+  configured?: boolean
+  syncing?: boolean
+  lastSyncError?: string | null
+  lastSyncAt?: string | null
+}
+
 export function updateTraySyncStatus(
   tray: Tray,
   state: string,
   detail?: unknown,
   lang: ResolvedLang = "zh"
 ): void {
-  const suffix =
+  const d = (detail ?? {}) as SyncStatusDetail
+  // "idle"（30s 轮询）时按 detail 推导真实状态：WalConflict / 云端读取
+  // 被封这类错误在下次成功同步前会一直挂在 lastSyncError 上，托盘
+  // tooltip 必须持续显示异常，而不是只在同步调用失败的那一刻。
+  // "server-exited" 维持无后缀——服务崩溃已有独立弹窗。
+  const effective =
     state === "synced"
+      ? d.lastSyncError
+        ? "error"
+        : "synced"
+      : state === "error" || state === "server-exited"
+        ? state
+        : d.lastSyncError
+          ? "error"
+          : d.syncing
+            ? "syncing"
+            : d.configured && d.lastSyncAt
+              ? "synced"
+              : "idle"
+  const suffix =
+    effective === "synced"
       ? ` ${SYNC_SUFFIX[lang].synced}`
-      : state === "error"
+      : effective === "error"
         ? ` ${SYNC_SUFFIX[lang].error}`
-        : ""
+        : effective === "syncing"
+          ? ` ${SYNC_SUFFIX[lang].syncing}`
+          : ""
   tray.setToolTip(`Zlog${suffix}`)
-  void detail
 }

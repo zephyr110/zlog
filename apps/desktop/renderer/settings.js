@@ -157,6 +157,8 @@ const I18N = {
     "status.rawError": "（原始错误：",
     "status.rawErrorClose": "）",
     "error.invalidState": "本地数据库由纯本地模式创建，无法原地启用同步。请删除用户数据目录中的 zlog.db（先备份）后重启应用",
+    "error.walConflict": "同步冲突（WalConflict）：本地与云端的写入并发撞帧，数据不会丢失。点「立即同步」重试；若持续出现，重启应用即可恢复",
+    "error.readsBlocked": "云端暂时拒绝了读取（reads are blocked）：通常是控制台用量限制，确认恢复后点「立即同步」",
   },
   en: {
     "nav.sync": "Sync",
@@ -305,6 +307,8 @@ const I18N = {
     "status.rawError": " (raw error: ",
     "status.rawErrorClose": ")",
     "error.invalidState": "This local database was created in local-only mode and cannot enable sync in place. Delete zlog.db in the user data folder (back it up first) and restart the app",
+    "error.walConflict": "Sync conflict (WalConflict): concurrent local/cloud writes collided. No data is lost. Click \"Sync Now\" to retry; if it persists, restarting the app clears it",
+    "error.readsBlocked": "Cloud reads are temporarily blocked (usually console usage limits). Click \"Sync Now\" once it recovers",
   },
 }
 let lang = "zh"
@@ -615,6 +619,16 @@ const SYNC_ERROR_HINTS = [
     match: /invalid local state/,
     hint: () => t("error.invalidState"),
   },
+  {
+    // 帧级 WAL 复制冲突（实测于 2026-10）：数据不丢，重试可自愈
+    match: /WalConflict|WAL frame insert conflict/i,
+    hint: () => t("error.walConflict"),
+  },
+  {
+    // Turso 控制台封禁/超限时拉取被拒
+    match: /reads are blocked/i,
+    hint: () => t("error.readsBlocked"),
+  },
 ]
 function renderStatus(s) {
   if (!s) return
@@ -861,6 +875,11 @@ document.getElementById("openBtn2")?.addEventListener("click", () => {
 })
 
 refreshStatus()
+// 面板常开时每 10s 自动刷新同步状态（窗口隐藏时跳过；主进程对托盘
+// tooltip 另有 30s 轮询 + 系统通知）。手动点「立即同步」后本就即时刷新。
+setInterval(() => {
+  if (!document.hidden) refreshStatus()
+}, 10_000)
 
 // ── 一键部署（Go Live 面板） ─────────────────────────────────────────
 // 状态机：idle → validating → project → env → source → upload → building
