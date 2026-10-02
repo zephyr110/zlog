@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Ellipsis, Search, SquarePen, Eye, Globe, FilePen, Trash2, Pin } from "lucide-react"
+import { Download, Ellipsis, Search, SquarePen, Eye, Globe, FilePen, Trash2, Pin } from "lucide-react"
 import { PostsListSkeleton } from "@/components/ui/loading"
 import { HeaderActions } from "@/components/admin/header-actions"
 import { PaginationBar } from "@/components/admin/pagination-bar"
@@ -365,6 +365,16 @@ function AdminPostsContent() {
     <>
     <div className="flex min-h-0 flex-1 flex-col gap-6">
       <HeaderActions>
+        {/* 纯 <a> 直连下载：GET /api/admin/export 带 cookie 即返回 zip，
+            无需客户端 JS 参与（大文件走浏览器原生下载 UI）。 */}
+        <a
+          href="/api/admin/export"
+          title={t("admin.exportSiteHint")}
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm font-medium transition-all hover:bg-muted"
+        >
+          <Download size={16} />
+          {t("admin.exportSite")}
+        </a>
         <Link
           href="/admin/posts/new"
           className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-transparent bg-primary text-primary-foreground text-sm font-medium px-2.5 hover:bg-primary/80 transition-all"
