@@ -1,0 +1,387 @@
+"use client"
+
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Copy, Download, RefreshCw, Share2 } from "lucide-react"
+import { toast } from "sonner"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { useT } from "@/components/layout/trans"
+import {
+  SHARE_BG_POOL,
+  SHARE_SIZE,
+  layoutTitle,
+  pickBackground,
+  shareCardFilename,
+} from "@/lib/share-card"
+
+const { width: W, height: H } = SHARE_SIZE
+
+// 卡片排版常量（画布坐标，1080×1440）
+const MARGIN = 80
+const QR_CONTENT = 200 // 含 4 模块 quiet zone
+const QR_PAD = 16
+const QR_TILE = QR_CONTENT + QR_PAD * 2
+const QR_RADIUS = 24
+const QR_CAPTION_GAP = 44 // 二维码瓦片底部到说明行的距离
+const TITLE_GAP = 48 // 标题区与二维码区的最小水平间距
+const TITLE_MAX_WIDTH = W - MARGIN * 2 - QR_TILE - TITLE_GAP
+const TITLE_BOTTOM = H - MARGIN - QR_CAPTION_GAP
+
+const FONT_STACK =
+  '"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", ui-sans-serif, system-ui, sans-serif'
+
+// 品牌点色与 /api/og 卡的圆点一致
+const ACCENT = "#e9b949"
+
+type QrcodeFactory = (typeNumber: number, level: string) => {
+  addData(data: string): void
+  make(): void
+  getModuleCount(): number
+  isDark(row: number, col: number): boolean
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    // 跨域必需：否则 canvas 被污染，导出会抛 SecurityError
+    img.crossOrigin = "anonymous"
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error(`image load failed: ${src}`))
+    img.src = src
+  })
+}
+
+function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement) {
+  const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight)
+  const dw = img.naturalWidth * scale
+  const dh = img.naturalHeight * scale
+  ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh)
+}
+
+function drawScrim(ctx: CanvasRenderingContext2D) {
+  const top = H * 0.55
+  const scrim = ctx.createLinearGradient(0, top, 0, H)
+  scrim.addColorStop(0, "rgba(0,0,0,0)")
+  scrim.addColorStop(1, "rgba(0,0,0,0.72)")
+  ctx.fillStyle = scrim
+  ctx.fillRect(0, top, W, H - top)
+}
+
+function drawMark(ctx: CanvasRenderingContext2D, siteName: string) {
+  const cy = MARGIN + 18
+  ctx.beginPath()
+  ctx.arc(MARGIN + 10, cy - 6, 10, 0, Math.PI * 2)
+  ctx.fillStyle = ACCENT
+  ctx.fill()
+  ctx.font = `600 36px ${FONT_STACK}`
+  ctx.fillStyle = "#ffffff"
+  ctx.textAlign = "left"
+  ctx.textBaseline = "middle"
+  ctx.fillText(siteName, MARGIN + 34, cy)
+}
+
+function drawTitle(ctx: CanvasRenderingContext2D, title: string) {
+  const measure = (text: string, fontSize: number) => {
+    ctx.font = `700 ${fontSize}px ${FONT_STACK}`
+    return ctx.measureText(text).width
+  }
+  const { fontSize, lines } = layoutTitle(measure, title, TITLE_MAX_WIDTH)
+  if (lines.length === 0) return
+  const lineHeight = Math.round(fontSize * 1.3)
+  const blockHeight = (lines.length - 1) * lineHeight + fontSize
+  ctx.font = `700 ${fontSize}px ${FONT_STACK}`
+  ctx.textAlign = "left"
+  ctx.textBaseline = "alphabetic"
+  ctx.fillStyle = "#ffffff"
+  ctx.shadowColor = "rgba(0,0,0,0.45)"
+  ctx.shadowBlur = 18
+  ctx.shadowOffsetY = 4
+  let y = TITLE_BOTTOM - (blockHeight - fontSize) // 首行基线
+  for (const line of lines) {
+    ctx.fillText(line, MARGIN, y)
+    y += lineHeight
+  }
+  ctx.shadowColor = "transparent"
+  ctx.shadowBlur = 0
+  ctx.shadowOffsetY = 0
+}
+
+function safeHost(url: string): string {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return ""
+  }
+}
+
+function drawQrTile(
+  ctx: CanvasRenderingContext2D,
+  qrCanvas: HTMLCanvasElement | null,
+  url: string,
+  date: string
+) {
+  const x = W - MARGIN - QR_TILE
+  const y = H - MARGIN - QR_CAPTION_GAP - QR_TILE
+  if (qrCanvas) {
+    ctx.beginPath()
+    ctx.roundRect(x, y, QR_TILE, QR_TILE, QR_RADIUS)
+    ctx.fillStyle = "#ffffff"
+    ctx.fill()
+    ctx.drawImage(qrCanvas, x + QR_PAD, y + QR_PAD, QR_CONTENT, QR_CONTENT)
+  }
+  // 说明行（域名 · 日期）：QR 即使缺失也保留，卡片仍指向来源
+  const host = safeHost(url)
+  ctx.font = `500 26px ${FONT_STACK}`
+  ctx.fillStyle = "rgba(255,255,255,0.92)"
+  ctx.textAlign = "right"
+  ctx.textBaseline = "alphabetic"
+  ctx.fillText(host ? `${host} · ${date}` : date, W - MARGIN, H - MARGIN)
+  ctx.textAlign = "left"
+}
+
+/** 生成二维码离屏画布；库加载失败返回 null（卡片隐藏 QR 区继续渲染）。 */
+async function renderQr(
+  url: string,
+  size: number
+): Promise<HTMLCanvasElement | null> {
+  try {
+    // 包的 d.ts 是 UMD `export =`：运行时 default（.mjs）与命名空间两种形态都兜住
+    const mod: unknown = await import("qrcode-generator")
+    const make = ((mod as { default?: unknown }).default ??
+      mod) as QrcodeFactory
+    const qr = make(0, "M") // typeNumber 0 = 自动选版本
+    qr.addData(url)
+    qr.make()
+    const count = qr.getModuleCount()
+    const scale = size / (count + 8) // 四边各 4 模块 quiet zone
+    const canvas = document.createElement("canvas")
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return null
+    ctx.fillStyle = "#ffffff"
+    ctx.fillRect(0, 0, size, size)
+    ctx.fillStyle = "#000000"
+    for (let row = 0; row < count; row++) {
+      for (let col = 0; col < count; col++) {
+        if (!qr.isDark(row, col)) continue
+        ctx.fillRect(
+          (col + 4) * scale,
+          (row + 4) * scale,
+          Math.ceil(scale),
+          Math.ceil(scale)
+        )
+      }
+    }
+    return canvas
+  } catch {
+    return null
+  }
+}
+
+interface ShareCardDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  /** 规范绝对地址（二维码内容） */
+  url: string
+  title: string
+  date: string
+  slug: string
+  siteName: string
+}
+
+export function ShareCardDialog({
+  open,
+  onOpenChange,
+  url,
+  title,
+  date,
+  slug,
+  siteName,
+}: ShareCardDialogProps) {
+  const { t } = useT()
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [bgIndex, setBgIndex] = useState(() => pickBackground(slug))
+  const rerollCount = useRef(0)
+  const [qr, setQr] = useState<HTMLCanvasElement | null>(null)
+  const [busy, setBusy] = useState(false)
+  // 能力探测：组件 ssr:false、点击后才挂载，初始化函数只跑一次即够；
+  // 不支持的浏览器直接不渲染对应按钮
+  const [canCopy] = useState(
+    () => typeof ClipboardItem !== "undefined" && !!navigator.clipboard?.write
+  )
+  const [canShare] = useState(() => {
+    try {
+      const probe = new File([new Uint8Array(1)], "probe.png", {
+        type: "image/png",
+      })
+      return !!navigator.canShare?.({ files: [probe] })
+    } catch {
+      return false
+    }
+  })
+
+  // 二维码只随 url 生成一次（换图不影响二维码）
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    void renderQr(url, QR_CONTENT).then((canvas) => {
+      if (!cancelled) setQr(canvas)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [open, url])
+
+  const drawToken = useRef(0)
+
+  const drawCard = useCallback(
+    async (index: number, qrCanvas: HTMLCanvasElement | null) => {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const ctx = canvas.getContext("2d")
+      if (!ctx) return
+      const token = ++drawToken.current
+      setBusy(true)
+
+      // 品牌色兜底渐变先铺底：底图加载中/失败都不出现空白画布
+      const bg = ctx.createLinearGradient(0, 0, W, H)
+      bg.addColorStop(0, "#1c2333")
+      bg.addColorStop(0.55, "#2b3a67")
+      bg.addColorStop(1, "#131822")
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, W, H)
+
+      try {
+        const img = await loadImage(SHARE_BG_POOL[index])
+        if (token !== drawToken.current) return // 已被更新的绘制取代
+        drawCover(ctx, img)
+      } catch {
+        // 底图失败：保留兜底渐变
+      }
+      if (token !== drawToken.current) return
+
+      drawScrim(ctx)
+      drawMark(ctx, siteName)
+      drawTitle(ctx, title)
+      drawQrTile(ctx, qrCanvas, url, date)
+      setBusy(false)
+    },
+    [siteName, title, url, date]
+  )
+
+  useEffect(() => {
+    if (!open) return
+    void drawCard(bgIndex, qr)
+  }, [open, bgIndex, qr, drawCard])
+
+  function handleReroll() {
+    rerollCount.current += 1
+    setBgIndex((current) =>
+      pickBackground(`${slug}#${rerollCount.current}`, current)
+    )
+  }
+
+  function exportBlob(type: string, quality?: number): Promise<Blob | null> {
+    const canvas = canvasRef.current
+    if (!canvas) return Promise.resolve(null)
+    return new Promise((resolve) =>
+      canvas.toBlob((blob) => resolve(blob), type, quality)
+    )
+  }
+
+  async function handleDownload() {
+    const blob = await exportBlob("image/jpeg", 0.92)
+    if (!blob) {
+      toast.error(t("post.cardExportFailed"))
+      return
+    }
+    const href = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = href
+    a.download = shareCardFilename(slug)
+    a.click()
+    // 立刻 revoke 可能取消下载，延后一拍
+    setTimeout(() => URL.revokeObjectURL(href), 1000)
+  }
+
+  async function handleCopy() {
+    try {
+      const blob = await exportBlob("image/png")
+      if (!blob) throw new Error("toBlob returned null")
+      await navigator.clipboard.write([
+        new ClipboardItem({ "image/png": blob }),
+      ])
+      toast.success(t("post.cardCopied"))
+    } catch {
+      toast.error(t("post.copyFailed"))
+    }
+  }
+
+  async function handleShare() {
+    try {
+      const blob = await exportBlob("image/jpeg", 0.92)
+      if (!blob) throw new Error("toBlob returned null")
+      const file = new File([blob], shareCardFilename(slug), {
+        type: "image/jpeg",
+      })
+      if (!navigator.canShare?.({ files: [file] })) return
+      await navigator.share({ files: [file], title })
+    } catch (err) {
+      // 用户取消系统分享（AbortError）静默；其余给出可重试提示
+      if ((err as Error)?.name !== "AbortError") {
+        toast.error(t("post.cardExportFailed"))
+      }
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[min(24rem,100%)]">
+        <DialogHeader>
+          <DialogTitle>{t("post.shareCard")}</DialogTitle>
+        </DialogHeader>
+        <canvas
+          ref={canvasRef}
+          width={W}
+          height={H}
+          role="img"
+          aria-label={t("post.shareCard")}
+          className="w-full rounded-lg ring-1 ring-foreground/10"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReroll}
+            disabled={busy}
+          >
+            <RefreshCw size={14} />
+            {t("post.cardReroll")}
+          </Button>
+          <Button size="sm" onClick={handleDownload}>
+            <Download size={14} />
+            {t("post.cardDownload")}
+          </Button>
+          {canCopy && (
+            <Button variant="outline" size="sm" onClick={handleCopy}>
+              <Copy size={14} />
+              {t("post.cardCopy")}
+            </Button>
+          )}
+          {canShare && (
+            <Button variant="outline" size="sm" onClick={handleShare}>
+              <Share2 size={14} />
+              {t("post.cardShare")}
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
