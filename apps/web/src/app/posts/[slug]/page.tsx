@@ -9,7 +9,10 @@ import { TagBadge } from "@/components/blog/tag-badge"
 import { ReadingProgress } from "@/components/blog/reading-progress"
 import { FormattedDate } from "@/components/blog/formatted-date"
 import { Container } from "@/components/ui/container"
-import { CopyLinkButton } from "@/components/blog/share-buttons"
+import {
+  CopyLinkButton,
+  ShareCardButton,
+} from "@/components/blog/share-buttons"
 import { CommentSection } from "@/components/blog/comment-section"
 import { HeroGlow } from "@/components/layout/hero-glow"
 import { Trans } from "@/components/layout/trans"
@@ -91,6 +94,9 @@ export default async function PostPage({ params }: PostPageProps) {
   ])
 
   if (!post || post.draft) notFound()
+
+  // 分享卡二维码用规范地址：桌面壳/本地预览下扫出来也指向线上文章
+  const shareUrl = `${site.siteUrl}/posts/${encodeURIComponent(post.slug)}`
 
   // 相关推荐与系列导航共用同一份已发布列表；相关推荐排除同系列
   // （系列成员有自己的上下篇导航，不占推荐位）。
@@ -200,6 +206,13 @@ export default async function PostPage({ params }: PostPageProps) {
 
               {/* Share */}
               <div className="ml-auto flex items-center gap-1">
+                <ShareCardButton
+                  url={shareUrl}
+                  slug={post.slug}
+                  title={post.title}
+                  date={post.date}
+                  siteName={site.name}
+                />
                 <CopyLinkButton url={`/posts/${encodeURIComponent(post.slug)}`} />
               </div>
             </div>
@@ -280,6 +293,13 @@ export default async function PostPage({ params }: PostPageProps) {
                 )}
               </div>
               <div className="flex items-center gap-2 sm:pt-6">
+                <ShareCardButton
+                  url={shareUrl}
+                  slug={post.slug}
+                  title={post.title}
+                  date={post.date}
+                  siteName={site.name}
+                />
                 <CopyLinkButton
                   url={`/posts/${encodeURIComponent(post.slug)}`}
                 />
