@@ -10,6 +10,8 @@ import { PageLoader } from "@/components/ui/page-loader"
 import { useT } from "@/components/layout/trans"
 import { cn } from "@/lib/utils"
 import { Search } from "lucide-react"
+import { IconButton } from "@/components/ui/icon-button"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { type AuthUser } from "@zlog/auth"
 import type { TranslationPath } from "@/lib/i18n"
 
@@ -193,21 +195,31 @@ export default function AdminLayout({
               )}
             </div>
           )}
-          {/* ⌘K 命令面板触发（面板本体在页面底部挂载，全局监听快捷键） */}
-          <button
-            type="button"
-            onClick={() => setPaletteOpen(true)}
-            aria-label={t("admin.commandSearch") as string}
-            className="ml-auto inline-flex h-8 shrink-0 items-center gap-2 rounded-lg border border-border bg-background pl-2.5 pr-2 text-sm text-muted-foreground transition-colors hover:bg-muted"
-          >
-            <Search size={14} />
-            <span className="hidden md:inline">
+          {/* ⌘K 命令面板触发（面板本体在页面底部挂载，全局监听快捷键）。
+              图标按钮而非输入框样式：媒体页顶栏还挂着页面自己的
+              「搜索文件名…」输入框，两个输入框样式的控件并排会互相混淆
+              （与移动端表现一致）；⌘K 提示收进 tooltip。 */}
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <IconButton
+                  size="sm"
+                  bordered
+                  aria-label={t("admin.commandSearch") as string}
+                  onClick={() => setPaletteOpen(true)}
+                  className="ml-auto rounded-lg border-border bg-background"
+                >
+                  <Search size={14} />
+                </IconButton>
+              }
+            />
+            <TooltipContent>
               {t("admin.commandSearch") as string}
-            </span>
-            <kbd className="hidden rounded border border-border bg-muted/60 px-1.5 font-sans text-[10px] leading-5 md:inline">
-              ⌘K
-            </kbd>
-          </button>
+              <kbd className="ml-1.5 rounded border border-border bg-muted/60 px-1 font-sans text-[10px] leading-4">
+                ⌘K
+              </kbd>
+            </TooltipContent>
+          </Tooltip>
           {/* Page primary actions portaled in via <HeaderActions /> */}
           <div
             id="admin-header-actions"
