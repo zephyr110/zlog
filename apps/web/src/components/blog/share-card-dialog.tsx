@@ -41,6 +41,12 @@ const TITLE_BOTTOM = H - MARGIN - QR_TILE - TITLE_GAP
 const FONT_STACK =
   '"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", ui-sans-serif, system-ui, sans-serif'
 
+// 叠卡：底卡顺时针旋转角（度），第二张取两倍形成扇形叠放。基准角写成
+// transform（而非 Tailwind 的 rotate-* —— v4 会编译成独立的 rotate
+// 属性），动画关键帧用同一常量，否则 transform 动画会叠在 rotate 属性
+// 上，起止瞬间跳变。
+const STACK_ANGLE = 2.5
+
 type QrcodeFactory = (typeNumber: number, level: string) => {
   addData(data: string): void
   make(): void
@@ -201,6 +207,8 @@ export function ShareCardDialog({
 }: ShareCardDialogProps) {
   const { t } = useT()
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const backRef = useRef<HTMLDivElement | null>(null)
+  const back2Ref = useRef<HTMLDivElement | null>(null)
   const [bgIndex, setBgIndex] = useState(() => pickBackground(slug))
   const rerollCount = useRef(0)
   const [qr, setQr] = useState<HTMLCanvasElement | null>(null)
@@ -274,11 +282,52 @@ export function ShareCardDialog({
     void drawCard(bgIndex, qr)
   }, [open, bgIndex, qr, drawCard])
 
+  /** 换一张的洗牌动效：顶卡反向轻甩回弹，底卡顺势多转一点再归位，
+      像从一叠照片里抽换最上面那张（两层底卡摆幅相同、基准角不同）。
+      reduced-motion 下不动；连点时先取消上一轮，避免动画叠加打架。 */
+  function playShuffle() {
+    const top = canvasRef.current
+    const back = backRef.current
+    const back2 = back2Ref.current
+    if (!top || !back || !back2) return
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+    for (const el of [top, back, back2]) {
+      el.getAnimations().forEach((animation) => animation.cancel())
+    }
+    const spring = "cubic-bezier(0.34, 1.4, 0.64, 1)"
+    const options = { duration: 620, easing: spring }
+    top.animate(
+      [
+        { transform: "rotate(0deg) scale(1)" },
+        { transform: "rotate(-2.4deg) scale(0.985)", offset: 0.38 },
+        { transform: "rotate(0.7deg) scale(1.004)", offset: 0.74 },
+        { transform: "rotate(0deg) scale(1)" },
+      ],
+      options
+    )
+    const swing = (el: HTMLDivElement, base: number) =>
+      el.animate(
+        [
+          { transform: `rotate(${base}deg)` },
+          {
+            transform: `rotate(${base + 2.3}deg) translateY(3px)`,
+            offset: 0.38,
+          },
+          { transform: `rotate(${base - 0.3}deg)`, offset: 0.74 },
+          { transform: `rotate(${base}deg)` },
+        ],
+        options
+      )
+    swing(back, STACK_ANGLE)
+    swing(back2, STACK_ANGLE * 2)
+  }
+
   function handleReroll() {
     rerollCount.current += 1
     setBgIndex((current) =>
       pickBackground(`${slug}#${rerollCount.current}`, current)
     )
+    playShuffle()
   }
 
   function exportBlob(type: string, quality?: number): Promise<Blob | null> {
@@ -336,21 +385,43 @@ export function ShareCardDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[min(32rem,100%)]">
+      <DialogContent className="max-w-[min(36rem,100%)] gap-6 p-5">
         <DialogHeader>
           <DialogTitle>{t("post.shareCard")}</DialogTitle>
         </DialogHeader>
-        {/* 32rem：中文四按钮一行有余，英文（Download image 等长标签）
-            也放得下同一行；画布按比例缩放进两个上限（55vh 高 / 容器
-            宽），矮视口下自动退让并居中 */}
-        <canvas
-          ref={canvasRef}
-          width={W}
-          height={H}
-          role="img"
-          aria-label={t("post.shareCard")}
-          className="mx-auto block max-h-[55vh] max-w-full rounded-lg ring-1 ring-foreground/10"
-        />
+        {/* 叠卡效果：两张灰色底卡顺时针递进微旋（2.5°/5°），从顶卡角上
+            露出，像一叠照片。三层同一网格格位叠放，尺寸由 canvas 决定
+            （底卡 h-full/w-full 跟随），底卡只是视觉，不参与导出。
+            画布要 relative z-10：底卡带 transform（非定位元素会因此进入
+            定位层绘制），否则静止时会盖住画布——只有动画期间画布自带
+            transform 才反超。
+            36rem：旋转后的底卡 bbox 比画布宽约 46px，32rem 下两侧只剩
+            22px 显得挤；加宽后左右各留约 42px。gap-6/p-5：底卡角在
+            上下各外扩约 17px，留出余量才不会挤到标题和按钮行——四按钮
+            （含英文长标签）一行也放得下。画布按比例缩进两个上限
+            （55vh 高 / 容器宽），矮视口下自动退让并居中 */}
+        <div className="relative mx-auto grid max-w-full place-items-center">
+          <div
+            ref={back2Ref}
+            aria-hidden="true"
+            style={{ transform: `rotate(${STACK_ANGLE * 2}deg)` }}
+            className="col-start-1 row-start-1 h-full w-full rounded-lg bg-muted ring-1 ring-foreground/5"
+          />
+          <div
+            ref={backRef}
+            aria-hidden="true"
+            style={{ transform: `rotate(${STACK_ANGLE}deg)` }}
+            className="col-start-1 row-start-1 h-full w-full rounded-lg bg-muted ring-1 ring-foreground/5"
+          />
+          <canvas
+            ref={canvasRef}
+            width={W}
+            height={H}
+            role="img"
+            aria-label={t("post.shareCard")}
+            className="relative z-10 col-start-1 row-start-1 block max-h-[55vh] max-w-full rounded-lg ring-1 ring-foreground/10"
+          />
+        </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <Button
             variant="outline"
@@ -358,7 +429,10 @@ export function ShareCardDialog({
             onClick={handleReroll}
             disabled={busy}
           >
-            <RefreshCw size={14} />
+            <RefreshCw
+              size={14}
+              className={busy ? "animate-spin motion-reduce:animate-none" : undefined}
+            />
             {t("post.cardReroll")}
           </Button>
           <Button size="sm" onClick={handleDownload}>
