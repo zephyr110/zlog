@@ -211,7 +211,6 @@ export default async function PostPage({ params }: PostPageProps) {
                   slug={post.slug}
                   title={post.title}
                   date={post.date}
-                  siteName={site.name}
                 />
                 <CopyLinkButton url={`/posts/${encodeURIComponent(post.slug)}`} />
               </div>
@@ -298,7 +297,6 @@ export default async function PostPage({ params }: PostPageProps) {
                   slug={post.slug}
                   title={post.title}
                   date={post.date}
-                  siteName={site.name}
                 />
                 <CopyLinkButton
                   url={`/posts/${encodeURIComponent(post.slug)}`}

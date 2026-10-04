@@ -56,14 +56,12 @@ export function ShareCardButton({
   slug,
   title,
   date,
-  siteName,
 }: {
   /** 规范绝对地址（用于二维码，桌面壳内 window.location.origin 不可扫） */
   url: string
   slug: string
   title: string
   date: string
-  siteName: string
 }) {
   const { t } = useT()
   const [open, setOpen] = useState(false)
@@ -93,7 +91,6 @@ export function ShareCardButton({
           slug={slug}
           title={title}
           date={date}
-          siteName={siteName}
         />
       )}
     </>

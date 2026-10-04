@@ -21,22 +21,20 @@ import {
 
 const { width: W, height: H } = SHARE_SIZE
 
-// 卡片排版常量（画布坐标，1080×1440）
+// 卡片排版常量（画布坐标，1080×1440）。
+// 底部两行布局：第一行标题（整宽），第二行二维码与「域名 · 日期」并排两列，
+// 二维码守右下角。白边尽量小：quiet zone 2 模块 + 8px 瓦片内边距。
 const MARGIN = 80
-const QR_CONTENT = 200 // 含 4 模块 quiet zone
-const QR_PAD = 16
+const QR_CONTENT = 200 // 内容区（含 2 模块 quiet zone）
+const QR_PAD = 8
 const QR_TILE = QR_CONTENT + QR_PAD * 2
-const QR_RADIUS = 24
-const QR_CAPTION_GAP = 44 // 二维码瓦片底部到说明行的距离
-const TITLE_GAP = 48 // 标题区与二维码区的最小水平间距
-const TITLE_MAX_WIDTH = W - MARGIN * 2 - QR_TILE - TITLE_GAP
-const TITLE_BOTTOM = H - MARGIN - QR_CAPTION_GAP
+const QR_RADIUS = 20
+const TITLE_GAP = 40 // 标题块与二维码行之间的垂直间距
+const TITLE_MAX_WIDTH = W - MARGIN * 2
+const TITLE_BOTTOM = H - MARGIN - QR_TILE - TITLE_GAP
 
 const FONT_STACK =
   '"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", ui-sans-serif, system-ui, sans-serif'
-
-// 品牌点色与 /api/og 卡的圆点一致
-const ACCENT = "#e9b949"
 
 type QrcodeFactory = (typeNumber: number, level: string) => {
   addData(data: string): void
@@ -70,19 +68,6 @@ function drawScrim(ctx: CanvasRenderingContext2D) {
   scrim.addColorStop(1, "rgba(0,0,0,0.72)")
   ctx.fillStyle = scrim
   ctx.fillRect(0, top, W, H - top)
-}
-
-function drawMark(ctx: CanvasRenderingContext2D, siteName: string) {
-  const cy = MARGIN + 18
-  ctx.beginPath()
-  ctx.arc(MARGIN + 10, cy - 6, 10, 0, Math.PI * 2)
-  ctx.fillStyle = ACCENT
-  ctx.fill()
-  ctx.font = `600 36px ${FONT_STACK}`
-  ctx.fillStyle = "#ffffff"
-  ctx.textAlign = "left"
-  ctx.textBaseline = "middle"
-  ctx.fillText(siteName, MARGIN + 34, cy)
 }
 
 function drawTitle(ctx: CanvasRenderingContext2D, title: string) {
@@ -126,7 +111,7 @@ function drawQrTile(
   date: string
 ) {
   const x = W - MARGIN - QR_TILE
-  const y = H - MARGIN - QR_CAPTION_GAP - QR_TILE
+  const y = H - MARGIN - QR_TILE
   if (qrCanvas) {
     ctx.beginPath()
     ctx.roundRect(x, y, QR_TILE, QR_TILE, QR_RADIUS)
@@ -134,14 +119,16 @@ function drawQrTile(
     ctx.fill()
     ctx.drawImage(qrCanvas, x + QR_PAD, y + QR_PAD, QR_CONTENT, QR_CONTENT)
   }
-  // 说明行（域名 · 日期）：QR 即使缺失也保留，卡片仍指向来源
+  // 「域名 · 日期」与二维码并排两列：右对齐到瓦片左缘、垂直居中；
+  // QR 即使缺失也保留，卡片仍指向来源
   const host = safeHost(url)
-  ctx.font = `500 26px ${FONT_STACK}`
+  ctx.font = `500 28px ${FONT_STACK}`
   ctx.fillStyle = "rgba(255,255,255,0.92)"
   ctx.textAlign = "right"
-  ctx.textBaseline = "alphabetic"
-  ctx.fillText(host ? `${host} · ${date}` : date, W - MARGIN, H - MARGIN)
+  ctx.textBaseline = "middle"
+  ctx.fillText(host ? `${host} · ${date}` : date, x - 32, y + QR_TILE / 2)
   ctx.textAlign = "left"
+  ctx.textBaseline = "alphabetic"
 }
 
 /** 生成二维码离屏画布；库加载失败返回 null（卡片隐藏 QR 区继续渲染）。 */
@@ -158,7 +145,9 @@ async function renderQr(
     qr.addData(url)
     qr.make()
     const count = qr.getModuleCount()
-    const scale = size / (count + 8) // 四边各 4 模块 quiet zone
+    // 四边各 2 模块 quiet zone（低于规范的 4，靠瓦片白底补足对比，
+    // 让白边尽量小；模块本身也更大更清晰）
+    const scale = size / (count + 4)
     const canvas = document.createElement("canvas")
     canvas.width = size
     canvas.height = size
@@ -171,8 +160,8 @@ async function renderQr(
       for (let col = 0; col < count; col++) {
         if (!qr.isDark(row, col)) continue
         ctx.fillRect(
-          (col + 4) * scale,
-          (row + 4) * scale,
+          (col + 2) * scale,
+          (row + 2) * scale,
           Math.ceil(scale),
           Math.ceil(scale)
         )
@@ -192,7 +181,6 @@ interface ShareCardDialogProps {
   title: string
   date: string
   slug: string
-  siteName: string
 }
 
 export function ShareCardDialog({
@@ -202,7 +190,6 @@ export function ShareCardDialog({
   title,
   date,
   slug,
-  siteName,
 }: ShareCardDialogProps) {
   const { t } = useT()
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -267,12 +254,11 @@ export function ShareCardDialog({
       if (token !== drawToken.current) return
 
       drawScrim(ctx)
-      drawMark(ctx, siteName)
       drawTitle(ctx, title)
       drawQrTile(ctx, qrCanvas, url, date)
       setBusy(false)
     },
-    [siteName, title, url, date]
+    [title, url, date]
   )
 
   useEffect(() => {
@@ -342,19 +328,21 @@ export function ShareCardDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[min(24rem,100%)]">
+      <DialogContent className="max-w-[min(28rem,100%)]">
         <DialogHeader>
           <DialogTitle>{t("post.shareCard")}</DialogTitle>
         </DialogHeader>
+        {/* 加宽对话框让四个操作按钮排成一行；画布按比例缩放进两个上限
+            （55vh 高 / 容器宽），矮视口下自动退让并居中 */}
         <canvas
           ref={canvasRef}
           width={W}
           height={H}
           role="img"
           aria-label={t("post.shareCard")}
-          className="w-full rounded-lg ring-1 ring-foreground/10"
+          className="mx-auto block max-h-[55vh] max-w-full rounded-lg ring-1 ring-foreground/10"
         />
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Button
             variant="outline"
             size="sm"
