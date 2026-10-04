@@ -385,7 +385,7 @@ export function ShareCardDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[min(36rem,100%)] gap-6 p-5">
+      <DialogContent className="max-w-[min(40rem,100%)] gap-8 p-5">
         <DialogHeader>
           <DialogTitle>{t("post.shareCard")}</DialogTitle>
         </DialogHeader>
@@ -395,12 +395,14 @@ export function ShareCardDialog({
             画布要 relative z-10：底卡带 transform（非定位元素会因此进入
             定位层绘制），否则静止时会盖住画布——只有动画期间画布自带
             transform 才反超。
-            36rem：旋转后的底卡 bbox 比画布宽约 46px，32rem 下两侧只剩
-            22px 显得挤；加宽后左右各留约 42px。gap-6/p-5：底卡角在
-            上下各外扩约 17px，留出余量才不会挤到标题和按钮行——四按钮
-            （含英文长标签）一行也放得下。画布按比例缩进两个上限
-            （55vh 高 / 容器宽），矮视口下自动退让并居中 */}
-        <div className="relative mx-auto grid max-w-full place-items-center">
+            px-8：5° 底卡的 bbox 比画布宽约 11%，高视口下画布被宽度卡满
+            内容区时，扇形角会越出 dialog 边缘（实测 1440×1400 左右各
+            10px），容器留出边距才能把整叠框进内容区。
+            40rem + gap-8 + p-5：加宽给扇形和四按钮（含英文长标签）留余
+            量；底卡角在上下各外扩约 5% 画布宽，两个 gap-8 保证不挤到
+            标题与按钮行。画布按比例缩进两个上限（55vh 高 / 容器宽），
+            矮视口下自动退让并居中 */}
+        <div className="relative mx-auto grid max-w-full place-items-center px-8">
           <div
             ref={back2Ref}
             aria-hidden="true"
