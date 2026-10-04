@@ -5,7 +5,7 @@ A new share-row button on public post pages opens a dialog that renders a 1080×
 ## Goals
 
 - Post page share row (top and bottom) gains a "share card" icon button beside the existing copy-link button.
-- Card composition: curated free photo cover-cropped to the frame → dark bottom scrim → site mark top-left (accent dot + site name, echoing the existing OG card) → title, greedy-wrapped up to 3 lines with a font-size ladder, "…" beyond → white rounded QR tile (with quiet zone) bottom-right + domain · date.
+- Card composition: curated free photo cover-cropped to the frame → dark bottom scrim → two-line footer — title (full width, greedy-wrapped up to 3 lines with a font-size ladder, "…" beyond) above a row of white rounded QR tile (bottom-right) with domain · date as its left column.
 - Works on the static export (GitHub Pages): no route handler, no server — all client-side canvas. (The `/api/og/[slug]` satori pipeline cannot serve this: the public reading surface is the export, where route handlers are stashed.)
 - Background is stable by default: seeded from the post slug, so every reader sharing the same post gets the same image; a reroll button draws a different one.
 - Actions: download JPEG (photo-backed PNG would be 3 MB+), copy image as PNG (`ClipboardItem`), native share with the file (`navigator.canShare({files})`).
@@ -32,7 +32,7 @@ Canvas pipeline in a dialog, client-only. Chosen over a satori route because the
 |--------|------|
 | `SHARE_SIZE` | `{ width: 1080, height: 1440 }` |
 | `pickBackground(seed, excludeIndex?)` | FNV-1a hash of the slug → pool index; reroll passes the current index to draw a different one |
-| `layoutTitle(measureText, text, maxWidth, maxLines)` | Tries the ladder 96/84/72/60 px, greedy-wraps with real text widths, returns `{ fontSize, lines }`; ellipsis on overflow |
+| `layoutTitle(measureText, text, maxWidth, maxLines)` | Tries the ladder 96/84/72/60 px, wraps with real text widths, then balances adjacent lines (no orphan last line), returns `{ fontSize, lines }`; over-wide words hard-break per character; ellipsis on overflow |
 | `shareCardFilename(slug)` | `zlog-<slug>.jpg` |
 
 `measureText` is injected (canvas `ctx.measureText` in production, a CJK=1em/latin=0.5em fake in tests) so the layout logic is unit-testable without a canvas.
@@ -43,10 +43,9 @@ Pipeline per open / reroll:
 
 1. `loadImage(poolUrl, { crossOrigin: "anonymous" })`; on error → brand gradient fill.
 2. Draw cover-cropped image → bottom scrim (transparent → `rgba(0,0,0,.72)`, bottom ~45%).
-3. Site mark: accent dot + site name, white.
-4. Title via `layoutTitle`, white, up to 3 lines.
-5. QR: `await import("qrcode-generator")` (tiny MIT encoder, no runtime deps — loaded only when the dialog opens, never in the main bundle) → module matrix → draw onto an offscreen canvas → composite a white rounded tile (4-module quiet zone) + `domain · date` caption.
-6. Preview is the live canvas, CSS-scaled to the dialog width; action row below.
+3. Title via `layoutTitle`, white, up to 3 lines, full content width.
+4. QR: `await import("qrcode-generator")` (tiny MIT encoder, no runtime deps — loaded only when the dialog opens, never in the main bundle) → module matrix → draw onto an offscreen canvas (2-module quiet zone, so the white margin stays minimal) → composite a white rounded tile (8 px padding) bottom-right, with `domain · date` right-aligned to the tile's left edge and vertically centered.
+5. Preview is the live canvas, scaled into the 28 rem dialog (55 vh height cap); action row below, four buttons on one line.
 
 Actions:
 
@@ -89,3 +88,9 @@ Post page (server) → `<ShareCardButton url={siteUrl + "/posts/<slug>"} title d
 | `apps/web/test/share-card.test.ts` | New unit tests |
 
 No DB, API, or export-chain changes.
+
+## Revision — 2026-10-04
+
+Post-launch feedback (v2): the site mark (dot + site name) is removed from the card; the footer becomes two lines (title, then QR + domain · date side by side); the QR quiet zone shrinks 4 → 2 modules and tile padding 16 → 8 px; the dialog widens 24 → 28 rem so all four actions fit one row. `siteName` dropped from the component chain accordingly.
+
+Oversized-title pass (v2.1): wrapping gains adjacent-line balancing — after the greedy wrap, tokens move between neighboring lines while that strictly narrows their width difference (and the receiver stays within the line), which removes orphan last lines (a 13-char CJK title at 96 px used to wrap 6/6/1, now 5/4/4). Tokens wider than the line itself (long words/URLs) hard-break per character instead of overflowing the canvas. Both behaviors are unit-tested with the fake measure.

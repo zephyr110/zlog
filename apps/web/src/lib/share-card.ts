@@ -72,26 +72,96 @@ function tokenize(text: string): string[] {
 
 const isSpace = (token: string) => /^\s+$/.test(token)
 
+/** 贪心换行（token 级）。比整行还长的 token（长单词/URL）按字符硬断，
+ *  避免整行溢出画布。 */
+function wrapTokens(
+  measure: Measure,
+  tokens: string[],
+  fontSize: number,
+  maxWidth: number
+): string[][] {
+  // 超宽 token 先展开成单字符，让贪心自然逐字符断
+  const expanded: string[] = []
+  for (const token of tokens) {
+    if (measure(token, fontSize) <= maxWidth) {
+      expanded.push(token)
+      continue
+    }
+    for (const ch of token) expanded.push(ch)
+  }
+
+  const lines: string[][] = []
+  let line: string[] = []
+  for (const token of expanded) {
+    if (isSpace(token) && line.length === 0) continue // 行首空白丢弃
+    if (line.length > 0 && measure(line.join("") + token, fontSize) > maxWidth) {
+      lines.push(line)
+      line = isSpace(token) ? [] : [token]
+    } else {
+      line.push(token)
+    }
+  }
+  if (line.length > 0) lines.push(line)
+  return lines
+}
+
+function lineWidth(measure: Measure, line: string[], fontSize: number): number {
+  return measure(line.join(""), fontSize)
+}
+
+/** 相邻行搬 token 的爬山式平衡：消除末行孤字、让各行长短接近
+ *  （标题超长时观感的关键）。搬运仅在"两行宽度差变小且下一行不超宽"
+ *  时发生，行数不变。 */
+function balanceLines(
+  measure: Measure,
+  lines: string[][],
+  fontSize: number,
+  maxWidth: number
+): string[][] {
+  if (lines.length < 2) return lines
+  for (const line of lines) {
+    while (line.length > 1 && isSpace(line[line.length - 1])) line.pop() // 行尾空白不参与搬运
+  }
+  let improved = true
+  while (improved) {
+    improved = false
+    for (let i = 0; i < lines.length - 1; i++) {
+      const cur = lines[i]
+      const next = lines[i + 1]
+      if (cur.length <= 1) continue
+      const last = cur[cur.length - 1]
+      const curRest = cur.slice(0, -1)
+      const nextWith = [last, ...next]
+      const nextWidth = lineWidth(measure, nextWith, fontSize)
+      if (nextWidth > maxWidth) continue
+      const before = Math.abs(
+        lineWidth(measure, cur, fontSize) - lineWidth(measure, next, fontSize)
+      )
+      const after = Math.abs(
+        lineWidth(measure, curRest, fontSize) - nextWidth
+      )
+      if (after < before) {
+        lines[i] = curRest
+        lines[i + 1] = nextWith
+        improved = true
+      }
+    }
+  }
+  return lines
+}
+
 function wrapOnce(
   measure: Measure,
   tokens: string[],
   fontSize: number,
   maxWidth: number
 ): string[] {
-  const lines: string[] = []
-  let line = ""
-  for (const token of tokens) {
-    if (isSpace(token) && line === "") continue // 行首空白丢弃
-    const next = line + token
-    if (line !== "" && measure(next, fontSize) > maxWidth) {
-      lines.push(line.trimEnd())
-      line = isSpace(token) ? "" : token
-    } else {
-      line = next
-    }
-  }
-  if (line.trim() !== "") lines.push(line.trimEnd())
-  return lines
+  return balanceLines(
+    measure,
+    wrapTokens(measure, tokens, fontSize, maxWidth),
+    fontSize,
+    maxWidth
+  ).map((line) => line.join("").trimEnd())
 }
 
 /** 标题排版：先按阶梯找放得下的字号；最小号仍超行数时截断加省略号。 */

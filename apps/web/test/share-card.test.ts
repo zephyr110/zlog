@@ -90,6 +90,27 @@ describe("layoutTitle", () => {
     expect(layout.lines[2].endsWith("…")).toBe(true)
   })
 
+  it("balances lines so a 3-line CJK title never ends in an orphan word", () => {
+    // 13 字：96px 贪心为 6/6/1（末行孤字）→ 平衡后 5/4/4
+    const layout = layoutTitle(fakeMeasure, "一二三四五六七八九十一二三", 640)
+    expect(layout.fontSize).toBe(96)
+    expect(layout.lines).toEqual(["一二三四五", "六七八九", "十一二三"])
+  })
+
+  it("hard-breaks a word wider than the line so nothing overflows", () => {
+    const layout = layoutTitle(
+      fakeMeasure,
+      "supercalifragilisticexpialidocious",
+      200
+    )
+    expect(layout.fontSize).toBe(60)
+    expect(layout.lines).toHaveLength(3)
+    expect(layout.lines[2].endsWith("…")).toBe(true)
+    for (const line of layout.lines) {
+      expect(fakeMeasure(line, layout.fontSize)).toBeLessThanOrEqual(200)
+    }
+  })
+
   it("returns no lines for an empty title", () => {
     expect(layoutTitle(fakeMeasure, "   ", 640)).toEqual({
       fontSize: 96,
