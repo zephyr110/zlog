@@ -22,14 +22,19 @@ import {
 const { width: W, height: H } = SHARE_SIZE
 
 // 卡片排版常量（画布坐标，1080×1440）。
-// 底部两行布局：第一行标题（整宽），第二行二维码与「域名 · 日期」并排两列，
-// 二维码守右下角。白边尽量小：quiet zone 2 模块 + 8px 瓦片内边距。
+// 页脚两行：第一行标题（贴左，整宽）；第二行二维码贴左（与标题同左缘），
+// 「日期（上）/ 域名（下）」紧贴二维码右侧、左对齐，并垂直居中于二维码
+// ——标题与二维码共享一条左版心线，页脚收成一个信息组。
+// 白边尽量小：quiet zone 2 模块 + 8px 瓦片内边距。
 const MARGIN = 80
 const QR_CONTENT = 200 // 内容区（含 2 模块 quiet zone）
 const QR_PAD = 8
 const QR_TILE = QR_CONTENT + QR_PAD * 2
 const QR_RADIUS = 20
 const TITLE_GAP = 40 // 标题块与二维码行之间的垂直间距
+const CAPTION_SIZE = 28 // 页脚文字字号
+const CAPTION_LINE_GAP = 40 // 日期与域名两行间距
+const CAPTION_QR_GAP = 40 // 二维码与文字块的横向间隙
 const TITLE_MAX_WIDTH = W - MARGIN * 2
 const TITLE_BOTTOM = H - MARGIN - QR_TILE - TITLE_GAP
 
@@ -110,24 +115,27 @@ function drawQrTile(
   url: string,
   date: string
 ) {
-  const x = W - MARGIN - QR_TILE
+  // 页脚第二行：二维码贴左边距（与标题同左缘）；「日期（上）/ 域名（下）」
+  // 两行文字紧贴二维码右侧、共享左缘，并垂直居中于二维码——标题与二维码
+  // 连成一条左版心线，页脚收成一个信息组。
+  // QR 即使缺失也保留文字，卡片仍指向来源。
+  const host = safeHost(url)
   const y = H - MARGIN - QR_TILE
   if (qrCanvas) {
     ctx.beginPath()
-    ctx.roundRect(x, y, QR_TILE, QR_TILE, QR_RADIUS)
+    ctx.roundRect(MARGIN, y, QR_TILE, QR_TILE, QR_RADIUS)
     ctx.fillStyle = "#ffffff"
     ctx.fill()
-    ctx.drawImage(qrCanvas, x + QR_PAD, y + QR_PAD, QR_CONTENT, QR_CONTENT)
+    ctx.drawImage(qrCanvas, MARGIN + QR_PAD, y + QR_PAD, QR_CONTENT, QR_CONTENT)
   }
-  // 「域名 · 日期」与二维码并排两列：右对齐到瓦片左缘、垂直居中；
-  // QR 即使缺失也保留，卡片仍指向来源
-  const host = safeHost(url)
-  ctx.font = `500 28px ${FONT_STACK}`
+  ctx.font = `500 ${CAPTION_SIZE}px ${FONT_STACK}`
+  const textX = MARGIN + QR_TILE + CAPTION_QR_GAP
+  const midY = y + QR_TILE / 2 // 二维码中线：两行文字对称跨骑
   ctx.fillStyle = "rgba(255,255,255,0.92)"
-  ctx.textAlign = "right"
-  ctx.textBaseline = "middle"
-  ctx.fillText(host ? `${host} · ${date}` : date, x - 32, y + QR_TILE / 2)
   ctx.textAlign = "left"
+  ctx.textBaseline = "middle"
+  ctx.fillText(date, textX, midY - CAPTION_LINE_GAP / 2)
+  if (host) ctx.fillText(host, textX, midY + CAPTION_LINE_GAP / 2)
   ctx.textBaseline = "alphabetic"
 }
 
@@ -328,12 +336,13 @@ export function ShareCardDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[min(28rem,100%)]">
+      <DialogContent className="max-w-[min(32rem,100%)]">
         <DialogHeader>
           <DialogTitle>{t("post.shareCard")}</DialogTitle>
         </DialogHeader>
-        {/* 加宽对话框让四个操作按钮排成一行；画布按比例缩放进两个上限
-            （55vh 高 / 容器宽），矮视口下自动退让并居中 */}
+        {/* 32rem：中文四按钮一行有余，英文（Download image 等长标签）
+            也放得下同一行；画布按比例缩放进两个上限（55vh 高 / 容器
+            宽），矮视口下自动退让并居中 */}
         <canvas
           ref={canvasRef}
           width={W}

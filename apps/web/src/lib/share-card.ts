@@ -128,6 +128,9 @@ function balanceLines(
     for (let i = 0; i < lines.length - 1; i++) {
       const cur = lines[i]
       const next = lines[i + 1]
+      // 每轮先清行尾空白：上一轮搬运可能刚暴露出行尾空白，
+      // 不清掉它下一轮就会被搬到下一行行首（标题行首冒出空格）
+      while (cur.length > 1 && isSpace(cur[cur.length - 1])) cur.pop()
       if (cur.length <= 1) continue
       const last = cur[cur.length - 1]
       const curRest = cur.slice(0, -1)

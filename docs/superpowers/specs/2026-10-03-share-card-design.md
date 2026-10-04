@@ -5,7 +5,7 @@ A new share-row button on public post pages opens a dialog that renders a 1080×
 ## Goals
 
 - Post page share row (top and bottom) gains a "share card" icon button beside the existing copy-link button.
-- Card composition: curated free photo cover-cropped to the frame → dark bottom scrim → two-line footer — title (full width, greedy-wrapped up to 3 lines with a font-size ladder, "…" beyond) above a row of white rounded QR tile (bottom-right) with domain · date as its left column.
+- Card composition: curated free photo cover-cropped to the frame → dark bottom scrim → footer of two rows — title (left-aligned, full width, wrapped up to 3 lines with a font-size ladder and adjacent-line balancing, "…" beyond); below it the white rounded QR tile at the left margin (sharing the title's left edge), with the caption (date on top, domain below, one left edge) tucked 40 px to the tile's right and vertically centered on it — title and tile share a single left axis.
 - Works on the static export (GitHub Pages): no route handler, no server — all client-side canvas. (The `/api/og/[slug]` satori pipeline cannot serve this: the public reading surface is the export, where route handlers are stashed.)
 - Background is stable by default: seeded from the post slug, so every reader sharing the same post gets the same image; a reroll button draws a different one.
 - Actions: download JPEG (photo-backed PNG would be 3 MB+), copy image as PNG (`ClipboardItem`), native share with the file (`navigator.canShare({files})`).
@@ -45,7 +45,7 @@ Pipeline per open / reroll:
 2. Draw cover-cropped image → bottom scrim (transparent → `rgba(0,0,0,.72)`, bottom ~45%).
 3. Title via `layoutTitle`, white, up to 3 lines, full content width.
 4. QR: `await import("qrcode-generator")` (tiny MIT encoder, no runtime deps — loaded only when the dialog opens, never in the main bundle) → module matrix → draw onto an offscreen canvas (2-module quiet zone, so the white margin stays minimal) → composite a white rounded tile (8 px padding) bottom-right, with `domain · date` right-aligned to the tile's left edge and vertically centered.
-5. Preview is the live canvas, scaled into the 28 rem dialog (55 vh height cap); action row below, four buttons on one line.
+5. Preview is the live canvas, scaled into the 32 rem dialog (55 vh height cap); action row below, four buttons on one line.
 
 Actions:
 
@@ -93,4 +93,6 @@ No DB, API, or export-chain changes.
 
 Post-launch feedback (v2): the site mark (dot + site name) is removed from the card; the footer becomes two lines (title, then QR + domain · date side by side); the QR quiet zone shrinks 4 → 2 modules and tile padding 16 → 8 px; the dialog widens 24 → 28 rem so all four actions fit one row. `siteName` dropped from the component chain accordingly.
 
-Oversized-title pass (v2.1): wrapping gains adjacent-line balancing — after the greedy wrap, tokens move between neighboring lines while that strictly narrows their width difference (and the receiver stays within the line), which removes orphan last lines (a 13-char CJK title at 96 px used to wrap 6/6/1, now 5/4/4). Tokens wider than the line itself (long words/URLs) hard-break per character instead of overflowing the canvas. Both behaviors are unit-tested with the fake measure.
+Oversized-title pass (v2.1): wrapping gains adjacent-line balancing — after the greedy wrap, tokens move between neighboring lines while that strictly narrows their width difference (and the receiver stays within the line), which removes orphan last lines (a 13-char CJK title at 96 px used to wrap 6/6/1, now 5/4/4). Tokens wider than the line itself (long words/URLs) hard-break per character instead of overflowing the canvas. A space exposed at a line's end by a balancing move is re-trimmed before the next move, so a line never starts with a stray space. All three behaviors are unit-tested with the fake measure.
+
+Footer pass (v2.2): the footer's second row becomes one grouped block — the QR tile keeps the left margin (sharing the title's left edge) and the caption (date above domain, one left edge) tucks 40 px to its right, vertically centered on the tile (40 px between the two caption lines, matching the title rhythm). Earlier in the pass the caption was tried right-aligned in the corner, then bottom-aligned with the tile against the right margin; both split the footer into two far-apart elements across ~400 px of dead space, so the grouped left-axis version won. The dialog widens 28 → 32 rem so the four action buttons stay on one row in English too ("Download image" / "Copy image" are ~40 px longer than their Chinese labels).

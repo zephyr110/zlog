@@ -111,6 +111,13 @@ describe("layoutTitle", () => {
     }
   })
 
+  it("never moves an exposed trailing space onto the next line's start", () => {
+    // 4em@96px：贪心得 [甲乙 丙…] / [丁]；搬走「丙」后行尾露出空格，
+    // 修复前下一轮会把空格搬到第二行行首（" 丙丁"）
+    const layout = layoutTitle(fakeMeasure, "甲乙 丙丁", 4 * 96)
+    expect(layout.lines).toEqual(["甲乙", "丙丁"])
+  })
+
   it("returns no lines for an empty title", () => {
     expect(layoutTitle(fakeMeasure, "   ", 640)).toEqual({
       fontSize: 96,
