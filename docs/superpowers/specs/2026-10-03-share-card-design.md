@@ -1,10 +1,10 @@
 # Share card generator — design
 
-A new share-row button on public post pages opens a dialog that renders a 1080×1440 poster — full-bleed curated photo, bottom scrim, site mark, auto-sized title, QR code + domain · date — entirely in the browser, then offers download / copy / native share. Click-triggered: nothing is generated until the reader opens it.
+A share menu on public post pages opens a dialog that renders a 1080×1440 poster — full-bleed curated photo, bottom scrim, auto-sized title, QR code + domain · date — entirely in the browser, then offers download / copy / native share. Click-triggered: nothing is generated until the reader opens it.
 
 ## Goals
 
-- Post page share row (top and bottom) gains a "share card" icon button beside the existing copy-link button.
+- Post page share row (top and bottom) hosts one "share" menu button whose dropdown offers "copy link" and "share card" (v2.3; originally two side-by-side icon buttons).
 - Card composition: curated free photo cover-cropped to the frame → dark bottom scrim → footer of two rows — title (left-aligned, full width, wrapped up to 3 lines with a font-size ladder and adjacent-line balancing, "…" beyond); below it the white rounded QR tile at the left margin (sharing the title's left edge), with the caption (date on top, domain below, one left edge) tucked 40 px to the tile's right and vertically centered on it — title and tile share a single left axis.
 - Works on the static export (GitHub Pages): no route handler, no server — all client-side canvas. (The `/api/og/[slug]` satori pipeline cannot serve this: the public reading surface is the export, where route handlers are stashed.)
 - Background is stable by default: seeded from the post slug, so every reader sharing the same post gets the same image; a reroll button draws a different one.
@@ -44,7 +44,7 @@ Pipeline per open / reroll:
 1. `loadImage(poolUrl, { crossOrigin: "anonymous" })`; on error → brand gradient fill.
 2. Draw cover-cropped image → bottom scrim (transparent → `rgba(0,0,0,.72)`, bottom ~45%).
 3. Title via `layoutTitle`, white, up to 3 lines, full content width.
-4. QR: `await import("qrcode-generator")` (tiny MIT encoder, no runtime deps — loaded only when the dialog opens, never in the main bundle) → module matrix → draw onto an offscreen canvas (2-module quiet zone, so the white margin stays minimal) → composite a white rounded tile (8 px padding) bottom-right, with `domain · date` right-aligned to the tile's left edge and vertically centered.
+4. QR: `await import("qrcode-generator")` (tiny MIT encoder, no runtime deps — loaded only when the dialog opens, never in the main bundle) → module matrix → draw onto an offscreen canvas (2-module quiet zone, so the white margin stays minimal) → composite a white rounded tile (8 px padding) at the left margin, caption (`date` over `domain`) tucked 40 px to its right and vertically centered (v2.2).
 5. Preview is the live canvas, scaled into the 32 rem dialog (55 vh height cap); action row below, four buttons on one line.
 
 Actions:
@@ -60,7 +60,7 @@ QR content: the canonical absolute post URL, passed down from the server compone
 
 ### Data flow
 
-Post page (server) → `<ShareCardButton url={siteUrl + "/posts/<slug>"} title date slug />` in both share rows → click → dynamic `import()` of the dialog → canvas render → preview → export actions.
+Post page (server) → `<ShareMenu url={siteUrl + "/posts/<slug>"} slug title date />` in both share rows → menu (copy link immediate / share card) → dynamic `import()` of the dialog → canvas render → preview → export actions.
 
 ### Error / fallback
 
@@ -81,8 +81,8 @@ Post page (server) → `<ShareCardButton url={siteUrl + "/posts/<slug>"} title d
 |------|--------|
 | `apps/web/src/lib/share-card.ts` | New: pool, PRNG, title layout, filename |
 | `apps/web/src/components/blog/share-card-dialog.tsx` | New: canvas pipeline + actions |
-| `apps/web/src/components/blog/share-buttons.tsx` | Add `ShareCardButton` (lazy dialog) |
-| `apps/web/src/app/posts/[slug]/page.tsx` | Pass canonical URL/title/date; render button in both share rows |
+| `apps/web/src/components/blog/share-menu.tsx` | Share menu (copy-link / share-card items) wrapping the lazy `ShareCardDialog`; renamed from `share-buttons.tsx` in v2.3 |
+| `apps/web/src/app/posts/[slug]/page.tsx` | Pass canonical URL/title/date; render the share menu in both share rows |
 | `apps/web/src/lib/i18n/post.ts` | New post-page keys (zh/en) |
 | `apps/web/package.json` | Add QR encoder dependency |
 | `apps/web/test/share-card.test.ts` | New unit tests |
@@ -96,3 +96,5 @@ Post-launch feedback (v2): the site mark (dot + site name) is removed from the c
 Oversized-title pass (v2.1): wrapping gains adjacent-line balancing — after the greedy wrap, tokens move between neighboring lines while that strictly narrows their width difference (and the receiver stays within the line), which removes orphan last lines (a 13-char CJK title at 96 px used to wrap 6/6/1, now 5/4/4). Tokens wider than the line itself (long words/URLs) hard-break per character instead of overflowing the canvas. A space exposed at a line's end by a balancing move is re-trimmed before the next move, so a line never starts with a stray space. All three behaviors are unit-tested with the fake measure.
 
 Footer pass (v2.2): the footer's second row becomes one grouped block — the QR tile keeps the left margin (sharing the title's left edge) and the caption (date above domain, one left edge) tucks 40 px to its right, vertically centered on the tile (40 px between the two caption lines, matching the title rhythm). Earlier in the pass the caption was tried right-aligned in the corner, then bottom-aligned with the tile against the right margin; both split the footer into two far-apart elements across ~400 px of dead space, so the grouped left-axis version won. The dialog widens 28 → 32 rem so the four action buttons stay on one row in English too ("Download image" / "Copy image" are ~40 px longer than their Chinese labels).
+
+Share-entry pass (v2.3): the two side-by-side icon buttons (copy link, share card) collapse into one "share" menu whose dropdown holds both actions, each with an output-semantics icon (Link / Image), copy link staying one click away. The pair read as two share buttons — the card button wore the generic share glyph — so the menu removes the icon ambiguity without dropping either output; the popup width is decoupled from the icon-button anchor. `ShareCardButton`/`CopyLinkButton` become a single `ShareMenu` (file renamed `share-buttons.tsx` → `share-menu.tsx`); new `post.share` i18n key (zh/en).
