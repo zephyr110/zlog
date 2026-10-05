@@ -27,6 +27,7 @@ const pageMeta: Record<
   "/admin/posts/new": { titleKey: "admin.newPost" },
   "/admin/posts/edit": { titleKey: "admin.editPost" },
   "/admin/media": { titleKey: "admin.media", descKey: "admin.mediaDesc" },
+  "/admin/projects": { titleKey: "admin.projects", descKey: "admin.projectsDesc" },
   "/admin/comments": { titleKey: "admin.commentsPage", descKey: "admin.commentsDesc" },
   "/admin/settings": { titleKey: "admin.settings", descKey: "admin.settingsDesc" },
 }

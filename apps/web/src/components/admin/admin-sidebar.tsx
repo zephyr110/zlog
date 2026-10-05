@@ -35,6 +35,7 @@ import {
   LayoutDashboard,
   FileText,
   Image,
+  FolderGit2,
   ExternalLink,
   Settings,
   LogOut,
@@ -57,6 +58,7 @@ const sidebarLinks: {
   { href: "/admin/posts", i18nKey: "admin.posts", icon: FileText },
   { href: "/admin/comments", i18nKey: "admin.comments", icon: MessageSquare },
   { href: "/admin/media", i18nKey: "admin.media", icon: Image },
+  { href: "/admin/projects", i18nKey: "admin.projects", icon: FolderGit2 },
 ]
 
 type ThemeMode = "light" | "dark" | "system"
