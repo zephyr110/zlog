@@ -38,6 +38,7 @@ const updateSchema = z.object({
   githubUrl: optionalHttpUrl.optional(),
   twitterUrl: optionalHttpUrl.optional(),
   commentEnabled: z.boolean().optional(),
+  projectsEnabled: z.boolean().optional(),
 })
 
 /** Public — effective site config (defaults merged). */
@@ -72,6 +73,7 @@ export async function PUT(request: NextRequest) {
     githubUrl: patch.githubUrl,
     twitterUrl: patch.twitterUrl,
     commentEnabled: patch.commentEnabled,
+    projectsEnabled: patch.projectsEnabled,
   }
 
   // First save with no existing row: fill missing fields from defaults so
@@ -89,6 +91,7 @@ export async function PUT(request: NextRequest) {
         githubUrl: patch.githubUrl ?? defaultSiteConfig.social.github,
         twitterUrl: patch.twitterUrl ?? defaultSiteConfig.social.twitter,
         commentEnabled: patch.commentEnabled ?? defaultSiteConfig.commentEnabled,
+        projectsEnabled: patch.projectsEnabled ?? defaultSiteConfig.projectsEnabled,
       })
 
   revalidateTag(SITE_CONFIG_TAG, { expire: 0 })

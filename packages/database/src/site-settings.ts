@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS site_settings (
   github_url TEXT NOT NULL DEFAULT '',
   twitter_url TEXT NOT NULL DEFAULT '',
   comment_enabled INTEGER NOT NULL DEFAULT 1,
+  projects_enabled INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 `
@@ -35,6 +36,9 @@ export interface SiteSettingsRecord {
   /** Guest comments master switch — off = the comment API rejects all
    *  new comments (spam kill-switch). */
   commentEnabled: boolean
+  /** Projects showcase master switch — off = the public /projects page
+   *  is not generated and has no nav entry. */
+  projectsEnabled: boolean
 }
 
 export type SiteSettingsUpdate = Partial<SiteSettingsRecord>
@@ -58,6 +62,15 @@ async function ensureTable(db: Client): Promise<void> {
       try {
         await db.execute(
           "ALTER TABLE site_settings ADD COLUMN comment_enabled INTEGER NOT NULL DEFAULT 1"
+        )
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (!/duplicate column/i.test(msg)) throw err
+      }
+      // Migrate existing DBs that predate projects_enabled.
+      try {
+        await db.execute(
+          "ALTER TABLE site_settings ADD COLUMN projects_enabled INTEGER NOT NULL DEFAULT 0"
         )
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -92,6 +105,11 @@ function rowToRecord(row: Record<string, unknown>): SiteSettingsRecord {
     commentEnabled: row.comment_enabled === undefined || row.comment_enabled === null
       ? true
       : Number(row.comment_enabled) !== 0,
+    // Missing column (pre-migration read) or NULL → projects off.
+    projectsEnabled:
+      row.projects_enabled === undefined || row.projects_enabled === null
+        ? false
+        : Number(row.projects_enabled) !== 0,
   }
 }
 
@@ -126,12 +144,13 @@ export async function upsertSiteSettings(
     githubUrl: patch.githubUrl ?? existing?.githubUrl ?? "",
     twitterUrl: patch.twitterUrl ?? existing?.twitterUrl ?? "",
     commentEnabled: patch.commentEnabled ?? existing?.commentEnabled ?? true,
+    projectsEnabled: patch.projectsEnabled ?? existing?.projectsEnabled ?? false,
   }
 
   await db.execute({
     sql: `INSERT INTO site_settings
-            (id, name, title, description, author_name, logo_url, logo_invert_dark, github_url, twitter_url, comment_enabled, updated_at)
-          VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+            (id, name, title, description, author_name, logo_url, logo_invert_dark, github_url, twitter_url, comment_enabled, projects_enabled, updated_at)
+          VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
           ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             title = excluded.title,
@@ -142,6 +161,7 @@ export async function upsertSiteSettings(
             github_url = excluded.github_url,
             twitter_url = excluded.twitter_url,
             comment_enabled = excluded.comment_enabled,
+            projects_enabled = excluded.projects_enabled,
             updated_at = excluded.updated_at`,
     args: [
       next.name,
@@ -153,6 +173,7 @@ export async function upsertSiteSettings(
       next.githubUrl,
       next.twitterUrl,
       next.commentEnabled ? 1 : 0,
+      next.projectsEnabled ? 1 : 0,
     ],
   })
 

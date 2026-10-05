@@ -18,6 +18,7 @@ type SiteSettingsDto = {
   githubUrl: string
   twitterUrl: string
   commentEnabled: boolean
+  projectsEnabled: boolean
 }
 
 /**
@@ -51,6 +52,7 @@ export function siteConfigFromRow(
       twitter: row.twitterUrl,
     },
     commentEnabled: row.commentEnabled,
+    projectsEnabled: row.projectsEnabled,
     siteUrl: defaultSiteConfig.siteUrl,
     ogImage: defaultSiteConfig.ogImage,
   }
@@ -67,6 +69,7 @@ export function toSettingsDto(config: SiteConfig): SiteSettingsDto {
     githubUrl: config.social.github,
     twitterUrl: config.social.twitter,
     commentEnabled: config.commentEnabled,
+    projectsEnabled: config.projectsEnabled,
   }
 }
 
@@ -89,6 +92,7 @@ async function loadCachedConfig(): Promise<
     logoInvertInDark: config.logoInvertInDark,
     social: config.social,
     commentEnabled: config.commentEnabled,
+    projectsEnabled: config.projectsEnabled,
   }
 }
 
@@ -117,6 +121,9 @@ export const getSiteConfig = cache(async (): Promise<SiteConfig> => {
       // deployments has no commentEnabled field — undefined would read
       // as "comments closed" for the whole revalidate window.
       commentEnabled: cached.commentEnabled ?? defaultSiteConfig.commentEnabled,
+      // ?? default: 同 commentEnabled —— 跨部署旧缓存条目缺此字段时
+      // undefined 会被读成「关闭」,用默认值兜底（本项目默认即 false）。
+      projectsEnabled: cached.projectsEnabled ?? defaultSiteConfig.projectsEnabled,
       siteUrl: defaultSiteConfig.siteUrl,
       ogImage: defaultSiteConfig.ogImage,
     }

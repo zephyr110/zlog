@@ -60,6 +60,10 @@ export function SiteConfigProvider({
           typeof s.commentEnabled === "boolean"
             ? s.commentEnabled
             : prev.commentEnabled,
+        projectsEnabled:
+          typeof s.projectsEnabled === "boolean"
+            ? s.projectsEnabled
+            : prev.projectsEnabled,
       }))
     } catch {
       // ignore network errors — keep last known config

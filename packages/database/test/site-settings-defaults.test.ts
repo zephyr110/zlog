@@ -12,3 +12,12 @@ describe("site settings invert default", () => {
     )
   })
 })
+
+describe("projects showcase default", () => {
+  it("fresh tables default projects_enabled to off (no empty public page)", () => {
+    expect(src).toMatch(/projects_enabled INTEGER NOT NULL DEFAULT 0/)
+    expect(src).toMatch(
+      /projectsEnabled: patch\.projectsEnabled \?\? existing\?\.projectsEnabled \?\? false/
+    )
+  })
+})

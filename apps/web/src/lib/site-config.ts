@@ -19,6 +19,8 @@ export type SiteConfig = {
   }
   /** Guest comments master switch (settings, DB-backed). */
   commentEnabled: boolean
+  /** Projects showcase master switch (settings, DB-backed). */
+  projectsEnabled: boolean
 }
 
 /**
@@ -72,6 +74,7 @@ export const defaultSiteConfig: SiteConfig = {
     twitter: "https://twitter.com",
   },
   commentEnabled: true,
+  projectsEnabled: false,
 }
 
 export const DEFAULT_SITE_LOGO = "/zlog-logo.png"
