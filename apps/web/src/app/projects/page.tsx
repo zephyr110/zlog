@@ -9,19 +9,23 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { Trans } from "@/components/layout/trans"
 import { defaultLocale, t } from "@/lib/i18n"
 
-export const metadata: Metadata = {
-  title: t(defaultLocale, "projects.title"),
-  description: t(defaultLocale, "projects.description"),
+export async function generateMetadata(): Promise<Metadata> {
+  const site = await getSiteConfig()
+  if (!site.projectsEnabled) {
+    return { title: t(defaultLocale, "site.notFound") as string }
+  }
+  return {
+    title: t(defaultLocale, "projects.title"),
+    description: t(defaultLocale, "projects.description"),
+  }
 }
 
 export default async function ProjectsPage() {
-  const [site, projects] = await Promise.all([
-    getSiteConfig(),
-    listVisibleProjects(),
-  ])
+  const site = await getSiteConfig()
   // 总开关关闭：页面不产出（静态导出时该路径输出 404 内容），
   // 导航也无入口。
   if (!site.projectsEnabled) notFound()
+  const projects = await listVisibleProjects()
 
   return (
     <div className="min-h-[calc(100vh-4rem)]">
