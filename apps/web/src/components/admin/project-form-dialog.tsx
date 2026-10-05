@@ -44,6 +44,13 @@ const EMPTY_FORM: FormState = {
   visible: true,
 }
 
+/** 服务端 optionalHttpUrl 的前端镜像：空串或 http(s):// 开头。
+ *  仅用于提示，不拦保存——服务端仍是校验关口。 */
+function isInvalidHttpUrl(value: string) {
+  const v = value.trim()
+  return v !== "" && !/^https?:\/\//i.test(v)
+}
+
 interface ProjectFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -88,10 +95,16 @@ export function ProjectFormDialog({
   }
 
   function addTag(raw: string) {
-    const tag = raw.trim().slice(0, MAX_TAG_LENGTH)
+    // 中英文逗号都算分隔符（同 post-editor 的 addTag）：粘贴 "react，vue"
+    // 应得到两个标签，而不是一个含全角逗号的标签。
+    const next = [...form.tags]
+    for (const part of raw.split(/[,，]/)) {
+      const tag = part.trim().slice(0, MAX_TAG_LENGTH)
+      if (!tag || next.includes(tag) || next.length >= MAX_TAGS) continue
+      next.push(tag)
+    }
     setTagDraft("")
-    if (!tag || form.tags.includes(tag) || form.tags.length >= MAX_TAGS) return
-    patch("tags", [...form.tags, tag])
+    if (next.length !== form.tags.length) patch("tags", next)
   }
 
   function removeTag(tag: string) {
@@ -195,6 +208,11 @@ export function ProjectFormDialog({
                   label={t("admin.openUrl") as string}
                 />
               </div>
+              {isInvalidHttpUrl(form.repoUrl) && (
+                <p className="text-xs text-destructive">
+                  {t("admin.projectUrlInvalid") as string}
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="project-demo">{t("admin.projectDemoUrl") as string}</Label>
@@ -210,6 +228,11 @@ export function ProjectFormDialog({
                   label={t("admin.openUrl") as string}
                 />
               </div>
+              {isInvalidHttpUrl(form.demoUrl) && (
+                <p className="text-xs text-destructive">
+                  {t("admin.projectUrlInvalid") as string}
+                </p>
+              )}
             </div>
 
             {/* 封面 */}
@@ -233,6 +256,11 @@ export function ProjectFormDialog({
                   {t("admin.projectCoverPick") as string}
                 </Button>
               </div>
+              {isInvalidHttpUrl(form.cover) && (
+                <p className="text-xs text-destructive">
+                  {t("admin.projectUrlInvalid") as string}
+                </p>
+              )}
               {form.cover && (
                 <div className="relative mt-1.5 aspect-video w-full overflow-hidden rounded-md border">
                   {/* eslint-disable-next-line @next/next/no-img-element -- jsdelivr 外链 */}
@@ -280,7 +308,10 @@ export function ProjectFormDialog({
                 disabled={form.tags.length >= MAX_TAGS}
                 onChange={(e) => setTagDraft(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === ",") {
+                  // IME 组字中的回车是"确认候选词"，不能当提交标签用
+                  // （同 archive-feed 的 isComposing 守卫）。
+                  if (e.nativeEvent.isComposing) return
+                  if (e.key === "Enter" || e.key === "," || e.key === "，") {
                     e.preventDefault()
                     addTag(tagDraft)
                   }

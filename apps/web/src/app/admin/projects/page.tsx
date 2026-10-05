@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { FolderGit2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -22,6 +22,9 @@ export default function AdminProjectsPage() {
   const site = useSiteConfig()
   const [projects, setProjects] = useState<Project[] | null>(null)
   const [error, setError] = useState(false)
+  // 是否成功加载过：重载失败时用它区分"首次加载失败"（重试空态）
+  // 与"已有列表时的失败"（保留列表，仅 toast）。
+  const loadedRef = useRef(false)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [togglingEnabled, setTogglingEnabled] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
@@ -34,12 +37,19 @@ export default function AdminProjectsPage() {
       const res = await apiFetch("/api/admin/projects")
       if (!res.ok) throw new Error("load failed")
       const data = await res.json()
+      loadedRef.current = true
       setProjects(data.projects ?? [])
       setError(false)
     } catch {
-      setError(true)
+      // 已有数据时（重载失败）保留列表，只提示——否则看起来像数据丢失；
+      // 首次加载失败才切到重试空态。
+      if (loadedRef.current) {
+        toast.error(t("admin.networkError") as string)
+      } else {
+        setError(true)
+      }
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     void load() // eslint-disable-line react-hooks/set-state-in-effect -- async fetch, same pattern as admin/media

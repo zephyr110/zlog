@@ -81,7 +81,7 @@ export function ProjectRow({
           checked={project.visible}
           disabled={busy}
           onCheckedChange={(checked) => onToggleVisible(checked)}
-          aria-label={t("admin.projectVisible") as string}
+          aria-label={`${t("admin.projectVisible") as string}: ${project.title}`}
         />
         <Tooltip>
           <TooltipTrigger

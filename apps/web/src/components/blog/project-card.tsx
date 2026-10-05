@@ -8,13 +8,13 @@ import { type Project } from "@zlog/database"
  *  标签 → 分隔线 → 外链行。整卡不可点，GitHub / 演示是两个平级外链。 */
 export function ProjectCard({ project }: { project: Project }) {
   return (
-    <article className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-shadow hover:shadow-md">
+    <article className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-all hover:border-primary/20 hover:shadow-md">
       <div className="relative aspect-video w-full overflow-hidden">
         <ProjectCover src={project.cover} alt={project.title} />
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-4">
-        <h3 className="font-semibold leading-snug">{project.title}</h3>
+        <h3 className="truncate font-semibold leading-snug">{project.title}</h3>
         {project.description && (
           <p className="line-clamp-2 text-sm text-muted-foreground">
             {project.description}

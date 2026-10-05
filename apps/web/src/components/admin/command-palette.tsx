@@ -6,6 +6,7 @@ import { useTheme } from "next-themes"
 import {
   Download,
   FileText,
+  FolderGit2,
   Home,
   Image,
   LayoutDashboard,
@@ -128,6 +129,14 @@ export function CommandPalette({
       icon: Image,
       keywords: ["media", "images", "uploads"],
       run: () => router.push("/admin/media"),
+    },
+    {
+      id: "nav-projects",
+      group: "nav",
+      label: t("admin.projects") as string,
+      icon: FolderGit2,
+      keywords: ["projects", "项目"],
+      run: () => router.push("/admin/projects"),
     },
     {
       id: "nav-settings",
