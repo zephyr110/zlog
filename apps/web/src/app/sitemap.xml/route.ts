@@ -25,6 +25,11 @@ export async function GET() {
     { url: `${siteUrl}/archive`, changefreq: "weekly", priority: "0.8", lastmod: today },
   ]
 
+  // 项目页随总开关显隐：关闭时不进 sitemap。
+  if (site.projectsEnabled) {
+    urls.push({ url: `${siteUrl}/projects`, changefreq: "weekly", priority: "0.8", lastmod: today })
+  }
+
   const postUrls = posts.map((post) => ({
     url: `${siteUrl}/posts/${encodeURIComponent(post.slug)}`,
     lastmod: (post.updated || post.date).slice(0, 10),

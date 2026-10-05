@@ -15,9 +15,14 @@ import { defaultSiteConfig } from "@/lib/site-config"
 import type { NavCategory } from "@/lib/nav-links"
 import type { TranslationPath } from "@/lib/i18n"
 
-const navLinks: { href: string; i18nKey: TranslationPath }[] = [
+const navLinks: {
+  href: string
+  i18nKey: TranslationPath
+  requiresProjects?: boolean
+}[] = [
   { href: "/", i18nKey: "site.home" },
   { href: "/archive", i18nKey: "site.archive" },
+  { href: "/projects", i18nKey: "site.projects", requiresProjects: true },
   { href: "/about", i18nKey: "site.about" },
 ]
 
@@ -64,7 +69,9 @@ export function MobileNav({
       />
       <div className="fixed inset-x-0 top-16 z-50 md:hidden border-b bg-background/95 backdrop-blur-xl animate-in slide-in-from-top-1 duration-200 shadow-lg shadow-black/5">
         <nav className="container mx-auto px-4 py-3 space-y-1">
-          {navLinks.map((link) => (
+          {navLinks
+            .filter((link) => !link.requiresProjects || site.projectsEnabled)
+            .map((link) => (
             <Link
               key={link.href}
               href={link.href}

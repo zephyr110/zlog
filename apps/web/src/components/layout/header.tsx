@@ -154,6 +154,13 @@ export function Header({ categories }: { categories: NavCategory[] }) {
               {t("site.archive")}
             </NavLink>
 
+            {/* 项目（总开关控制入口） */}
+            {site.projectsEnabled && (
+              <NavLink href="/projects" active={pathname === "/projects"}>
+                {t("site.projects")}
+              </NavLink>
+            )}
+
             {/* 关于 */}
             <NavLink href="/about" active={atAbout}>
               {t("site.about")}

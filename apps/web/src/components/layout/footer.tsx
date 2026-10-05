@@ -90,6 +90,14 @@ export function Footer() {
               >
                 {t("site.archive")}
               </Link>
+              {site.projectsEnabled && (
+                <Link
+                  href="/projects"
+                  className="w-fit text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {t("site.projects")}
+                </Link>
+              )}
               <Link
                 href="/about"
                 className="w-fit text-sm text-muted-foreground transition-colors hover:text-foreground"
