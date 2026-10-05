@@ -77,12 +77,14 @@ export default function AdminProjectsPage() {
     } catch {
       toast.error(t("admin.networkError") as string)
     } finally {
-      setBusyId(null)
+      // 只清本行的 busy:期间其他行在途时,不能把它的控件提前放开(双提交)
+      setBusyId((cur) => (cur === project.id ? null : cur))
     }
   }
 
   /** 可见性切换：乐观更新 + 失败回滚。 */
   async function handleToggleVisible(project: Project, visible: boolean) {
+    const prevVisible = project.visible
     setBusyId(project.id)
     setProjects((prev) =>
       prev ? prev.map((p) => (p.id === project.id ? { ...p, visible } : p)) : prev
@@ -96,12 +98,13 @@ export default function AdminProjectsPage() {
     } catch {
       setProjects((prev) =>
         prev
-          ? prev.map((p) => (p.id === project.id ? { ...p, visible: !visible } : p))
+          ? prev.map((p) => (p.id === project.id ? { ...p, visible: prevVisible } : p))
           : prev
       )
       toast.error(t("admin.networkError") as string)
     } finally {
-      setBusyId(null)
+      // 只清本行的 busy:期间其他行在途时,不能把它的控件提前放开(双提交)
+      setBusyId((cur) => (cur === project.id ? null : cur))
     }
   }
 

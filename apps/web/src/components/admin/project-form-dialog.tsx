@@ -115,15 +115,23 @@ export function ProjectFormDialog({
         : await apiFetch("/api/admin/projects", { method: "POST", body })
       if (!res.ok) {
         const data = await res.json().catch(() => null)
-        throw new Error(data?.error || "save failed")
+        const error = new Error(data?.error || "")
+        // 标记来源:只有服务端返回了校验文案才把它透出(见下面的 catch),
+        // fetch 层失败(断网/超时)没有服务端响应体。
+        error.name = "ServerError"
+        throw error
       }
       toast.success(
         t(project ? "admin.projectSaved" : "admin.projectCreated") as string
       )
       onOpenChange(false)
       onSaved()
-    } catch {
-      toast.error(t("admin.networkError") as string)
+    } catch (err) {
+      // 服务端非 2xx 的校验文案(上面的 ServerError)透出原文;fetch 层失败
+      // (断网/超时)与没有服务端文案时退回通用网络错误提示。
+      const serverMessage =
+        err instanceof Error && err.name === "ServerError" ? err.message : ""
+      toast.error(serverMessage || (t("admin.networkError") as string))
     } finally {
       setSaving(false)
     }
