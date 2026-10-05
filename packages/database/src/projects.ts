@@ -247,12 +247,14 @@ export async function moveProject(
   if (target < 0 || target >= list.length) return false
   const reordered = [...list]
   ;[reordered[index], reordered[target]] = [reordered[target], reordered[index]]
-  for (let i = 0; i < reordered.length; i++) {
-    await db.execute({
+  // 整表重排：db.batch 单次往返 + 隐式事务，避免逐行 UPDATE 的 n+1 往返
+  // 与中断时的半新半旧状态（整表规范化本身也会自愈，但别依赖它）。
+  await db.batch(
+    reordered.map((p, i) => ({
       sql: "UPDATE projects SET sort_order = ? WHERE id = ?",
-      args: [i, reordered[i].id],
-    })
-  }
+      args: [i, p.id],
+    }))
+  )
   scheduleSync()
   return true
 }
