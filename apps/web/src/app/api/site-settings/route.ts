@@ -10,14 +10,7 @@ import {
   toSettingsDto,
 } from "@/lib/get-site-config"
 import { defaultSiteConfig } from "@/lib/site-config"
-
-/** Empty or http(s) only — blocks javascript:/data: href injection. */
-const optionalHttpUrl = z
-  .string()
-  .max(300)
-  .refine((v) => v === "" || /^https?:\/\//i.test(v), {
-    message: "URL must be empty or an http(s) URL",
-  })
+import { optionalHttpUrl } from "@/lib/url-validation"
 
 /** Empty, site-relative path, or http(s) — safe for <img src>. */
 const optionalLogoUrl = z
