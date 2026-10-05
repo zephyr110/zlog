@@ -43,6 +43,16 @@ export type { MediaRecord, MediaMeta } from "./media"
 export { getSiteSettings, upsertSiteSettings } from "./site-settings"
 export type { SiteSettingsRecord, SiteSettingsUpdate } from "./site-settings"
 export {
+  listProjects,
+  listVisibleProjects,
+  createProject,
+  updateProject,
+  deleteProject,
+  moveProject,
+  normalizeTags,
+} from "./projects"
+export type { Project, ProjectInput, ProjectUpdate } from "./projects"
+export {
   getCommentsByPost,
   getReplyTarget,
   getRepliesToComments,
