@@ -7,6 +7,7 @@ import { timeline } from "./i18n/timeline"
 import { archive } from "./i18n/archive"
 import { category } from "./i18n/category"
 import { admin } from "./i18n/admin"
+import { projects } from "./i18n/projects"
 
 export type { LocaleMessages } from "./i18n/locale-messages"
 
@@ -32,6 +33,7 @@ const translations = {
     archive: archive.zh,
     category: category.zh,
     admin: admin.zh,
+    projects: projects.zh,
   },
   en: {
     site: site.en,
@@ -43,6 +45,7 @@ const translations = {
     archive: archive.en,
     category: category.en,
     admin: admin.en,
+    projects: projects.en,
   },
 } as const
 
