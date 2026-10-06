@@ -157,3 +157,68 @@ describe("生成 CSS：drift 守护与选择器不变式", () => {
     )
   })
 })
+
+const GLOBALS_CSS = readFileSync(join(__dirname, "../src/app/globals.css"), "utf8")
+
+function cssVarsOf(block: string): Record<string, string> {
+  return Object.fromEntries(
+    [...block.matchAll(/--([a-z0-9-]+)\s*:\s*([^;]+);/g)].map((m) => [
+      m[1],
+      m[2].trim(),
+    ])
+  )
+}
+
+// 站点自有图表色（globals.css 持有；生成 CSS 的 neutral 块不发射，见 Task 3 修订）。
+const CHART_SITE_KEYS = ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"]
+
+// JSON 模块类型没有索引签名；按 Record 视图访问（纯类型层，不改断言）。
+const NEUTRAL_LIGHT: Record<string, string> = catalog.bases.neutral.light
+const NEUTRAL_DARK: Record<string, string> = catalog.bases.neutral.dark
+const GRAY_LIGHT: Record<string, string> = catalog.bases.gray.light
+const GRAY_DARK: Record<string, string> = catalog.bases.gray.dark
+
+describe("默认零回归（Neutral 与 globals.css :root/.dark 除图表色外全等）", () => {
+  const rootBlock = GLOBALS_CSS.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1] ?? ""
+  const darkBlock = GLOBALS_CSS.match(/\.dark\s*\{([\s\S]*?)\n\}/)?.[1] ?? ""
+  const rootVars = cssVarsOf(rootBlock)
+  const darkVars = cssVarsOf(darkBlock)
+
+  it(":root：除 chart-1..5 外逐键相等（仅允许自定义 --login-glow）", () => {
+    expect(rootBlock).not.toBe("")
+    for (const [key, value] of Object.entries(catalog.bases.neutral.light)) {
+      if (CHART_SITE_KEYS.includes(key)) continue
+      expect(rootVars[key]).toBe(value)
+    }
+    // 差异集合恰为 chart-1..5（不多不少）
+    const differing = Object.keys(catalog.bases.neutral.light).filter(
+      (k) => rootVars[k] !== NEUTRAL_LIGHT[k]
+    )
+    expect(differing.sort()).toEqual([...CHART_SITE_KEYS].sort())
+    // 站点图表色 == 官方 gray 快照图表值（锁定现行默认观感；上游 gray 若变则此处红）
+    for (const k of CHART_SITE_KEYS) {
+      expect(rootVars[k]).toBe(GRAY_LIGHT[k])
+    }
+    expect(
+      Object.keys(rootVars).filter((k) => !(k in catalog.bases.neutral.light))
+    ).toEqual(["login-glow"])
+  })
+
+  it(".dark：同上（差异集合恰为 chart-1..5，图表值 == gray.dark）", () => {
+    expect(darkBlock).not.toBe("")
+    for (const [key, value] of Object.entries(catalog.bases.neutral.dark)) {
+      if (CHART_SITE_KEYS.includes(key)) continue
+      expect(darkVars[key]).toBe(value)
+    }
+    const differing = Object.keys(catalog.bases.neutral.dark).filter(
+      (k) => darkVars[k] !== NEUTRAL_DARK[k]
+    )
+    expect(differing.sort()).toEqual([...CHART_SITE_KEYS].sort())
+    for (const k of CHART_SITE_KEYS) {
+      expect(darkVars[k]).toBe(GRAY_DARK[k])
+    }
+    expect(
+      Object.keys(darkVars).filter((k) => !(k in catalog.bases.neutral.dark))
+    ).toEqual(["login-glow"])
+  })
+})
