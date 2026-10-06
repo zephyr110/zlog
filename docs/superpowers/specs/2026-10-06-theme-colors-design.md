@@ -1,6 +1,6 @@
 # 主题配色（Base Color + Theme Color）— 设计
 
-日期：2026-10-06 · 状态：已确认，实施中（执行期修订：neutral 块排除 chart-1..5，见 §0.4/§1.3）
+日期：2026-10-06 · 状态：已确认，实施中（执行期修订：neutral 块排除 chart-1..5，见 §0.4/§1.3；数据源固定提交号，见 §1.1）
 
 后台设置新增「外观」面板：选择 shadcn **基准色**（经典 5 色）与**主题色**（Default + 精选 7 色）。两轴正交，保存后前端页面与后台系统全部应用。配色目录为官方 registry 快照（入仓，单一事实来源），构建期生成静态 CSS，SSR 直出 `data-*` 属性——零闪烁、零运行时 JS。默认组合（Neutral + Default）与现状视觉一致（图表色例外与处理见 §0.4），零视觉回归。
 
@@ -24,7 +24,7 @@
 
 1. **官方 v4 就是双轴正交模型**：配置项 `baseColor` × `theme` 两个独立枚举；合并语义为浅合并 `{...base.cssVars, ...theme.cssVars}`（theme 覆盖 base）。证据：`apps/v4/registry/config.ts` 的 `buildRegistryTheme()` 与 `apps/v4/app/(app)/(create)/lib/merge-theme.ts` 的 `buildTheme()`。
 2. **accent 主题每模式仅覆盖 11 键**：`primary / primary-foreground / secondary / secondary-foreground / chart-1..5 / sidebar-primary / sidebar-primary-foreground`（`ring` 不被覆盖）。rose 暗色额外含 `sidebar`，原样保真。
-3. **数据源**：基准色快照自 `https://ui.shadcn.com/r/colors/{name}.json` 的 `cssVarsV4`（oklch；亮 32 键 / 暗 31 键）；accent 快照自官方仓库 `apps/v4/registry/themes.ts`（抓取日期 2026-10-06）。
+3. **数据源**：基准色快照自 shadcn-ui/ui 固定提交 `7ff7dbf8669fa3392c294ee745dc8d8c3cee842c` 的 `apps/v4/public/r/colors/{name}.json`（raw URL）的 `cssVarsV4`（oklch；亮 32 键 / 暗 31 键）；accent 快照自同一提交的 `apps/v4/registry/themes.ts`（抓取日期 2026-10-06）。
 4. **默认零回归可证**：现有 `globals.css` 的 `:root`/`.dark` 与官方 neutral 调色**除 `chart-1..5` 外**逐 token 相同（唯一额外 token：自定义 `--login-glow`）。例外：站内图表色为经典彩色调色（与官方 **gray** 基准图表值逐值相同），且 dashboard 真实消费（`country-map`/`contribution-calendar`/`post-stats`/`traffic-analytics` 以 `chart-2` 为特色色）——官方 neutral 的灰阶图表色会改变默认观感，故 neutral 块不发射 chart 键（§1.3）。
 
 ## 1. 配色目录
@@ -34,8 +34,9 @@
 ```json
 {
   "source": {
-    "bases": "https://ui.shadcn.com/r/colors/{name}.json (cssVarsV4)",
-    "themes": "shadcn-ui/ui apps/v4/registry/themes.ts",
+    "commit": "7ff7dbf8669fa3392c294ee745dc8d8c3cee842c",
+    "bases": "https://raw.githubusercontent.com/shadcn-ui/ui/7ff7dbf8669fa3392c294ee745dc8d8c3cee842c/apps/v4/public/r/colors/{name}.json (cssVarsV4)",
+    "themes": "https://raw.githubusercontent.com/shadcn-ui/ui/7ff7dbf8669fa3392c294ee745dc8d8c3cee842c/apps/v4/registry/themes.ts",
     "fetchedAt": "2026-10-06"
   },
   "bases": {
