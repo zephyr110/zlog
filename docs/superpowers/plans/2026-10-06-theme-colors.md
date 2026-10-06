@@ -1662,3 +1662,26 @@ Expected: 无错误。
 1. **Spec 覆盖**：§0 调研结论 → Task 1（数据源/pin SHA）；§1.1–1.2 → Task 1/2；§1.3 生成器与选择器不变式 → Task 3（含 neutral 修订）；§1.4 → Task 7；§2.1 → Task 5；§2.2 → Task 6（含 schema 拆分修订）；§2.3 → Task 7；§3.1–3.2 → Task 8；§3.3 → Task 8 Step 1（10 键：6 个规格键 + appearanceSave/Saved/SaveFailed/LoadFailed，为实施时「核对现有键」的结论）；§4 生效时机/旧缓存/脏值/扩展路径 → Task 6 兜底 + Task 8 hint + Task 9；§5 测试 1–4 → Task 3/4，API 校验 → Task 6，export 冒烟 → Task 9，CDP 视觉 → Task 9 Step 4；§6 清单 → File Structure（差异：`site-settings-schema.ts` 为 spec 修订后新增，`site-config-provider.tsx` 为链路一致性补充，均在修订中有据）。
 2. **占位符扫描**：无 TBD/TODO；所有代码步骤为完整代码；唯一分叉「回退方案」为 spec 预授权的二选一，两个分支的代码都写全。
 3. **类型一致性**：`generateThemeCss(catalog)` 定义于 Task 3、调用处签名一致；`BASE_COLOR_IDS`/`THEME_COLOR_IDS` 在 Task 2 定义为元组（供 `z.enum`），Task 3/6 使用处一致；`SiteSettingsRecord` 两字段在 Task 5 定义、Task 6 fixture 与测试一致；`AppearanceForm` 仅收 `className`（Task 8 两处引用一致，idPrefix 已按实现简化删除）。
+
+---
+
+## 终审修正（2026-10-06，执行后追加）
+
+全部 9 任务 + T9 收尾验证完成后，opus 终审给出 `READY（无阻塞项）`（并另行联网将 committed catalog 与 shadcn 上游固定提交逐键逐值比对，全等）。终审 9 项 Minor：修 6 项、接受 2 项、1 项为范围外提示。
+
+**已修（提交 38e88fc + 51b5bea）**
+- M1 `appearance-form.tsx`：保存成功后用 PUT 响应 `settings` 同步 SiteConfigContext（防「面板重开时 GET 失败 → 回退过期上下文 → 顺手保存静默回退配色」；同 site-info-form 保存后范式）。
+- M2 新增 `apps/web/test/theme-wiring.test.ts`：静态锚点守护 layout 的 generated CSS import + `<html>` 两属性、route 的 dbPatch 透传与首存两字段——此前这些关键接线零测试覆盖；变异探针（删属性 / 删 dbPatch 行）各自变红后恢复。
+- M3 `theme-colors.test.ts` 增「accent 钉值」5 条（blue 亮/暗 primary、violet 亮 primary、rose 暗色 sidebar、amber 亮 primary），防重抓快照静默换色。
+- M5 两组色板容器加 `role="group"` + `aria-label`（复用现有 i18n 键）。
+- M7 生成器 main 守卫加注释：drift 测试成立前提，勿删。
+- M8 spec 验收清单 5 项勾选。
+
+**接受（记录在案）**
+- M4 迁移路径无专门测试：该迁移（两条幂等 ALTER）在 T9 已于真实库实际执行成功（保存/恢复即证），「部署时才炸」场景不存在；其余环境由 duplicate-column 容错兜底。
+- M6 恒发两字段：配色对为单一设置单元、dialog 为唯一写者，与 site-info-form 的 touched 模式分叉合理。
+- T4 五项延后 Minor（失败信息键名 / `\n\}` 解析假设 / 常量遮蔽 / `in` 原型链）：终审逐项复核均判接受。
+- T6 `refreshSiteConfig` 死代码：裁定**保留**——先于本功能存在的 context API 表面，补两字段属类型一致性维护；M1 接线后其配色守卫已有真实语义。
+- M9 范围外顺手改动（New Post 图标等）：无问题。
+
+**T9 收尾验证关键结论**：保存后 `router.refresh()` 实测更新 `<html>` 属性（保存后对话框仍开、toast 在、全站已换色 = 无整页重载），spec 预授权的 `location.reload()` 回退**未使用**；站点最终状态已恢复 Neutral + Default（API 回读 + SSR 属性 + 前后台亮暗截图确认）。
