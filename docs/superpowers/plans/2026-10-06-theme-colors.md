@@ -702,6 +702,8 @@ git commit -m "test(web): 锁定默认零回归（neutral 与 globals.css 除图
 - Modify: `packages/database/test/site-settings-defaults.test.ts`
 - Modify: `packages/database/src/site-settings.ts`
 
+> **执行期修订（2026-10-06，质量审查修正 `97b2581`）**：测试锚点收紧以区分 SCHEMA / ALTER / DO UPDATE SET 三个位点——原宽泛子串正则经变异探针实测无法发现「删 ALTER 块」「ALTER 默认值分叉」「丢 DO UPDATE 赋值」三类回归。
+
 - [ ] **Step 1: 追加失败测试**
 
 在 `packages/database/test/site-settings-defaults.test.ts` 末尾追加：
@@ -709,11 +711,13 @@ git commit -m "test(web): 锁定默认零回归（neutral 与 globals.css 除图
 ```ts
 describe("theme colors default", () => {
   it("fresh tables default base_color/theme_color to neutral/default", () => {
-    expect(src).toMatch(/base_color TEXT NOT NULL DEFAULT 'neutral'/)
-    expect(src).toMatch(/theme_color TEXT NOT NULL DEFAULT 'default'/)
+    expect(src).toMatch(/\n {2}base_color TEXT NOT NULL DEFAULT 'neutral',/)
+    expect(src).toMatch(/\n {2}theme_color TEXT NOT NULL DEFAULT 'default',/)
   })
 
   it("upsert 局部合并链与旧行缺列/NULL 兜底", () => {
+    expect(src).toMatch(/ADD COLUMN base_color TEXT NOT NULL DEFAULT 'neutral'/)
+    expect(src).toMatch(/ADD COLUMN theme_color TEXT NOT NULL DEFAULT 'default'/)
     expect(src).toMatch(
       /baseColor: patch\.baseColor \?\? existing\?\.baseColor \?\? "neutral"/
     )
@@ -722,6 +726,8 @@ describe("theme colors default", () => {
     )
     expect(src).toMatch(/row\.base_color \?\? "neutral"/)
     expect(src).toMatch(/row\.theme_color \?\? "default"/)
+    expect(src).toMatch(/base_color = excluded\.base_color,/)
+    expect(src).toMatch(/theme_color = excluded\.theme_color,/)
   })
 })
 ```
