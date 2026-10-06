@@ -66,6 +66,7 @@ export function generateThemeCss(catalog) {
   return lines.join("\n")
 }
 
+// 本守卫是 drift 测试成立的前提：测试 import 本模块只重算输出、不得写文件，勿删。
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const catalog = JSON.parse(readFileSync(CATALOG_URL, "utf8"))
   const css = generateThemeCss(catalog)

@@ -89,6 +89,21 @@ describe("配色目录完整性", () => {
   })
 })
 
+// 钉值：终审已联网核对 theme-catalog.json 与 shadcn 上游固定提交逐值全等。
+// 只钉代表值（每色族 1 个 + rose 暗色特有键 sidebar）——若日后重抓快照时
+// 上游静默换色，drift 测试（自洽比对）抓不到，本组断言才会红。
+describe("accent 钉值", () => {
+  it("代表值逐字（防重抓快照静默换色）", () => {
+    expect(catalog.themes.blue.light.primary).toBe("oklch(0.488 0.243 264.376)")
+    expect(catalog.themes.blue.dark.primary).toBe("oklch(0.424 0.199 265.638)")
+    expect(catalog.themes.violet.light.primary).toBe(
+      "oklch(0.491 0.27 292.581)"
+    )
+    expect(catalog.themes.rose.dark.sidebar).toBe("oklch(0.21 0.006 285.885)")
+    expect(catalog.themes.amber.light.primary).toBe("oklch(0.555 0.163 48.998)")
+  })
+})
+
 const GENERATED_PATH = join(__dirname, "../src/app/theme-colors.generated.css")
 
 describe("生成 CSS：drift 守护与选择器不变式", () => {

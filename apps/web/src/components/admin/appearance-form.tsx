@@ -85,6 +85,17 @@ export function AppearanceForm({ className }: { className?: string }) {
         return
       }
       toast.success(t("admin.appearanceSaved"))
+      // 同步上下文（同 site-info-form 保存后范式）：刷新链路走 SSR 属性，
+      // 但 context 仍是页面加载时的旧值——若此后面板重开且 GET 瞬时失败，
+      // 回退分支会把过期上下文填进表单，管理员顺手保存即静默回退配色。
+      const s = data.settings
+      site.setSiteConfig((prev) => ({
+        ...prev,
+        baseColor: isBaseColorName(s.baseColor) ? s.baseColor : prev.baseColor,
+        themeColor: isThemeColorName(s.themeColor)
+          ? s.themeColor
+          : prev.themeColor,
+      }))
       // 根布局重渲染 → <html> 属性更新 → 全站即时换色。
       router.refresh()
     } catch {
@@ -111,7 +122,11 @@ export function AppearanceForm({ className }: { className?: string }) {
     <div className={cn("space-y-5", className)}>
       <div className="space-y-2.5">
         <Label>{t("admin.appearanceBaseColor")}</Label>
-        <div className="grid grid-cols-5 gap-2">
+        <div
+          role="group"
+          aria-label={t("admin.appearanceBaseColor")}
+          className="grid grid-cols-5 gap-2"
+        >
           {BASE_COLORS.map((c) => {
             const selected = baseColor === c.id
             return (
@@ -151,7 +166,11 @@ export function AppearanceForm({ className }: { className?: string }) {
 
       <div className="space-y-2.5">
         <Label>{t("admin.appearanceThemeColor")}</Label>
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+        <div
+          role="group"
+          aria-label={t("admin.appearanceThemeColor")}
+          className="grid grid-cols-4 gap-2 sm:grid-cols-8"
+        >
           {THEME_COLORS.map((c) => {
             const selected = themeColor === c.id
             return (
