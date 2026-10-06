@@ -15,6 +15,7 @@ import { getAllTags } from "@zlog/database"
 import { unstable_cache } from "next/cache"
 import { categoryKeys } from "@/lib/categories"
 import "./globals.css"
+import "./theme-colors.generated.css"
 
 const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() || undefined
 
@@ -99,6 +100,8 @@ export default async function RootLayout({
   return (
     <html
       lang={defaultLocale}
+      data-base-color={site.baseColor}
+      data-theme-color={site.themeColor}
       className="h-full antialiased"
       // globals.css sets `scroll-behavior: smooth` on <html>; Next.js 16
       // requires this explicit opt-in to keep smooth scrolling across
