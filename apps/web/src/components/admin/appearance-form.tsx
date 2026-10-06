@@ -1,0 +1,194 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { apiFetch } from "@/lib/api-client"
+import { useT } from "@/components/layout/trans"
+import { useSiteConfig } from "@/components/layout/site-config-provider"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Spinner } from "@/components/ui/spinner"
+import { cn } from "@/lib/utils"
+import {
+  BASE_COLORS,
+  THEME_COLORS,
+  DEFAULT_BASE_COLOR,
+  DEFAULT_THEME_COLOR,
+  isBaseColorName,
+  isThemeColorName,
+  type BaseColorName,
+  type ThemeColorName,
+} from "@/lib/theme-catalog"
+
+/**
+ * 「外观」面板 — 基准色 × 主题色（accent）。
+ *
+ * 活预览：每个选项按钮同时挂 data-base-color / data-theme-color 两个属性——
+ * 被选择的一轴挂本选项 id，另一轴挂表单当前选择——预览即「本选项 × 另一轴
+ * 当前选择」的真实组合。两轴都作用于按钮元素本身，变量元素级解析、不依赖
+ * ambient html（Neutral 落到与 :root 等值的 neutral 块；Default 无 accent 块
+ * → 落回基准色自身主色）。亮暗随面板所处模式自适应（.dark 后代形态）。
+ */
+export function AppearanceForm({ className }: { className?: string }) {
+  const { t } = useT()
+  const router = useRouter()
+  const site = useSiteConfig()
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [baseColor, setBaseColor] = useState<BaseColorName>(DEFAULT_BASE_COLOR)
+  const [themeColor, setThemeColor] =
+    useState<ThemeColorName>(DEFAULT_THEME_COLOR)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch("/api/site-settings")
+        if (!res.ok) throw new Error("failed")
+        const data = await res.json()
+        if (cancelled) return
+        const s = data.settings
+        if (isBaseColorName(s.baseColor)) setBaseColor(s.baseColor)
+        if (isThemeColorName(s.themeColor)) setThemeColor(s.themeColor)
+      } catch {
+        if (!cancelled) {
+          // 同 site-info-form：加载失败不静默回退——提示并退回上下文值。
+          toast.error(t("admin.appearanceLoadFailed"))
+          if (isBaseColorName(site.baseColor)) setBaseColor(site.baseColor)
+          if (isThemeColorName(site.themeColor)) setThemeColor(site.themeColor)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+    // Initial hydrate only — site context is a fallback.（同 site-info-form）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      // 仅两字段：upsert 为局部合并，不会碰站点信息字段。
+      const res = await apiFetch("/api/site-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseColor, themeColor }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || t("admin.appearanceSaveFailed"))
+        return
+      }
+      toast.success(t("admin.appearanceSaved"))
+      // 根布局重渲染 → <html> 属性更新 → 全站即时换色。
+      router.refresh()
+    } catch {
+      toast.error(t("admin.networkError"))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div
+        className={cn(
+          "flex min-h-[10rem] items-center justify-center",
+          className
+        )}
+      >
+        <Spinner size="md" />
+      </div>
+    )
+  }
+
+  return (
+    <div className={cn("space-y-5", className)}>
+      <div className="space-y-2.5">
+        <Label>{t("admin.appearanceBaseColor")}</Label>
+        <div className="grid grid-cols-5 gap-2">
+          {BASE_COLORS.map((c) => {
+            const selected = baseColor === c.id
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={selected}
+                data-base-color={c.id}
+                data-theme-color={themeColor}
+                onClick={() => setBaseColor(c.id)}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 rounded-lg border p-2 text-[11px] leading-none transition-colors",
+                  selected
+                    ? "border-ring text-foreground ring-2 ring-ring"
+                    : "border-border text-muted-foreground hover:border-muted-foreground/50"
+                )}
+              >
+                <span
+                  aria-hidden
+                  className="flex size-9 items-center justify-center rounded-md border"
+                  style={{
+                    backgroundColor: "var(--background)",
+                    borderColor: "var(--border)",
+                  }}
+                >
+                  <span
+                    className="size-3 rounded-full"
+                    style={{ backgroundColor: "var(--primary)" }}
+                  />
+                </span>
+                <span>{c.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2.5">
+        <Label>{t("admin.appearanceThemeColor")}</Label>
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+          {THEME_COLORS.map((c) => {
+            const selected = themeColor === c.id
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={selected}
+                data-base-color={baseColor}
+                data-theme-color={c.id}
+                onClick={() => setThemeColor(c.id)}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 rounded-lg border p-2 text-[11px] leading-none transition-colors",
+                  selected
+                    ? "border-ring text-foreground ring-2 ring-ring"
+                    : "border-border text-muted-foreground hover:border-muted-foreground/50"
+                )}
+              >
+                <span
+                  aria-hidden
+                  className="size-6 rounded-full border"
+                  style={{
+                    backgroundColor: "var(--primary)",
+                    borderColor: "var(--border)",
+                  }}
+                />
+                <span>{c.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <p className="text-xs text-muted-foreground">{t("admin.appearanceHint")}</p>
+
+      <Button type="button" onClick={handleSave} disabled={saving}>
+        {saving ? t("admin.saving") : t("admin.appearanceSave")}
+      </Button>
+    </div>
+  )
+}

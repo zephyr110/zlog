@@ -12,14 +12,15 @@ import {
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SiteInfoForm } from "@/components/admin/site-info-form"
+import { AppearanceForm } from "@/components/admin/appearance-form"
 import { ChangePasswordForm } from "@/components/admin/change-password-form"
 import { apiFetch } from "@/lib/api-client"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { Globe, UserRound, XIcon } from "lucide-react"
+import { Globe, Palette, UserRound, XIcon } from "lucide-react"
 
-type SettingsPanel = "site" | "account"
+type SettingsPanel = "site" | "appearance" | "account"
 
 interface SettingsDialogProps {
   open: boolean
@@ -74,13 +75,22 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   const nav = [
     { id: "site" as const, label: t("admin.settingsNavSite"), icon: Globe },
+    { id: "appearance" as const, label: t("admin.settingsNavAppearance"), icon: Palette },
     { id: "account" as const, label: t("admin.settingsNavAccount"), icon: UserRound },
   ]
 
   const title =
-    panel === "site" ? t("admin.siteInfo") : t("admin.accountInfo")
+    panel === "site"
+      ? t("admin.siteInfo")
+      : panel === "appearance"
+        ? t("admin.appearanceInfo")
+        : t("admin.accountInfo")
   const description =
-    panel === "site" ? t("admin.siteInfoDesc") : t("admin.settingsAccountDesc")
+    panel === "site"
+      ? t("admin.siteInfoDesc")
+      : panel === "appearance"
+        ? t("admin.appearanceInfoDesc")
+        : t("admin.settingsAccountDesc")
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -143,6 +153,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 {/* h-full 高度链：加载时 spinner 在右侧内容区水平垂直居中 */}
                 <div hidden={panel !== "site"} className="h-full">
                   <SiteInfoForm idPrefix="dlg-site" className="h-full" />
+                </div>
+                <div hidden={panel !== "appearance"} className="h-full">
+                  <AppearanceForm className="h-full" />
                 </div>
                 <div hidden={panel !== "account"} className="max-w-sm space-y-5">
                   <section>
