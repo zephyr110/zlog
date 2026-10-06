@@ -180,8 +180,8 @@ html.dark[data-theme-color="blue"], .dark [data-theme-color="blue"] { /* 暗 11 
 
 ## 验收标准
 
-- [ ] 后台外观面板：5 基准 × 8 主题可选，活预览正确反映组合效果，选中态清晰。
-- [ ] 保存后（本地/Vercel）全站即时应用；前后台亮/暗四态截图核验。
-- [ ] 默认组合（Neutral + Default）与现状逐像素一致。
-- [ ] drift 守护、目录完整性、默认零回归断言全绿；`check:i18n`、lint、typecheck 通过。
-- [ ] 导出构建产物含 generated CSS + data 属性；Pages 生效语义在面板中有说明。
+- [x] 后台外观面板：5 基准 × 8 主题可选，活预览正确反映组合效果，选中态清晰。
+- [x] 保存后（本地/Vercel）全站即时应用；前后台亮/暗四态截图核验。
+- [x] 默认组合（Neutral + Default）与现状逐像素一致。
+- [x] drift 守护、目录完整性、默认零回归断言全绿；`check:i18n`、lint、typecheck 通过。
+- [x] 导出构建产物含 generated CSS + data 属性；Pages 生效语义在面板中有说明。
