@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS site_settings (
   twitter_url TEXT NOT NULL DEFAULT '',
   comment_enabled INTEGER NOT NULL DEFAULT 1,
   projects_enabled INTEGER NOT NULL DEFAULT 0,
+  base_color TEXT NOT NULL DEFAULT 'neutral',
+  theme_color TEXT NOT NULL DEFAULT 'default',
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 `
@@ -39,6 +41,11 @@ export interface SiteSettingsRecord {
   /** Projects showcase master switch — off = the public /projects page
    *  is not generated and has no nav entry. */
   projectsEnabled: boolean
+  /** 主题配色 — shadcn 基准色 id（如 "neutral"/"slate"）。值域由 web 层
+   *  zod 与 siteConfigFromRow 成员校验兜底；DB 层只存 string。 */
+  baseColor: string
+  /** 主题配色 — accent 主题 id（如 "default"/"blue"）。 */
+  themeColor: string
 }
 
 export type SiteSettingsUpdate = Partial<SiteSettingsRecord>
@@ -71,6 +78,24 @@ async function ensureTable(db: Client): Promise<void> {
       try {
         await db.execute(
           "ALTER TABLE site_settings ADD COLUMN projects_enabled INTEGER NOT NULL DEFAULT 0"
+        )
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (!/duplicate column/i.test(msg)) throw err
+      }
+      // Migrate existing DBs that predate base_color.
+      try {
+        await db.execute(
+          "ALTER TABLE site_settings ADD COLUMN base_color TEXT NOT NULL DEFAULT 'neutral'"
+        )
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (!/duplicate column/i.test(msg)) throw err
+      }
+      // Migrate existing DBs that predate theme_color.
+      try {
+        await db.execute(
+          "ALTER TABLE site_settings ADD COLUMN theme_color TEXT NOT NULL DEFAULT 'default'"
         )
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -110,6 +135,10 @@ function rowToRecord(row: Record<string, unknown>): SiteSettingsRecord {
       row.projects_enabled === undefined || row.projects_enabled === null
         ? false
         : Number(row.projects_enabled) !== 0,
+    // Missing column (pre-migration read) or NULL → neutral.
+    baseColor: String(row.base_color ?? "neutral"),
+    // Missing column (pre-migration read) or NULL → default (no accent).
+    themeColor: String(row.theme_color ?? "default"),
   }
 }
 
@@ -145,12 +174,14 @@ export async function upsertSiteSettings(
     twitterUrl: patch.twitterUrl ?? existing?.twitterUrl ?? "",
     commentEnabled: patch.commentEnabled ?? existing?.commentEnabled ?? true,
     projectsEnabled: patch.projectsEnabled ?? existing?.projectsEnabled ?? false,
+    baseColor: patch.baseColor ?? existing?.baseColor ?? "neutral",
+    themeColor: patch.themeColor ?? existing?.themeColor ?? "default",
   }
 
   await db.execute({
     sql: `INSERT INTO site_settings
-            (id, name, title, description, author_name, logo_url, logo_invert_dark, github_url, twitter_url, comment_enabled, projects_enabled, updated_at)
-          VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+            (id, name, title, description, author_name, logo_url, logo_invert_dark, github_url, twitter_url, comment_enabled, projects_enabled, base_color, theme_color, updated_at)
+          VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
           ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             title = excluded.title,
@@ -162,6 +193,8 @@ export async function upsertSiteSettings(
             twitter_url = excluded.twitter_url,
             comment_enabled = excluded.comment_enabled,
             projects_enabled = excluded.projects_enabled,
+            base_color = excluded.base_color,
+            theme_color = excluded.theme_color,
             updated_at = excluded.updated_at`,
     args: [
       next.name,
@@ -174,6 +207,8 @@ export async function upsertSiteSettings(
       next.twitterUrl,
       next.commentEnabled ? 1 : 0,
       next.projectsEnabled ? 1 : 0,
+      next.baseColor,
+      next.themeColor,
     ],
   })
 

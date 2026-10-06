@@ -21,3 +21,21 @@ describe("projects showcase default", () => {
     )
   })
 })
+
+describe("theme colors default", () => {
+  it("fresh tables default base_color/theme_color to neutral/default", () => {
+    expect(src).toMatch(/base_color TEXT NOT NULL DEFAULT 'neutral'/)
+    expect(src).toMatch(/theme_color TEXT NOT NULL DEFAULT 'default'/)
+  })
+
+  it("upsert 局部合并链与旧行缺列/NULL 兜底", () => {
+    expect(src).toMatch(
+      /baseColor: patch\.baseColor \?\? existing\?\.baseColor \?\? "neutral"/
+    )
+    expect(src).toMatch(
+      /themeColor: patch\.themeColor \?\? existing\?\.themeColor \?\? "default"/
+    )
+    expect(src).toMatch(/row\.base_color \?\? "neutral"/)
+    expect(src).toMatch(/row\.theme_color \?\? "default"/)
+  })
+})
