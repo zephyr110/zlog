@@ -441,17 +441,26 @@ describe("生成 CSS：drift 守护与选择器不变式", () => {
     )
   })
 
-  it("neutral 块不发射 chart-1..5（站点图表色保留在 globals.css）", () => {
+  it("neutral 块不发射 chart-1..5，且除图表键外全量（站点图表色保留在 globals.css）", () => {
     const NEUTRAL_LIGHT = 'html[data-base-color="neutral"], [data-base-color="neutral"]'
     const NEUTRAL_DARK =
       'html.dark[data-base-color="neutral"], .dark [data-base-color="neutral"]'
     const blockOf = (sel: string) => {
       const start = css.indexOf(sel + " {")
-      expect(start).toBeGreaterThan(-1)
+      expect(start, `block for: ${sel}`).toBeGreaterThan(-1)
       return css.slice(start, css.indexOf("}", start))
     }
-    expect(blockOf(NEUTRAL_LIGHT)).not.toMatch(/--chart-[1-5]:/)
-    expect(blockOf(NEUTRAL_DARK)).not.toMatch(/--chart-[1-5]:/)
+    const light = blockOf(NEUTRAL_LIGHT)
+    const dark = blockOf(NEUTRAL_DARK)
+    expect(light).not.toMatch(/--chart-[1-5]:/)
+    expect(dark).not.toMatch(/--chart-[1-5]:/)
+    // 除图表键外全量（键数 = catalog neutral 键数 - 5），防过度剔除
+    expect(light.match(/--[a-z-]+:/g)).toHaveLength(
+      Object.keys(catalog.bases.neutral.light).length - 5
+    )
+    expect(dark.match(/--[a-z-]+:/g)).toHaveLength(
+      Object.keys(catalog.bases.neutral.dark).length - 5
+    )
     // 其余基准色仍全量发射（防止过度剔除）
     expect(blockOf('html[data-base-color="gray"], [data-base-color="gray"]')).toMatch(
       /--chart-1:/
@@ -542,7 +551,7 @@ export function generateThemeCss(catalog) {
   return lines.join("\n")
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const catalog = JSON.parse(readFileSync(CATALOG_URL, "utf8"))
   const css = generateThemeCss(catalog)
   writeFileSync(OUT_URL, css)
