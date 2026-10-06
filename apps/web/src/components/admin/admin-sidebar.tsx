@@ -44,7 +44,7 @@ import {
   Monitor,
   ChevronRight,
   PanelLeft,
-  SquarePen,
+  Plus,
   MessageSquare,
   type LucideIcon,
 } from "lucide-react"
@@ -205,7 +205,7 @@ export function AdminSidebar({ collapsed, onToggle, user, mobileOpen, onMobileCl
                     aria-label={t("admin.newPost")}
                     className="flex size-9 items-center justify-center rounded-md text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   >
-                    <SquarePen size={16} />
+                    <Plus size={16} />
                   </Link>
                 }
               />
@@ -239,7 +239,7 @@ export function AdminSidebar({ collapsed, onToggle, user, mobileOpen, onMobileCl
               onClick={onMobileClose}
               className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              <SquarePen size={16} />
+              <Plus size={16} />
               <span className="truncate">{t("admin.newPost")}</span>
             </Link>
             <Tooltip>
