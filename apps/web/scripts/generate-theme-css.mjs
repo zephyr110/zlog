@@ -66,7 +66,7 @@ export function generateThemeCss(catalog) {
   return lines.join("\n")
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const catalog = JSON.parse(readFileSync(CATALOG_URL, "utf8"))
   const css = generateThemeCss(catalog)
   writeFileSync(OUT_URL, css)
