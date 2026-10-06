@@ -24,11 +24,13 @@ describe("projects showcase default", () => {
 
 describe("theme colors default", () => {
   it("fresh tables default base_color/theme_color to neutral/default", () => {
-    expect(src).toMatch(/base_color TEXT NOT NULL DEFAULT 'neutral'/)
-    expect(src).toMatch(/theme_color TEXT NOT NULL DEFAULT 'default'/)
+    expect(src).toMatch(/\n {2}base_color TEXT NOT NULL DEFAULT 'neutral',/)
+    expect(src).toMatch(/\n {2}theme_color TEXT NOT NULL DEFAULT 'default',/)
   })
 
   it("upsert 局部合并链与旧行缺列/NULL 兜底", () => {
+    expect(src).toMatch(/ADD COLUMN base_color TEXT NOT NULL DEFAULT 'neutral'/)
+    expect(src).toMatch(/ADD COLUMN theme_color TEXT NOT NULL DEFAULT 'default'/)
     expect(src).toMatch(
       /baseColor: patch\.baseColor \?\? existing\?\.baseColor \?\? "neutral"/
     )
@@ -37,5 +39,7 @@ describe("theme colors default", () => {
     )
     expect(src).toMatch(/row\.base_color \?\? "neutral"/)
     expect(src).toMatch(/row\.theme_color \?\? "default"/)
+    expect(src).toMatch(/base_color = excluded\.base_color,/)
+    expect(src).toMatch(/theme_color = excluded\.theme_color,/)
   })
 })
