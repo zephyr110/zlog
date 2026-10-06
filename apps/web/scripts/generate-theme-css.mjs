@@ -7,7 +7,9 @@
 // - 暗色双形态：html.dark[…] 压过 .dark（0-2-1 > 0-1-0）；.dark […] 为后代形态
 //   （暗色子树内元素自动取暗色值）。
 // - 基准段整体先于 accent 段：重叠键由 accent 覆盖（复刻官方浅合并方向）。
-// - neutral 块产出且与 :root 逐键等值（预览色板需要元素级解析）；
+// - neutral 块产出，但排除 chart-1..5：站点图表色为站点自有（globals.css 持有，
+//   dashboard 以 chart-2 为特色色），官方 neutral 灰阶图表色会破坏默认零回归；
+//   预览色板需要元素级解析（仅用 background/border/primary，不涉图表色）。
 //   default（主题侧）不产出块——accent 层「不覆盖」的唯一表达。
 
 import { readFileSync, writeFileSync } from "node:fs"
@@ -36,13 +38,18 @@ export function generateThemeCss(catalog) {
     lines.push("}", "")
   }
 
-  // 基准色段 — 全 5 色（neutral 与 globals.css 的 :root/.dark 逐键等值）。
+  // 基准色段 — 全 5 色；neutral 排除 chart-1..5（站点图表色保留在 globals.css）。
+  const CHART_KEYS = new Set(["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"])
+  const strip = (name, vars) =>
+    name === "neutral"
+      ? Object.fromEntries(Object.entries(vars).filter(([k]) => !CHART_KEYS.has(k)))
+      : vars
   for (const [name, { light, dark }] of Object.entries(catalog.bases)) {
     emit(
       `html[data-base-color="${name}"], [data-base-color="${name}"]`,
       `html.dark[data-base-color="${name}"], .dark [data-base-color="${name}"]`,
-      light,
-      dark
+      strip(name, light),
+      strip(name, dark)
     )
   }
 

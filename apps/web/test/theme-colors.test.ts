@@ -130,4 +130,21 @@ describe("生成 CSS：drift 守护与选择器不变式", () => {
       css.indexOf('[data-theme-color="blue"]')
     )
   })
+
+  it("neutral 块不发射 chart-1..5（站点图表色保留在 globals.css）", () => {
+    const NEUTRAL_LIGHT = 'html[data-base-color="neutral"], [data-base-color="neutral"]'
+    const NEUTRAL_DARK =
+      'html.dark[data-base-color="neutral"], .dark [data-base-color="neutral"]'
+    const blockOf = (sel: string) => {
+      const start = css.indexOf(sel + " {")
+      expect(start).toBeGreaterThan(-1)
+      return css.slice(start, css.indexOf("}", start))
+    }
+    expect(blockOf(NEUTRAL_LIGHT)).not.toMatch(/--chart-[1-5]:/)
+    expect(blockOf(NEUTRAL_DARK)).not.toMatch(/--chart-[1-5]:/)
+    // 其余基准色仍全量发射（防止过度剔除）
+    expect(blockOf('html[data-base-color="gray"], [data-base-color="gray"]')).toMatch(
+      /--chart-1:/
+    )
+  })
 })
