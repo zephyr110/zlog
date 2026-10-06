@@ -384,6 +384,8 @@ git commit -m "feat(web): 主题配色目录类型与访问器（含完整性测
 - Modify: `apps/web/test/theme-colors.test.ts`（追加 describe）
 - Modify: `apps/web/package.json`
 
+> **执行期修订（2026-10-06）**：站内 dashboard 真实消费 `chart-1..5`（`country-map`/`contribution-calendar`/`post-stats`/`traffic-analytics` 以 `chart-2` 为特色色），官方 neutral 灰阶图表色会造成可见回归 → **neutral 块排除 chart 键**（站点图表色保留在 `globals.css`）；其余 base/accent 全量发射。
+
 - [ ] **Step 1: 追加失败测试**
 
 在 `apps/web/test/theme-colors.test.ts` 顶部 import 区追加：
@@ -438,6 +440,23 @@ describe("生成 CSS：drift 守护与选择器不变式", () => {
       css.indexOf('[data-theme-color="blue"]')
     )
   })
+
+  it("neutral 块不发射 chart-1..5（站点图表色保留在 globals.css）", () => {
+    const NEUTRAL_LIGHT = 'html[data-base-color="neutral"], [data-base-color="neutral"]'
+    const NEUTRAL_DARK =
+      'html.dark[data-base-color="neutral"], .dark [data-base-color="neutral"]'
+    const blockOf = (sel: string) => {
+      const start = css.indexOf(sel + " {")
+      expect(start).toBeGreaterThan(-1)
+      return css.slice(start, css.indexOf("}", start))
+    }
+    expect(blockOf(NEUTRAL_LIGHT)).not.toMatch(/--chart-[1-5]:/)
+    expect(blockOf(NEUTRAL_DARK)).not.toMatch(/--chart-[1-5]:/)
+    // 其余基准色仍全量发射（防止过度剔除）
+    expect(blockOf('html[data-base-color="gray"], [data-base-color="gray"]')).toMatch(
+      /--chart-1:/
+    )
+  })
 })
 ```
 
@@ -464,7 +483,9 @@ Expected: FAIL — 无法解析 `../scripts/generate-theme-css.mjs`（生成器�
 // - 暗色双形态：html.dark[…] 压过 .dark（0-2-1 > 0-1-0）；.dark […] 为后代形态
 //   （暗色子树内元素自动取暗色值）。
 // - 基准段整体先于 accent 段：重叠键由 accent 覆盖（复刻官方浅合并方向）。
-// - neutral 块产出且与 :root 逐键等值（预览色板需要元素级解析）；
+// - neutral 块产出，但排除 chart-1..5：站点图表色为站点自有（globals.css 持有，
+//   dashboard 以 chart-2 为特色色），官方 neutral 灰阶图表色会破坏默认零回归；
+//   预览色板需要元素级解析（仅用 background/border/primary，不涉图表色）。
 //   default（主题侧）不产出块——accent 层「不覆盖」的唯一表达。
 
 import { readFileSync, writeFileSync } from "node:fs"
@@ -493,13 +514,18 @@ export function generateThemeCss(catalog) {
     lines.push("}", "")
   }
 
-  // 基准色段 — 全 5 色（neutral 与 globals.css 的 :root/.dark 逐键等值）。
+  // 基准色段 — 全 5 色；neutral 排除 chart-1..5（站点图表色保留在 globals.css）。
+  const CHART_KEYS = new Set(["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"])
+  const strip = (name, vars) =>
+    name === "neutral"
+      ? Object.fromEntries(Object.entries(vars).filter(([k]) => !CHART_KEYS.has(k)))
+      : vars
   for (const [name, { light, dark }] of Object.entries(catalog.bases)) {
     emit(
       `html[data-base-color="${name}"], [data-base-color="${name}"]`,
       `html.dark[data-base-color="${name}"], .dark [data-base-color="${name}"]`,
-      light,
-      dark
+      strip(name, light),
+      strip(name, dark)
     )
   }
 
@@ -544,7 +570,7 @@ cd /Users/zephyr/Code/zlog
 pnpm --filter @zlog/web test theme-colors
 ```
 
-Expected: PASS（8 个用例）。drift 测试此后守护：手改产物、或改了 JSON 忘了重跑生成器，都会红。
+Expected: PASS（9 个用例）。drift 测试此后守护：手改产物、或改了 JSON 忘了重跑生成器，都会红。
 
 - [ ] **Step 6: 加 package.json 脚本**
 
@@ -564,10 +590,12 @@ git commit -m "feat(web): 配色 CSS 生成器与静态产物（data-属性选�
 
 ---
 
-### Task 4: 默认零回归锁定（Neutral == globals.css）
+### Task 4: 默认零回归锁定（Neutral 与 globals.css 除图表色外全等）
 
 **Files:**
 - Modify: `apps/web/test/theme-colors.test.ts`（追加 describe）
+
+> **执行期修订（2026-10-06）**：零回归断言改为「除 `chart-1..5` 外逐键全等 + 差异集合恰为 chart 键 + 图表值锁定为官方 gray 快照」——生成 CSS 的 neutral 块不发射图表键（Task 3 修订），站点图表色由 `globals.css` 保留。
 
 - [ ] **Step 1: 追加测试**
 
@@ -585,26 +613,47 @@ function cssVarsOf(block: string): Record<string, string> {
   )
 }
 
-describe("默认零回归（Neutral == globals.css :root/.dark）", () => {
+// 站点自有图表色（globals.css 持有；生成 CSS 的 neutral 块不发射，见 Task 3 修订）。
+const CHART_SITE_KEYS = ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"]
+
+describe("默认零回归（Neutral 与 globals.css :root/.dark 除图表色外全等）", () => {
   const rootBlock = GLOBALS_CSS.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1] ?? ""
   const darkBlock = GLOBALS_CSS.match(/\.dark\s*\{([\s\S]*?)\n\}/)?.[1] ?? ""
   const rootVars = cssVarsOf(rootBlock)
   const darkVars = cssVarsOf(darkBlock)
 
-  it(":root 与 catalog neutral.light 逐键相等（仅允许自定义 --login-glow）", () => {
+  it(":root：除 chart-1..5 外逐键相等（仅允许自定义 --login-glow）", () => {
     expect(rootBlock).not.toBe("")
     for (const [key, value] of Object.entries(catalog.bases.neutral.light)) {
+      if (CHART_SITE_KEYS.includes(key)) continue
       expect(rootVars[key]).toBe(value)
+    }
+    // 差异集合恰为 chart-1..5（不多不少）
+    const differing = Object.keys(catalog.bases.neutral.light).filter(
+      (k) => rootVars[k] !== catalog.bases.neutral.light[k]
+    )
+    expect(differing.sort()).toEqual([...CHART_SITE_KEYS].sort())
+    // 站点图表色 == 官方 gray 快照图表值（锁定现行默认观感；上游 gray 若变则此处红）
+    for (const k of CHART_SITE_KEYS) {
+      expect(rootVars[k]).toBe(catalog.bases.gray.light[k])
     }
     expect(
       Object.keys(rootVars).filter((k) => !(k in catalog.bases.neutral.light))
     ).toEqual(["login-glow"])
   })
 
-  it(".dark 与 catalog neutral.dark 逐键相等（仅允许自定义 --login-glow）", () => {
+  it(".dark：同上（差异集合恰为 chart-1..5，图表值 == gray.dark）", () => {
     expect(darkBlock).not.toBe("")
     for (const [key, value] of Object.entries(catalog.bases.neutral.dark)) {
+      if (CHART_SITE_KEYS.includes(key)) continue
       expect(darkVars[key]).toBe(value)
+    }
+    const differing = Object.keys(catalog.bases.neutral.dark).filter(
+      (k) => darkVars[k] !== catalog.bases.neutral.dark[k]
+    )
+    expect(differing.sort()).toEqual([...CHART_SITE_KEYS].sort())
+    for (const k of CHART_SITE_KEYS) {
+      expect(darkVars[k]).toBe(catalog.bases.gray.dark[k])
     }
     expect(
       Object.keys(darkVars).filter((k) => !(k in catalog.bases.neutral.dark))
@@ -620,14 +669,14 @@ cd /Users/zephyr/Code/zlog
 pnpm --filter @zlog/web test theme-colors
 ```
 
-Expected: PASS（10 个用例）。这是特征化测试，**理应直接通过**——若 FAIL，说明快照与 `globals.css` 有真实漂移（例如上游改了中性色或本仓改过 token），**停下来报告**，不要改测试凑数。
+Expected: PASS（11 个用例）。这是特征化测试，**理应直接通过**——若 FAIL，说明快照与 `globals.css` 有真实漂移（例如上游改了中性色或本仓改过 token），**停下来报告**，不要改测试凑数。
 
 - [ ] **Step 3: 提交**
 
 ```bash
 cd /Users/zephyr/Code/zlog
 git add apps/web/test/theme-colors.test.ts
-git commit -m "test(web): 锁定默认组合零回归（neutral 快照 == globals.css）"
+git commit -m "test(web): 锁定默认零回归（neutral 与 globals.css 除图表色外全等）"
 ```
 
 ---
