@@ -8,6 +8,9 @@ import {
   isBaseColorName,
   isThemeColorName,
 } from "@/lib/theme-catalog"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { generateThemeCss } from "../scripts/generate-theme-css.mjs"
 
 const ACCENT_KEYS = [
   "primary",
@@ -83,5 +86,48 @@ describe("配色目录完整性", () => {
     expect(isThemeColorName(42)).toBe(false)
     expect(DEFAULT_BASE_COLOR).toBe("neutral")
     expect(DEFAULT_THEME_COLOR).toBe("default")
+  })
+})
+
+const GENERATED_PATH = join(__dirname, "../src/app/theme-colors.generated.css")
+
+describe("生成 CSS：drift 守护与选择器不变式", () => {
+  const css = readFileSync(GENERATED_PATH, "utf8")
+
+  it("committed 产物 == 由 committed JSON 重算的输出（drift）", () => {
+    expect(css).toBe(generateThemeCss(catalog))
+  })
+
+  it("无 default accent 块；五色基准块与七色 accent 块齐备", () => {
+    expect(css).not.toContain('data-theme-color="default"')
+    for (const id of BASE_COLOR_IDS) {
+      expect(css).toContain(`[data-base-color="${id}"]`)
+    }
+    for (const id of THEME_COLOR_IDS) {
+      if (id !== "default") {
+        expect(css).toContain(`[data-theme-color="${id}"]`)
+      }
+    }
+  })
+
+  it("双形态选择器逐字（html 形态 + 元素级形态；暗色为后代形态）", () => {
+    expect(css).toContain(
+      'html[data-base-color="slate"], [data-base-color="slate"] {'
+    )
+    expect(css).toContain(
+      'html.dark[data-base-color="slate"], .dark [data-base-color="slate"] {'
+    )
+    expect(css).toContain(
+      'html[data-theme-color="blue"], [data-theme-color="blue"] {'
+    )
+    expect(css).toContain(
+      'html.dark[data-theme-color="blue"], .dark [data-theme-color="blue"] {'
+    )
+  })
+
+  it("基准段整体先于 accent 段（重叠键 accent 覆盖）", () => {
+    expect(css.indexOf('[data-base-color="slate"]')).toBeLessThan(
+      css.indexOf('[data-theme-color="blue"]')
+    )
   })
 })

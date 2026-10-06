@@ -13,6 +13,7 @@
     "check": "pnpm lint && pnpm typecheck",
     "check:i18n": "node scripts/check-i18n.mjs",
     "generate:geo": "node scripts/generate-geo-assets.mjs",
+    "generate:theme": "node scripts/generate-theme-css.mjs",
     "test": "vitest run"
   },
   "dependencies": {
