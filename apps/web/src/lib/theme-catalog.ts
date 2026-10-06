@@ -25,7 +25,10 @@ export const THEME_COLORS = [
 
 export type ThemeColorName = (typeof THEME_COLORS)[number]["id"]
 
-/** 从目录派生的 id 数组（zod 枚举与守卫共用）——新增颜色只改这一处。 */
+/**
+ * 从目录派生的 id 数组（zod 枚举与守卫共用）。
+ * 本文件内新增颜色只改目录表；JSON 快照与生成 CSS 需另行同步。
+ */
 export const BASE_COLOR_IDS = BASE_COLORS.map((c) => c.id) as [
   BaseColorName,
   ...BaseColorName[],
