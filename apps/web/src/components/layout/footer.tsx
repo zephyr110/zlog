@@ -21,8 +21,8 @@ const iconButtonClass =
 
 /**
  * Site footer — brand block + quick nav + icon actions, sitting on a
- * gradient that fades from the page background into the muted panel tone
- * (no hairline: the tonal zone itself marks the boundary). The admin entry
+ * gradient that fades from the page background into the muted panel tone.
+ * A hairline top border separates it from the page content. The admin entry
  * is a quiet icon button (lock when signed out, dashboard when signed in):
  * invisible to readers, always where the admin expects it.
  */
@@ -45,7 +45,7 @@ export function Footer() {
   if (pathname?.startsWith("/admin")) return null
 
   return (
-    <footer className="bg-gradient-to-b from-background via-muted/40 to-muted">
+    <footer className="border-t bg-gradient-to-b from-background via-muted/40 to-muted">
       <div className="container mx-auto max-w-5xl px-4 pb-8 pt-16 2xl:max-w-7xl">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           {/* Brand */}
