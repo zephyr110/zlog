@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import { z } from "zod"
 import { revalidatePath, revalidateTag } from "next/cache"
 import { getSiteSettings, upsertSiteSettings } from "@zlog/database"
 import { requireAuth } from "@/lib/api-auth"
@@ -10,29 +9,7 @@ import {
   toSettingsDto,
 } from "@/lib/get-site-config"
 import { defaultSiteConfig } from "@/lib/site-config"
-import { optionalHttpUrl } from "@/lib/url-validation"
-
-/** Empty, site-relative path, or http(s) — safe for <img src>. */
-const optionalLogoUrl = z
-  .string()
-  .max(500)
-  .refine(
-    (v) => v === "" || v.startsWith("/") || /^https?:\/\//i.test(v),
-    { message: "Logo must be a relative path or http(s) URL" }
-  )
-
-const updateSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  title: z.string().min(1).max(100).optional(),
-  description: z.string().max(500).optional(),
-  authorName: z.string().max(100).optional(),
-  logoUrl: optionalLogoUrl.optional(),
-  logoInvertInDark: z.boolean().optional(),
-  githubUrl: optionalHttpUrl.optional(),
-  twitterUrl: optionalHttpUrl.optional(),
-  commentEnabled: z.boolean().optional(),
-  projectsEnabled: z.boolean().optional(),
-})
+import { updateSchema } from "@/lib/site-settings-schema"
 
 /** Public — effective site config (defaults merged). */
 export async function GET() {
@@ -67,6 +44,8 @@ export async function PUT(request: NextRequest) {
     twitterUrl: patch.twitterUrl,
     commentEnabled: patch.commentEnabled,
     projectsEnabled: patch.projectsEnabled,
+    baseColor: patch.baseColor,
+    themeColor: patch.themeColor,
   }
 
   // First save with no existing row: fill missing fields from defaults so
@@ -85,6 +64,8 @@ export async function PUT(request: NextRequest) {
         twitterUrl: patch.twitterUrl ?? defaultSiteConfig.social.twitter,
         commentEnabled: patch.commentEnabled ?? defaultSiteConfig.commentEnabled,
         projectsEnabled: patch.projectsEnabled ?? defaultSiteConfig.projectsEnabled,
+        baseColor: patch.baseColor ?? defaultSiteConfig.baseColor,
+        themeColor: patch.themeColor ?? defaultSiteConfig.themeColor,
       })
 
   revalidateTag(SITE_CONFIG_TAG, { expire: 0 })

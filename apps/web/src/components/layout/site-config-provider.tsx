@@ -8,6 +8,7 @@ import {
   useState,
 } from "react"
 import { defaultSiteConfig, type SiteConfig } from "@/lib/site-config"
+import { isBaseColorName, isThemeColorName } from "@/lib/theme-catalog"
 
 type SiteConfigContextValue = SiteConfig & {
   setSiteConfig: (next: SiteConfig | ((prev: SiteConfig) => SiteConfig)) => void
@@ -64,6 +65,10 @@ export function SiteConfigProvider({
           typeof s.projectsEnabled === "boolean"
             ? s.projectsEnabled
             : prev.projectsEnabled,
+        baseColor: isBaseColorName(s.baseColor) ? s.baseColor : prev.baseColor,
+        themeColor: isThemeColorName(s.themeColor)
+          ? s.themeColor
+          : prev.themeColor,
       }))
     } catch {
       // ignore network errors — keep last known config

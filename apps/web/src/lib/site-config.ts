@@ -1,3 +1,10 @@
+import {
+  DEFAULT_BASE_COLOR,
+  DEFAULT_THEME_COLOR,
+  type BaseColorName,
+  type ThemeColorName,
+} from "@/lib/theme-catalog"
+
 export type SiteConfig = {
   name: string
   title: string
@@ -21,6 +28,10 @@ export type SiteConfig = {
   commentEnabled: boolean
   /** Projects showcase master switch (settings, DB-backed). */
   projectsEnabled: boolean
+  /** 主题配色 — shadcn 基准色（外观面板设置）。 */
+  baseColor: BaseColorName
+  /** 主题配色 — accent 主题（外观面板设置）。 */
+  themeColor: ThemeColorName
 }
 
 /**
@@ -75,6 +86,8 @@ export const defaultSiteConfig: SiteConfig = {
   },
   commentEnabled: true,
   projectsEnabled: false,
+  baseColor: DEFAULT_BASE_COLOR,
+  themeColor: DEFAULT_THEME_COLOR,
 }
 
 export const DEFAULT_SITE_LOGO = "/zlog-logo.png"

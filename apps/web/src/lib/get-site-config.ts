@@ -5,6 +5,14 @@ import {
   type SiteSettingsRecord,
 } from "@zlog/database"
 import { defaultSiteConfig, type SiteConfig } from "@/lib/site-config"
+import {
+  DEFAULT_BASE_COLOR,
+  DEFAULT_THEME_COLOR,
+  isBaseColorName,
+  isThemeColorName,
+  type BaseColorName,
+  type ThemeColorName,
+} from "@/lib/theme-catalog"
 
 export const SITE_CONFIG_TAG = "site-config"
 
@@ -19,6 +27,8 @@ type SiteSettingsDto = {
   twitterUrl: string
   commentEnabled: boolean
   projectsEnabled: boolean
+  baseColor: BaseColorName
+  themeColor: ThemeColorName
 }
 
 /**
@@ -53,6 +63,13 @@ export function siteConfigFromRow(
     },
     commentEnabled: row.commentEnabled,
     projectsEnabled: row.projectsEnabled,
+    // 成员校验兜底：手改 DB 的脏值不能把 data-* 属性带崩。
+    baseColor: isBaseColorName(row.baseColor)
+      ? row.baseColor
+      : DEFAULT_BASE_COLOR,
+    themeColor: isThemeColorName(row.themeColor)
+      ? row.themeColor
+      : DEFAULT_THEME_COLOR,
     siteUrl: defaultSiteConfig.siteUrl,
     ogImage: defaultSiteConfig.ogImage,
   }
@@ -70,6 +87,8 @@ export function toSettingsDto(config: SiteConfig): SiteSettingsDto {
     twitterUrl: config.social.twitter,
     commentEnabled: config.commentEnabled,
     projectsEnabled: config.projectsEnabled,
+    baseColor: config.baseColor,
+    themeColor: config.themeColor,
   }
 }
 
@@ -93,6 +112,8 @@ async function loadCachedConfig(): Promise<
     social: config.social,
     commentEnabled: config.commentEnabled,
     projectsEnabled: config.projectsEnabled,
+    baseColor: config.baseColor,
+    themeColor: config.themeColor,
   }
 }
 
@@ -124,6 +145,10 @@ export const getSiteConfig = cache(async (): Promise<SiteConfig> => {
       // ?? default: 同 commentEnabled —— 跨部署旧缓存条目缺此字段时
       // undefined 会被读成「关闭」,用默认值兜底（本项目默认即 false）。
       projectsEnabled: cached.projectsEnabled ?? defaultSiteConfig.projectsEnabled,
+      // ?? default: 跨部署旧缓存条目没有配色字段——undefined 会渲染出
+      // 无效的 data-* 值，用默认兜底（同 commentEnabled 先例）。
+      baseColor: cached.baseColor ?? defaultSiteConfig.baseColor,
+      themeColor: cached.themeColor ?? defaultSiteConfig.themeColor,
       siteUrl: defaultSiteConfig.siteUrl,
       ogImage: defaultSiteConfig.ogImage,
     }
