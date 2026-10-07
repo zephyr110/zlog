@@ -11,6 +11,10 @@ import { defaultLocale, t } from "@/lib/i18n"
 import { collectSeriesPosts, listSeries, seriesName, seriesTagOf } from "@/lib/series"
 import { Calendar, Clock, Layers } from "lucide-react"
 
+/** 线上 ISR：内容变更最长 60s 后自动重新生成（桌面 standalone 构建注入
+ *  force-dynamic，优先级更高、每请求实时，不受此影响）。 */
+export const revalidate = 60
+
 interface SeriesPageProps {
   params: Promise<{ name: string }>
 }

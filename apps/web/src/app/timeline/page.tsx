@@ -9,6 +9,10 @@ import { Container } from "@/components/ui/container"
 import { EmptyState } from "@/components/ui/empty-state"
 import { YearSection } from "./year-section"
 
+/** 线上 ISR：内容变更最长 60s 后自动重新生成（桌面 standalone 构建注入
+ *  force-dynamic，优先级更高、每请求实时，不受此影响）。 */
+export const revalidate = 60
+
 export const metadata: Metadata = {
   title: t(defaultLocale, "timeline.title") as string,
   description: t(defaultLocale, "timeline.description") as string,

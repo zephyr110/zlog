@@ -11,6 +11,10 @@ import { PostCard } from "@/components/blog/post-card"
 import { Trans } from "@/components/layout/trans"
 import { EmptyState } from "@/components/ui/empty-state"
 
+/** 线上 ISR：内容变更最长 60s 后自动重新生成（桌面 standalone 构建注入
+ *  force-dynamic，优先级更高、每请求实时，不受此影响）。 */
+export const revalidate = 60
+
 /** How many cards the home page shows: 1 featured + this many in the grid. */
 const LATEST_GRID_COUNT = 6
 

@@ -9,6 +9,10 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { Trans } from "@/components/layout/trans"
 import { defaultLocale, t } from "@/lib/i18n"
 
+/** 线上 ISR：内容变更最长 60s 后自动重新生成（桌面 standalone 构建注入
+ *  force-dynamic，优先级更高、每请求实时，不受此影响）。 */
+export const revalidate = 60
+
 export async function generateMetadata(): Promise<Metadata> {
   const site = await getSiteConfig()
   if (!site.projectsEnabled) {

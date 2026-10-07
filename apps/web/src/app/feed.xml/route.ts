@@ -1,6 +1,10 @@
 import { getSiteConfig } from "@/lib/get-site-config"
 import { getPublishedPosts } from "@zlog/database"
 
+/** 线上 ISR：新文章/改标题最长 60s 后进入 feed（桌面 standalone 构建注入
+ *  force-dynamic，优先级更高、每请求实时，不受此影响）。 */
+export const revalidate = 60
+
 /** Escape the CDATA terminator so a description containing "]]>" can't
  *  truncate the CDATA block and break the whole feed's XML. */
 function escapeCdata(str: string): string {

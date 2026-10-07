@@ -8,6 +8,10 @@ import { Sparkles, Palette, FileCode, Cloud, Rocket, Database, UserRound } from 
 import { GithubIcon, XIcon } from "@/components/ui/brand-icons"
 import type { TranslationPath } from "@/lib/i18n"
 
+/** 线上 ISR：内容变更最长 60s 后自动重新生成（桌面 standalone 构建注入
+ *  force-dynamic，优先级更高、每请求实时，不受此影响）。 */
+export const revalidate = 60
+
 export const metadata: Metadata = {
   title: t(defaultLocale, "about.title"),
   description: t(defaultLocale, "about.description"),

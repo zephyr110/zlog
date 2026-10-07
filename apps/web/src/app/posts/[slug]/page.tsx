@@ -19,6 +19,10 @@ import { rankRelatedPosts } from "@/lib/related"
 import { buildSeriesNav, publicTags, sameSeries } from "@/lib/series"
 import { POST_PROSE_CLASSES } from "@/lib/prose"
 
+/** 线上 ISR：内容变更最长 60s 后自动重新生成（桌面 standalone 构建注入
+ *  force-dynamic，优先级更高、每请求实时，不受此影响）。 */
+export const revalidate = 60
+
 interface PostPageProps {
   params: Promise<{ slug: string }>
 }

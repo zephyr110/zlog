@@ -2,6 +2,10 @@ import { getSiteConfig } from "@/lib/get-site-config"
 import { getPublishedPosts } from "@zlog/database"
 import { listSeries } from "@/lib/series"
 
+/** 线上 ISR：新文章/系列最长 60s 后进入 sitemap（桌面 standalone 构建注入
+ *  force-dynamic，优先级更高、每请求实时，不受此影响）。 */
+export const revalidate = 60
+
 function escapeXml(s: string) {
   return s
     .replace(/&/g, "&amp;")
