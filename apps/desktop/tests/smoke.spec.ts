@@ -50,7 +50,10 @@ test("app boots, serves the blog, admin login works", async () => {
     // getByRole 只看 accessible name，无此问题。
     await win.goto(`${base}/admin/posts/new`)
     await win.getByRole("textbox", { name: /^标题$|^Title$/i }).fill("E2E Smoke Post")
-    await win.getByRole("button", { name: /发布|Publish/i }).click()
+    // 发布按钮须锚定名称：编辑器里的「定时发布」日期时间触发器
+    // （aria-label「定时发布」/「Publish at」）同样命中未锚定的
+    // /发布|Publish/i，strict mode 会二义到两个按钮。
+    await win.getByRole("button", { name: /^(发布|Publish)$/ }).click()
     await win.waitForURL(/\/admin\/posts\/edit\?slug=/, { timeout: 15_000 })
     await expect(win.getByText(/已发布|Published/).first()).toBeVisible()
     await expect(
