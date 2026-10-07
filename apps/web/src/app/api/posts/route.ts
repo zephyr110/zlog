@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireAuth } from "@/lib/api-auth"
@@ -127,6 +128,9 @@ export async function POST(request: NextRequest) {
   }
 
   await savePost(post)
+  // 公开页面是 ISR 缓存（revalidate=60）：写操作后立即全站失效，
+  // 不等窗口 —— 与 api/site-settings 同款（桌面端为动态渲染，无副作用）。
+  revalidatePath("/", "layout")
   return NextResponse.json({ post }, { status: 201 })
 }
 
@@ -205,6 +209,7 @@ export async function PUT(request: NextRequest) {
   }
 
   await savePost(updatedPost, slug)
+  revalidatePath("/", "layout")
   return NextResponse.json({ post: updatedPost })
 }
 
@@ -226,6 +231,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Post not found" }, { status: 404 })
   }
 
+  revalidatePath("/", "layout")
   return NextResponse.json({ success: true })
 }
 
@@ -290,5 +296,6 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
+  revalidatePath("/", "layout")
   return NextResponse.json({ post: updatedPost })
 }
