@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest"
 import {
   formatLocalDate,
+  formatLocalDateTime,
   formatUtcDateTime,
   formatUtcTimestamp,
   groupPostsByUtcYear,
+  parseLocalDateTime,
   parseUtcDate,
   toUtcTimestamp,
 } from "@/lib/date"
@@ -84,5 +86,24 @@ describe("groupPostsByUtcYear", () => {
     // First-seen: 2026 (a), then 2025 (b), then 2026 again (c) — c joins
     // the existing 2026 group, so order is [2026, 2025].
     expect(years).toEqual([2026, 2025])
+  })
+})
+
+describe("formatLocalDateTime / parseLocalDateTime", () => {
+  it("round-trips a local Date through the wire string", () => {
+    const d = new Date(2026, 9, 2, 9, 5)
+    expect(formatLocalDateTime(d)).toBe("2026-10-02T09:05")
+    expect(parseLocalDateTime("2026-10-02T09:05")?.getTime()).toBe(d.getTime())
+  })
+
+  it("requires the full date-time shape", () => {
+    // A bare date would parse as UTC midnight — reject it here instead.
+    expect(parseLocalDateTime("2026-10-02")).toBeUndefined()
+    expect(parseLocalDateTime("")).toBeUndefined()
+    expect(parseLocalDateTime("nonsense")).toBeUndefined()
+  })
+
+  it("rejects out-of-range components instead of normalizing", () => {
+    expect(parseLocalDateTime("2026-13-99T09:00")).toBeUndefined()
   })
 })

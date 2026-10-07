@@ -20,6 +20,26 @@ export function formatLocalDate(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+/** Local "YYYY-MM-DDTHH:mm" from a Date — the schedule picker's wire
+ *  contract (the shape <input type="datetime-local"> used to speak, and
+ *  lib/schedule's localValue argument). Inverse of parseLocalDateTime. */
+export function formatLocalDateTime(d: Date): string {
+  const hh = String(d.getHours()).padStart(2, "0")
+  const mm = String(d.getMinutes()).padStart(2, "0")
+  return `${formatLocalDate(d)}T${hh}:${mm}`
+}
+
+/** Local "YYYY-MM-DDTHH:mm" → Date interpreted in the local zone.
+ *  Requires the full date-time shape: a bare "YYYY-MM-DD" would parse
+ *  as UTC midnight (see parseUtcDate) instead of the local day the
+ *  schedule contract means. Returns undefined for "" or anything
+ *  unparseable. */
+export function parseLocalDateTime(value: string): Date | undefined {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return undefined
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? undefined : d
+}
+
 /** UTC datetime string (SQLite "YYYY-MM-DD HH:MM:SS") → local
  *  "YYYY-MM-DD" for display. Falls back to the date portion of the raw
  *  string when it can't be parsed. */

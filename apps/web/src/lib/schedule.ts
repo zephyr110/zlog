@@ -2,32 +2,30 @@
  * Scheduled-publishing helpers. `publish_at` is stored as UTC
  * "YYYY-MM-DD HH:MM:SS" — the same format as datetime('now') and
  * pinned_at, so SQL string comparison is exact — while the admin edits
- * it through an <input type="datetime-local">, which speaks local time
- * at minute precision. Everything between those two worlds lives here.
+ * it through the shadcn date-time picker (components/ui/date-time-picker),
+ * which speaks local time at minute precision. Everything between those
+ * two worlds lives here.
  */
 
-/** <input type="datetime-local"> value ("YYYY-MM-DDTHH:mm") → stored UTC,
+import { formatLocalDateTime, parseLocalDateTime } from "@/lib/date"
+
+/** Local "YYYY-MM-DDTHH:mm" (the picker's wire value) → stored UTC,
  *  or null for "publish immediately" / unparseable input. */
 export function toPublishAtUtc(localValue: string): string | null {
-  if (!localValue) return null
-  // A date-time string without a zone is parsed as LOCAL time, which is
-  // exactly what the author picked in their browser.
-  const date = new Date(localValue)
-  if (Number.isNaN(date.getTime())) return null
+  // Without a zone the value is parsed as LOCAL time, which is exactly
+  // what the author picked in their browser.
+  const date = parseLocalDateTime(localValue)
+  if (!date) return null
   return toUtcStamp(date)
 }
 
-/** Stored UTC → the local value the datetime-local input expects.
- *  Parsed as UTC (seconds are dropped — the input has minute precision). */
+/** Stored UTC → the local "YYYY-MM-DDTHH:mm" the picker expects.
+ *  Parsed as UTC (seconds are dropped — the picker has minute precision). */
 export function fromPublishAtUtc(stored: string | null | undefined): string {
   if (!stored) return ""
   const date = new Date(`${stored.replace(" ", "T")}Z`)
   if (Number.isNaN(date.getTime())) return ""
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  )
+  return formatLocalDateTime(date)
 }
 
 /** True while the post's publish time is still in the future. A null /

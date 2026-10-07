@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
+import { DateTimePicker } from "@/components/ui/date-time-picker"
 import { apiFetch } from "@/lib/api-client"
 import { fromPublishAtUtc, isScheduled, toPublishAtUtc } from "@/lib/schedule"
 import { useT } from "@/components/layout/trans"
@@ -153,7 +153,7 @@ interface PostEditorProps {
 }
 
 export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
-  const { t } = useT()
+  const { t, locale } = useT()
   const router = useRouter()
 
   const [title, setTitle] = useState(initialPost?.title || "")
@@ -893,19 +893,19 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
               ? (t("admin.statusScheduledDesc"))
               : (t("admin.publishedDesc"))}
         </span>
-        <label
-          htmlFor="publish-at"
-          className="ml-auto flex items-center gap-2"
-        >
+        <div className="ml-auto flex items-center gap-2">
           <span className="text-xs">{t("admin.scheduleLabel")}</span>
-          <Input
-            id="publish-at"
-            type="datetime-local"
+          <DateTimePicker
             value={publishAt}
-            onChange={(e) => setPublishAt(e.target.value)}
-            className="h-8 w-auto text-xs"
+            onChange={setPublishAt}
+            ariaLabel={t("admin.scheduleLabel")}
+            placeholder={t("admin.schedulePlaceholder")}
+            locale={locale}
+            clearLabel={t("admin.scheduleClear")}
+            hourLabel={t("admin.scheduleHour")}
+            minuteLabel={t("admin.scheduleMinute")}
           />
-        </label>
+        </div>
       </div>
       <p className="-mt-3 text-xs text-muted-foreground">
         {t("admin.scheduleHint")}
