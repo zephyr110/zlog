@@ -106,25 +106,34 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             const Icon = item.icon
             const active = panel === item.id
             return (
-              <Button
+              <div
                 key={item.id}
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-current={active ? "page" : undefined}
-                onClick={() => selectPanel(item.id)}
                 className={cn(
-                  "h-8 shrink-0 justify-start px-2.5 text-sm sm:w-full",
-                  active
-                    ? "bg-accent font-medium text-accent-foreground hover:bg-accent hover:text-accent-foreground"
-                    : "text-muted-foreground"
+                  "flex shrink-0",
+                  // 「账号」固定侧边栏底部（sm+），与主侧边栏底部的用户区
+                  // 位置一致；移动端保持横向行内末位。
+                  item.id === "account" && "sm:mt-auto sm:border-t sm:pt-2"
                 )}
               >
-                <Icon
-                  className={cn("size-4", !active && "opacity-70")}
-                />
-                {item.label}
-              </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => selectPanel(item.id)}
+                  className={cn(
+                    "h-8 shrink-0 justify-start px-2.5 text-sm sm:w-full",
+                    active
+                      ? "bg-accent font-medium text-accent-foreground hover:bg-accent hover:text-accent-foreground"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  <Icon
+                    className={cn("size-4", !active && "opacity-70")}
+                  />
+                  {item.label}
+                </Button>
+              </div>
             )
           })}
         </nav>
