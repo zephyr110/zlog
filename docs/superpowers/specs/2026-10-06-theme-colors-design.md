@@ -1,6 +1,6 @@
 # 主题配色（Base Color + Theme Color）— 设计
 
-日期：2026-10-06 · 状态：已确认，已实施（执行期修订：neutral 块排除 chart-1..5，见 §0.4/§1.3；数据源固定提交号，见 §1.1；2026-10-07 起为上线后修订：基准色板改单轴作用域，见 §3.2；「账号」nav 项固定底部，见 §3.1）
+日期：2026-10-06 · 状态：已确认，已实施（执行期修订：neutral 块排除 chart-1..5，见 §0.4/§1.3；数据源固定提交号，见 §1.1；2026-10-07 起为上线后修订：基准色板改单轴作用域，见 §3.2；「账号」nav 项移至站点上方，见 §3.1）
 
 后台设置新增「外观」面板：选择 shadcn **基准色**（经典 5 色）与**主题色**（Default + 精选 7 色）。两轴正交，保存后前端页面与后台系统全部应用。配色目录为官方 registry 快照（入仓，单一事实来源），构建期生成静态 CSS，SSR 直出 `data-*` 属性——零闪烁、零运行时 JS。默认组合（Neutral + Default）与现状视觉一致（图表色例外与处理见 §0.4），零视觉回归。
 
@@ -128,8 +128,8 @@ html.dark[data-theme-color="blue"], .dark [data-theme-color="blue"] { /* 暗 11 
 ### 3.1 SettingsDialog 接入 — `apps/web/src/components/admin/settings-dialog.tsx`
 
 - `SettingsPanel` 联合类型加 `"appearance"`。
-- nav 加 `{ id: "appearance", label: t("admin.settingsNavAppearance"), icon: Palette }`（位于 site 与 account 之间）。
-- 「账号」项固定侧边栏底部（2026-10-07 用户要求）：sm+ 用 `mt-auto` + 顶部发丝线与站点/外观分组，与主侧边栏底部用户区位置一致；移动端保持横向行内末位。
+- nav 加 `{ id: "appearance", label: t("admin.settingsNavAppearance"), icon: Palette }`（现为列表末位，在 site 之后）。
+- 「账号」项移至站点上方（2026-10-07 用户要求，取代早前"固定底部"方案）：nav 顺序为 账号 → 站点 → 外观，sm+ 与移动端均为首项，不再有 `mt-auto` 底部分组。
 - title/description 三元组加分支（`appearanceInfo` / `appearanceInfoDesc`）。
 - 内容区加 `<div hidden={panel !== "appearance"}><AppearanceForm idPrefix="dlg-appearance" /></div>`（沿用 hidden 容器的既有范式）。
 - recovery-key 切换守卫对 appearance 自动生效，无需改动。

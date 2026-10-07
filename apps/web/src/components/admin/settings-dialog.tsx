@@ -74,9 +74,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   }
 
   const nav = [
+    { id: "account" as const, label: t("admin.settingsNavAccount"), icon: UserRound },
     { id: "site" as const, label: t("admin.settingsNavSite"), icon: Globe },
     { id: "appearance" as const, label: t("admin.settingsNavAppearance"), icon: Palette },
-    { id: "account" as const, label: t("admin.settingsNavAccount"), icon: UserRound },
   ]
 
   const title =
@@ -106,15 +106,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             const Icon = item.icon
             const active = panel === item.id
             return (
-              <div
-                key={item.id}
-                className={cn(
-                  "flex shrink-0",
-                  // 「账号」固定侧边栏底部（sm+），与主侧边栏底部的用户区
-                  // 位置一致；移动端保持横向行内末位。
-                  item.id === "account" && "sm:mt-auto sm:border-t sm:pt-2"
-                )}
-              >
+              <div key={item.id} className="flex shrink-0">
                 <Button
                   type="button"
                   variant="ghost"
