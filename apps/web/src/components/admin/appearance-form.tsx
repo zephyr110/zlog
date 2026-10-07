@@ -24,11 +24,14 @@ import {
 /**
  * 「外观」面板 — 基准色 × 主题色（accent）。
  *
- * 活预览：每个选项按钮同时挂 data-base-color / data-theme-color 两个属性——
- * 被选择的一轴挂本选项 id，另一轴挂表单当前选择——预览即「本选项 × 另一轴
- * 当前选择」的真实组合。两轴都作用于按钮元素本身，变量元素级解析、不依赖
- * ambient html（Neutral 落到与 :root 等值的 neutral 块；Default 无 accent 块
- * → 落回基准色自身主色）。亮暗随面板所处模式自适应（.dark 后代形态）。
+ * 活预览为元素级作用域，不依赖 ambient html：
+ * - 基准色按钮只挂自身 data-base-color——色块恒为本基准色身份（背景/边框/
+ *   primary 圆点），不随主题色选择变化。切勿再挂 data-theme-color：accent
+ *   段源序在 base 段之后，同特异性下会把 --primary 圆点劫持成当前主题色。
+ * - 主题色按钮挂 data-base-color={当前基准} + data-theme-color={本项}——圆点
+ *   取本主题 accent（同特异性、accent 段靠后取胜），边框等中性上下文取当前
+ *   基准色；Default 无 accent 块 → 落回基准色自身主色，Neutral 落到与 :root
+ *   等值的 neutral 块。亮暗随面板所处模式自适应（.dark 后代形态）。
  */
 export function AppearanceForm({ className }: { className?: string }) {
   const { t } = useT()
@@ -135,7 +138,6 @@ export function AppearanceForm({ className }: { className?: string }) {
                 type="button"
                 aria-pressed={selected}
                 data-base-color={c.id}
-                data-theme-color={themeColor}
                 onClick={() => setBaseColor(c.id)}
                 className={cn(
                   "flex flex-col items-center gap-1.5 rounded-lg border p-2 text-[11px] leading-none transition-colors",

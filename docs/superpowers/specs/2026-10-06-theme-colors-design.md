@@ -1,6 +1,6 @@
 # 主题配色（Base Color + Theme Color）— 设计
 
-日期：2026-10-06 · 状态：已确认，实施中（执行期修订：neutral 块排除 chart-1..5，见 §0.4/§1.3；数据源固定提交号，见 §1.1）
+日期：2026-10-06 · 状态：已确认，已实施（执行期修订：neutral 块排除 chart-1..5，见 §0.4/§1.3；数据源固定提交号，见 §1.1；2026-10-07 起为上线后修订：基准色板改单轴作用域，见 §3.2）
 
 后台设置新增「外观」面板：选择 shadcn **基准色**（经典 5 色）与**主题色**（Default + 精选 7 色）。两轴正交，保存后前端页面与后台系统全部应用。配色目录为官方 registry 快照（入仓，单一事实来源），构建期生成静态 CSS，SSR 直出 `data-*` 属性——零闪烁、零运行时 JS。默认组合（Neutral + Default）与现状视觉一致（图表色例外与处理见 §0.4），零视觉回归。
 
@@ -141,7 +141,7 @@ html.dark[data-theme-color="blue"], .dark [data-theme-color="blue"] { /* 暗 11 
   - 「主题色」8 项：按钮自身挂 `data-theme-color="Y"`（default 置首）。
 - **真实 token 活预览**（非贴图、非硬编码色值）：
   - 色板内部用 `var(--background) / var(--border) / var(--primary)` 等渲染；基准色板为圆角方块（背景 + 边框 + 中央 `var(--primary)` 圆点），主题色板为圆形填充 `var(--primary)`。
-  - **两轴在色板元素上均显式作用域**：每个选项按钮同时挂 `data-base-color` 与 `data-theme-color`——被选择的一轴挂本选项 id，另一轴挂表单当前选择。预览 = 「本选项 × 另一轴现阶段选择」的真实组合，完全元素级解析、不依赖 ambient html：Neutral 选项落到与 `:root` 等值的 neutral 块、Default 选项无 accent 块 → 显示该基准色自身主色。亮暗随面板所处模式自适应（`.dark […]` 后代形态）。
+  - **元素级作用域（2026-10-07 修订：基准色板只挂自身轴）**：基准色按钮只挂 `data-base-color="X"`——色块恒为该基准色自身身份（背景 + 边框 + `var(--primary)` 圆点），不随主题色选择变化。原实现两轴同挂（「本选项 × 另一轴」交叉预览），因 accent 段源序在 base 段之后、同特异性下 `--primary` 被当前主题色的 accent 块劫持、圆点随之变色（2026-10-07 用户报告），故移除基准色按钮上的 `data-theme-color`；headless Chrome 对生成 CSS 的级联实测坐实机制与修法（双轴 → blue 主色；单轴 → slate 自身主色），守护测试见 §5。主题色按钮仍双轴：`data-base-color={当前基准} + data-theme-color="Y"`——圆点取本主题 accent（accent 段靠后、同特异性取胜），边框等中性上下文取当前基准色。完全元素级解析、不依赖 ambient html：Neutral 选项落到与 `:root` 等值的 neutral 块、Default 选项无 accent 块 → 显示该基准色自身主色。亮暗随面板所处模式自适应（`.dark […]` 后代形态）。
 - 选中态：`ring-2 ring-ring` + Check 图标；hover 态边框/缩放微反馈。
 - 保存成功：toast（复用或新增 `appearanceSaved`，实施时核对现有键）→ `router.refresh()`（根布局重渲染 → html 属性更新 → 全站即时换色）。**实施时实测该路径；若 html 属性不随 refresh 更新，回退 `window.location.reload()`**。失败路径 toast.error（同既有范式）。
 - 面板内一行说明文案（`appearanceHint`）：配色应用于前台与后台；线上 Pages 静态镜像需下一次构建生效（与总开关同语义）。
@@ -166,6 +166,7 @@ html.dark[data-theme-color="blue"], .dark [data-theme-color="blue"] { /* 暗 11 
   2. **默认零回归**：除 `chart-1..5` 外逐键全等；差异集合恰为 `chart-1..5` 且其值等于官方 gray 快照图表值（锁定站点图表色，防上游漂移）；额外键仅 `--login-glow`。
   3. **目录完整性**：bases = 5 ×（亮 32 / 暗 31 键）；themes = 7 × 11 键（rose 暗色 12）；无未知键。
   4. **生成器不变式**：输出不含 `data-theme-color="default"` 块；基准段（5 色）整体先于 accent 段；双形态选择器逐字断言（含暗色后代形态 `.dark […]`）；neutral 块不含 `--chart-*`（站点图表色保留于 `globals.css`），其余 base 仍含。
+- `apps/web/test/theme-wiring.test.ts`（终审修正增补；2026-10-07 扩）：layout / route / appearance-form 三处接线静态守护——appearance 项锁定「基准色按钮只挂自身轴」，防 `--primary` 圆点被 accent 段劫持（§3.2 修订）。
 - `packages/database/test/site-settings-defaults.test.ts`（增补，沿静态源文本断言范式）：两列 DEFAULT 声明与 upsert 兜底链。
 - `apps/web/test/site-settings-theme.test.ts`（新增）：`siteConfigFromRow` 脏值/缺省兜底 + `updateSchema` 枚举校验（schema 拆分见下）。
 - **API 校验**：非法枚举 400 由 `z.enum` 保证；`updateSchema` 拆至 `apps/web/src/lib/site-settings-schema.ts`（route 文件只做 IO，Next 不允许 route 文件额外导出），单测直引断言合法/非法枚举。
