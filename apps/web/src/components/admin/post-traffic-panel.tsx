@@ -29,7 +29,7 @@ import {
 
 type MonthsWindow = "6" | "12" | "all"
 
-const SPARK_W = 88
+const SPARK_W = 120
 const SPARK_H = 24
 
 /** Per-post traffic attribution — top posts by archived views over the
@@ -144,8 +144,8 @@ export function PostTrafficPanel() {
             {Array.from({ length: 5 }).map((_, i) => (
               <li key={i} className="flex items-center gap-3 px-2 py-2">
                 <Skeleton className="h-4 min-w-0 flex-1" />
-                <Skeleton className="h-6 w-[88px] shrink-0" />
-                <Skeleton className="h-4 w-12 shrink-0" />
+                <Skeleton className="h-6 w-[120px] shrink-0" />
+                <Skeleton className="h-4 w-16 shrink-0" />
               </li>
             ))}
           </ul>
@@ -164,10 +164,10 @@ export function PostTrafficPanel() {
           <ul className="flex flex-col">
             <li className="flex items-center gap-3 border-b px-2 pb-2 text-xs text-muted-foreground">
               <span className="min-w-0 flex-1">{t("admin.posts")}</span>
-              <span className="w-[88px] shrink-0 text-center">
+              <span className="w-[120px] shrink-0 text-center">
                 {monthsLabel}
               </span>
-              <span className="w-12 shrink-0 text-right">
+              <span className="w-16 shrink-0 text-right">
                 {t("admin.postTrafficViews")}
               </span>
             </li>
@@ -184,7 +184,7 @@ export function PostTrafficPanel() {
                 </Link>
                 <svg
                   viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
-                  className="h-6 w-[88px] shrink-0 text-primary"
+                  className="h-6 w-[120px] shrink-0 text-primary"
                   role="img"
                   aria-label={`${entry.views} ${t("admin.postTrafficViews")}`}
                 >
@@ -206,7 +206,7 @@ export function PostTrafficPanel() {
                     )}
                   />
                 </svg>
-                <span className="w-12 shrink-0 text-right text-sm tabular-nums">
+                <span className="w-16 shrink-0 text-right text-sm tabular-nums">
                   {entry.views.toLocaleString()}
                 </span>
               </li>
