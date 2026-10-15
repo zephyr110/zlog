@@ -1,4 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton"
+import { BannerArt, pageBannerMinClass } from "@/components/layout/banner-art"
+import { cn } from "@/lib/utils"
 
 /** Shared PageHeader loading chrome — breadcrumb, icon + title/desc. */
 export function PageHeaderSkeleton({
@@ -8,12 +10,14 @@ export function PageHeaderSkeleton({
   withStats?: boolean
 }) {
   return (
-    <section className="relative overflow-hidden border-b bg-muted/10">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.06] to-transparent"
-      />
-      <div className="container relative mx-auto max-w-5xl px-4 py-16 md:py-20 2xl:max-w-7xl">
+    <section
+      className={cn(
+        "relative flex flex-col overflow-hidden border-b bg-background",
+        pageBannerMinClass
+      )}
+    >
+      <BannerArt />
+      <div className="container relative mx-auto flex max-w-5xl flex-1 flex-col justify-center px-4 py-12 md:py-16 2xl:max-w-7xl">
         <nav className="mb-6 flex items-center gap-2">
           <Skeleton className="h-3.5 w-16" />
           <span className="opacity-40">/</span>

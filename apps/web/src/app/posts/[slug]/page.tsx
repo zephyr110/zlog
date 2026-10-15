@@ -11,7 +11,8 @@ import { FormattedDate } from "@/components/blog/formatted-date"
 import { Container } from "@/components/ui/container"
 import { ShareMenu } from "@/components/blog/share-menu"
 import { CommentSection } from "@/components/blog/comment-section"
-import { HeroGlow } from "@/components/layout/hero-glow"
+import { BannerArt, pageBannerMinClass } from "@/components/layout/banner-art"
+import { cn } from "@/lib/utils"
 import { Trans } from "@/components/layout/trans"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Calendar, ChevronLeft, ChevronRight, Clock, Layers } from "lucide-react"
@@ -115,13 +116,13 @@ export default async function PostPage({ params }: PostPageProps) {
 
       <article className="min-h-screen">
         {/* Hero Header */}
-        <header className="relative overflow-hidden border-b bg-gradient-to-b from-muted/40 via-muted/20 to-background">
-          {/* Login-style top glow only when there is no cover — covers
-              already fill the hero, so a second wash would muddy them. */}
-          {!post.cover && (
-            <HeroGlow className="h-52 md:h-64 opacity-[0.14] dark:opacity-20" />
+        <header
+          className={cn(
+            "relative flex flex-col overflow-hidden border-b bg-background",
+            pageBannerMinClass
           )}
-          {post.cover && (
+        >
+          {post.cover ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -129,15 +130,13 @@ export default async function PostPage({ params }: PostPageProps) {
                 alt=""
                 className="absolute inset-0 h-full w-full object-cover"
               />
-              {/* Legibility scrim — the cover shows at full opacity; a
-                  background-colored gradient (strongest behind the title
-                  block, fading upward) keeps the breadcrumb/title readable
-                  on busy art in both themes without hiding the image. */}
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/55 to-background/25" />
             </>
+          ) : (
+            <BannerArt />
           )}
 
-          <Container size="lg" className="relative">
+          <Container className="relative flex flex-1 flex-col justify-center py-12 md:py-16">
             {/* Breadcrumb */}
             <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-8 animate-in fade-in slide-in-from-top-2 duration-500">
               <Link

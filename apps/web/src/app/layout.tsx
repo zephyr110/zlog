@@ -9,7 +9,7 @@ import { DocumentTitle } from "@/components/layout/document-title"
 import { SiteAnalytics } from "@/components/layout/site-analytics"
 import { ReplyNotifications } from "@/components/blog/reply-notifications"
 import { getSiteConfig } from "@/lib/get-site-config"
-import { DEFAULT_FAVICON } from "@/lib/site-config"
+import { FAVICON_DARK, FAVICON_LIGHT } from "@/lib/site-config"
 import { defaultLocale } from "@/lib/i18n"
 import { getAllTags } from "@zlog/database"
 import { unstable_cache } from "next/cache"
@@ -40,15 +40,28 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `${site.title} | %s`,
     },
     description: site.description,
-    icons: {
-      // The favicon follows the uploaded site logo — /icon proxies its
-      // bytes; the ?u= query cache-busts so a logo change shows up on
-      // the next page render. No logo → the built-in mark.
-      icon: site.logoUrl.trim()
-        ? `/icon?u=${encodeURIComponent(site.logoUrl.trim())}`
-        : DEFAULT_FAVICON,
-      apple: DEFAULT_FAVICON,
-    },
+    icons: site.logoUrl.trim()
+      ? {
+          // Custom logo: /icon proxies its bytes. ?u= cache-busts so a
+          // logo change shows up on the next page render.
+          icon: `/icon?u=${encodeURIComponent(site.logoUrl.trim())}`,
+          apple: FAVICON_LIGHT,
+        }
+      : {
+          // Follow the OS color scheme, not the in-app theme toggle.
+          // Both marks use the same rounded canvas.
+          icon: [
+            {
+              url: FAVICON_LIGHT,
+              media: "(prefers-color-scheme: light)",
+            },
+            {
+              url: FAVICON_DARK,
+              media: "(prefers-color-scheme: dark)",
+            },
+          ],
+          apple: FAVICON_LIGHT,
+        },
     openGraph: {
       title: site.title,
       description: site.description,

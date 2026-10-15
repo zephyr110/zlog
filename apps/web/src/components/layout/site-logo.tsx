@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
-import { DEFAULT_SITE_LOGO } from "@/lib/site-config"
+import { DEFAULT_SITE_LOGO, isBuiltinLogo, LOGO_DARK, LOGO_LIGHT } from "@/lib/site-config"
 
 type SiteLogoProps = {
   src: string
@@ -34,9 +34,9 @@ type SiteLogoProps = {
 }
 
 /**
- * Site mark. The shipped colorful PNG is never inverted. Custom
- * uploads can opt into a CSS invert via invertInDark. Theme comes
- * from next-themes `resolvedTheme` rather than `dark:` variants.
+ * Site mark. Built-in assets follow the theme: light mark on a light
+ * theme, the original dark mark when `.dark` is set. Custom uploads
+ * can opt into a CSS invert via invertInDark.
  */
 export function SiteLogo({
   src,
@@ -53,38 +53,52 @@ export function SiteLogo({
     setMounted(true) // eslint-disable-line react-hooks/set-state-in-effect -- theme is only known client-side
   }, [])
 
-  // A stored logo URL can dangle (e.g. the file was deleted from the media
-  // library, which removes it from the CDN but can't clear settings) —
-  // fall back to the built-in mark instead of showing a broken image.
-  // A URL that ever failed is never retried (a failed-set, not a latch):
-  // the old code flip-flopped src → fallback → src once the fallback also
-  // failed, re-firing img onError on every render; and a latch that pins
-  // the fallback for good would ignore a NEW src after one built-in hiccup
-  // (e.g. an admin re-uploading a logo). The machine always settles:
-  // renderedSrc only changes when an error adds a URL to the set.
-  const effectiveSrc = failed.has(src) ? DEFAULT_SITE_LOGO : src
-  // Invert only the requested custom mark — never the colorful fallback.
+  const builtin = isBuiltinLogo(src) || src === DEFAULT_SITE_LOGO
+  // A stored logo URL can dangle — fall back to the built-in pair.
+  const customBroken = !builtin && failed.has(src)
+  const showBuiltin = builtin || customBroken
   const needsInvert =
     invertInDark &&
-    effectiveSrc !== DEFAULT_SITE_LOGO &&
+    !showBuiltin &&
     mounted &&
     resolvedTheme === "dark"
 
-  function handleError() {
-    setFailed((prev) => new Set(prev).add(effectiveSrc))
+  function handleError(failedSrc: string) {
+    setFailed((prev) => (prev.has(failedSrc) ? prev : new Set(prev).add(failedSrc)))
   }
 
-  const img = (
+  const markClass = cn(
+    chip ? "size-full rounded-[inherit] object-cover" : "object-contain",
+    !chip && className
+  )
+  const lightSrc = failed.has(LOGO_LIGHT) ? LOGO_DARK : LOGO_LIGHT
+  const darkSrc = failed.has(LOGO_DARK) ? LOGO_LIGHT : LOGO_DARK
+
+  const img = showBuiltin ? (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element -- local theme marks; keep in sync with the dark variant */}
+      <img
+        src={lightSrc}
+        alt={alt}
+        className={cn(markClass, "dark:hidden")}
+        onError={() => handleError(lightSrc)}
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={darkSrc}
+        alt=""
+        className={cn(markClass, "hidden dark:block")}
+        onError={() => handleError(darkSrc)}
+      />
+    </>
+  ) : (
     // eslint-disable-next-line @next/next/no-img-element -- remote/uploaded logos; avoid next/image domain config
     <img
-      src={effectiveSrc}
+      src={src}
       alt={alt}
-      className={cn(
-        chip ? "size-full rounded-[inherit] object-cover" : "object-contain",
-        !chip && className
-      )}
+      className={markClass}
       style={needsInvert ? { filter: "invert(1)" } : undefined}
-      onError={handleError}
+      onError={() => handleError(src)}
     />
   )
 

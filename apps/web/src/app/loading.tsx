@@ -1,12 +1,20 @@
 import { Skeleton } from "@/components/ui/skeleton"
 import { PostFeedSkeleton } from "@/components/ui/loading"
+import { BannerArt, pageBannerMinClass } from "@/components/layout/banner-art"
+import { cn } from "@/lib/utils"
 
 export default function HomeLoading() {
   return (
     <div className="min-h-[calc(100vh-4rem)]">
       {/* Hero skeleton — avoid "0 articles" flash */}
-      <section className="relative overflow-hidden border-b bg-background">
-        <div className="container mx-auto px-4 py-12 md:py-16 lg:py-20 max-w-5xl 2xl:max-w-7xl relative">
+      <section
+        className={cn(
+          "relative flex flex-col overflow-hidden border-b bg-background",
+          pageBannerMinClass
+        )}
+      >
+        <BannerArt />
+        <div className="container relative mx-auto flex max-w-5xl flex-1 flex-col justify-center px-4 py-12 md:py-16 lg:py-20 2xl:max-w-7xl">
           <div className="max-w-2xl space-y-6">
             <Skeleton className="h-6 w-28 rounded-full" />
             <div className="space-y-3">

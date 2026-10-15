@@ -1,7 +1,8 @@
 import Link from "next/link"
 import type { ReactNode } from "react"
 import { Container } from "@/components/ui/container"
-import { HeroGlow } from "@/components/layout/hero-glow"
+import { BannerArt, pageBannerMinClass } from "@/components/layout/banner-art"
+import { cn } from "@/lib/utils"
 
 interface BreadcrumbItem {
   href: string
@@ -30,13 +31,14 @@ export function PageHeader({
   children,
 }: PageHeaderProps) {
   return (
-    <section className="relative overflow-hidden border-b bg-muted/10">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.06] to-transparent"
-      />
-      <HeroGlow />
-      <Container size="lg" className="relative">
+    <section
+      className={cn(
+        "relative flex flex-col overflow-hidden border-b bg-background",
+        pageBannerMinClass
+      )}
+    >
+      <BannerArt />
+      <Container className="relative flex flex-1 flex-col justify-center py-12 md:py-16">
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           {breadcrumb && breadcrumb.length > 0 && (
             <nav

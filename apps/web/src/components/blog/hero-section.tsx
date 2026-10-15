@@ -3,86 +3,24 @@
 import Link from "next/link"
 import { useT } from "@/components/layout/trans"
 import { ArrowRight, Archive } from "lucide-react"
-import { floatingParticles, blinkingParticles, HeroParticle, HeroPixel } from "./hero-particles"
-
-/* ── Layer: Line grid ── */
-function GridLayer() {
-  return (
-    <div
-      className="absolute inset-0"
-      aria-hidden
-      style={{
-        backgroundImage: `
-          linear-gradient(to right, color-mix(in oklab, var(--color-foreground) 9%, transparent) 1px, transparent 1px),
-          linear-gradient(to bottom, color-mix(in oklab, var(--color-foreground) 9%, transparent) 1px, transparent 1px)
-        `,
-        backgroundSize: "56px 56px",
-        maskImage: "radial-gradient(ellipse 95% 90% at 50% 0%, black 35%, transparent 80%)",
-        WebkitMaskImage: "radial-gradient(ellipse 95% 90% at 50% 0%, black 35%, transparent 80%)",
-      }}
-    />
-  )
-}
-
-/* ── Layer: Sweeping cell highlight ── */
-function CellsSweepLayer() {
-  return (
-    <div
-      className="absolute inset-0 motion-safe:block hidden opacity-[0.10] dark:opacity-[0.16]"
-      aria-hidden
-      style={{
-        backgroundImage: "conic-gradient(from 90deg at 2px 2px, transparent 90deg, oklch(0.6 0.2 290) 0)",
-        backgroundSize: "56px 56px",
-        maskImage: "linear-gradient(90deg, transparent 30%, black 42%, black 58%, transparent 70%)",
-        WebkitMaskImage: "linear-gradient(90deg, transparent 30%, black 42%, black 58%, transparent 70%)",
-        maskSize: "300% 100%",
-        WebkitMaskSize: "300% 100%",
-        maskRepeat: "no-repeat",
-        WebkitMaskRepeat: "no-repeat",
-        animation: "hero-cells-sweep 8s linear infinite",
-      }}
-    />
-  )
-}
-
-/* ── Layer: Blinking particles ── */
-function BlinkingLayer() {
-  return (
-    <div className="absolute inset-0 motion-safe:block hidden" aria-hidden>
-      {blinkingParticles.map((p, i) => (
-        <HeroPixel key={i} p={p} />
-      ))}
-    </div>
-  )
-}
-
-/* ── Layer: Floating particles ── */
-function FloatingLayer() {
-  return (
-    <div className="absolute inset-0 motion-safe:block hidden" aria-hidden>
-      {floatingParticles.map((p, i) => (
-        <HeroParticle key={i} p={p} className="hero-particle" />
-      ))}
-    </div>
-  )
-}
+import { BannerArt, pageBannerMinClass } from "@/components/layout/banner-art"
+import { cn } from "@/lib/utils"
 
 export function HeroSection({ postCount }: { postCount: number }) {
   const { t } = useT()
   const articlesLabel = t("site.articlesPublished") as (n: number) => string
 
   return (
-    <section className="relative overflow-hidden border-b bg-background">
-      <GridLayer />
-      <CellsSweepLayer />
-      <BlinkingLayer />
-      <FloatingLayer />
-
-      {/* Bottom blend into the post feed */}
-      <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background to-transparent" aria-hidden />
+    <section
+      className={cn(
+        "relative flex flex-col overflow-hidden border-b bg-background",
+        pageBannerMinClass
+      )}
+    >
+      <BannerArt />
 
       {/* ── Content ── */}
-      <div className="container mx-auto px-4 py-12 md:py-16 lg:py-20 max-w-5xl 2xl:max-w-7xl relative">
+      <div className="container relative mx-auto flex max-w-5xl flex-1 flex-col justify-center px-4 py-12 md:py-16 lg:py-20 2xl:max-w-7xl">
         <div className="max-w-2xl">
           {/* Article count badge */}
           <div

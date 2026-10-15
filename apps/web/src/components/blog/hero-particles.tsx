@@ -49,7 +49,13 @@ function pick<T>(rand: () => number, arr: readonly T[]): T {
 function makeParticles(
   seed: number,
   count: number,
-  opts: { sizeRange: [number, number]; delayRange: [number, number]; durRange: [number, number]; leftPad?: number; includeTop?: boolean }
+  opts: {
+    sizeRange: [number, number]
+    delayRange: [number, number]
+    durRange: [number, number]
+    leftPad?: number
+    includeTop?: boolean
+  }
 ): ParticleDef[] {
   const rand = mulberry32(seed)
   const [szMin, szMax] = opts.sizeRange

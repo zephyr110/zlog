@@ -90,12 +90,22 @@ export const defaultSiteConfig: SiteConfig = {
   themeColor: DEFAULT_THEME_COLOR,
 }
 
-export const DEFAULT_SITE_LOGO = "/zlog-logo.png"
-/** Built-in favicon — same colorful mark as the navbar, rounded corners
- *  (22% radius, transparent outside). Separate file so the navbar logo
- *  keeps its square shape. */
-export const DEFAULT_FAVICON = "/zlog-favicon.png"
+/** 浅色底色标。浅色主题下的站点 Logo。 */
+export const LOGO_LIGHT = "/zlog-mark-light.png"
+/** 深色底色标（原 logo）。深色主题下的站点 Logo。 */
+export const LOGO_DARK = "/zlog-logo.png"
+/** 圆角深色标。系统为浅色时的 favicon。 */
+export const FAVICON_LIGHT = "/zlog-favicon.png"
+/** 圆角浅色标。系统为深色时的 favicon，圆角与浅色 favicon 一致。 */
+export const FAVICON_DARK = "/zlog-favicon-dark.png"
+
+/** 未上传自定义 Logo 时的默认图（浅色标；深色由 SiteLogo 切换）。 */
+export const DEFAULT_SITE_LOGO = LOGO_LIGHT
+
+export function isBuiltinLogo(src: string): boolean {
+  return src === LOGO_LIGHT || src === LOGO_DARK
+}
 
 export function siteLogoSrc(config: Pick<SiteConfig, "logoUrl">): string {
-  return config.logoUrl || DEFAULT_SITE_LOGO
+  return config.logoUrl || LOGO_LIGHT
 }

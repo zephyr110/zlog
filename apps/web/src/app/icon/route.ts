@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { NextRequest } from "next/server"
 import { getSiteConfig } from "@/lib/get-site-config"
-import { DEFAULT_FAVICON } from "@/lib/site-config"
+import { FAVICON_LIGHT } from "@/lib/site-config"
 
 // ISR (revalidate 3600) instead of a plain dynamic route: /icon is a
 // metadata route, which Next ≥ 16 keeps static by default — the build
@@ -58,7 +58,7 @@ function imageHeaders(
 }
 
 async function defaultFavicon(request: NextRequest): Promise<Response> {
-  const file = DEFAULT_FAVICON.replace(/^\//, "")
+  const file = FAVICON_LIGHT.replace(/^\//, "")
   const headers = imageHeaders(
     defaultFaviconType(file),
     "public, max-age=3600"
@@ -69,7 +69,7 @@ async function defaultFavicon(request: NextRequest): Promise<Response> {
   } catch {
     try {
       const res = await fetch(
-        new URL(DEFAULT_FAVICON, request.nextUrl.origin),
+        new URL(FAVICON_LIGHT, request.nextUrl.origin),
         // Cached like the proxy below: a no-store fetch would make the
         // build-time prerender of this route fail.
         { next: { revalidate: 3600 }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
