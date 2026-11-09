@@ -183,3 +183,40 @@ describe("samePostContent", () => {
     ).toBe(true)
   })
 })
+
+describe("可见性与版本历史", () => {
+  it("切换可见性不产生快照", async () => {
+    const slug = "rev-visibility-toggle"
+    await content.savePost(mkPost(slug, { content: "v1" }))
+    await content.setPostVisible(slug, false)
+
+    expect(await revisions.listPostRevisions(slug)).toHaveLength(0)
+  })
+
+  it("恢复历史内容不改变当前可见性", async () => {
+    const slug = "rev-visibility-restore"
+    await content.savePost(mkPost(slug, { content: "v1" }))
+    await content.savePost(mkPost(slug, { content: "v2" }))
+
+    const list = await revisions.listPostRevisions(slug)
+    const revision = await revisions.getPostRevision(list[0].id)
+    expect(revision).not.toBeNull()
+
+    await content.setPostVisible(slug, false)
+    // 路由的恢复路径就是 savePost(revision)。
+    await content.savePost(revision!)
+
+    const stored = await content.getPostBySlug(slug, true)
+    expect(stored?.content).toBe("v1")
+    expect(stored?.visible).toBe(false)
+  })
+
+  it("samePostContent 忽略 visible", () => {
+    expect(
+      revisions.samePostContent(
+        mkPost("same", { visible: true }),
+        mkPost("same", { visible: false })
+      )
+    ).toBe(true)
+  })
+})
