@@ -47,7 +47,7 @@ async function ensureTable(db: Client): Promise<void> {
   if (!tableReady) {
     tableReady = (async () => {
       await db.executeMultiple(SCHEMA)
-      // Migrate existing DBs that predate pinned_at / publish_at.
+      // Migrate existing DBs that predate pinned_at / publish_at / visible.
       for (const column of [
         "pinned_at TEXT",
         "publish_at TEXT",

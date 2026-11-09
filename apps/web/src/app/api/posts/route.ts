@@ -237,7 +237,7 @@ export async function DELETE(request: NextRequest) {
   return NextResponse.json({ success: true })
 }
 
-// PATCH /api/posts?slug=xxx — publish / unpublish and/or pin / unpin
+// PATCH /api/posts?slug=xxx — publish / unpublish, pin / unpin, and/or show / hide
 export async function PATCH(request: NextRequest) {
   const user = await requireAuth(request)
   if (!user) {

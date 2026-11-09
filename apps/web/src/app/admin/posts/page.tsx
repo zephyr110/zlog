@@ -42,8 +42,9 @@ import { categoryKeys, getCategoryLabel, resolveCategory } from "@/lib/categorie
 import { isPublished, isScheduled } from "@/lib/schedule"
 import { type PostSummary } from "@zlog/database"
 
-/** Draft / scheduled / published badge — shared by the mobile card and
- *  desktop table so the status palette can't drift between the variants. */
+/** Draft / scheduled / published badge, plus a hidden marker — shared by
+ *  the mobile card and desktop table so the status palette can't drift
+ *  between the variants. */
 function StatusBadge({ post }: { post: PostSummary }) {
   const { t } = useT()
   const scheduled = !post.draft && isScheduled(post.publishAt)

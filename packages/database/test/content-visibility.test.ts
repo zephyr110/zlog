@@ -67,6 +67,16 @@ beforeAll(async () => {
       content: "vault body",
     })
   )
+  await content.savePost(
+    mkPost("hidden-draft", { date: "2025-12-30", draft: true, visible: false })
+  )
+  await content.savePost(
+    mkPost("hidden-scheduled", {
+      date: "2025-12-29",
+      visible: false,
+      publishAt: FUTURE,
+    })
+  )
 })
 
 afterAll(() => {
@@ -82,7 +92,17 @@ describe("public visibility with publish_at", () => {
   it("getAllPosts(includeDrafts) returns everything", async () => {
     const slugs = (await content.getAllPosts(true)).map((p) => p.slug)
     expect(slugs.sort()).toEqual(
-      ["draft", "draft-scheduled", "flip", "future", "hidden", "live", "past"].sort()
+      [
+        "draft",
+        "draft-scheduled",
+        "flip",
+        "future",
+        "hidden",
+        "hidden-draft",
+        "hidden-scheduled",
+        "live",
+        "past",
+      ].sort()
     )
   })
 
@@ -155,6 +175,28 @@ describe("hidden posts (visible = 0)", () => {
   })
 })
 
+describe("visibility × draft/schedule matrix", () => {
+  it("hidden + draft: public queries skip it, admin list still includes it", async () => {
+    expect(await content.getPostBySlug("hidden-draft")).toBeNull()
+    expect((await content.getAllPosts()).map((p) => p.slug)).not.toContain(
+      "hidden-draft"
+    )
+    expect((await content.getAllPosts(true)).map((p) => p.slug)).toContain(
+      "hidden-draft"
+    )
+  })
+
+  it("hidden + scheduled: public null, admin sees visible=false with the future schedule", async () => {
+    expect(await content.getPostBySlug("hidden-scheduled")).toBeNull()
+    expect((await content.getAllPosts()).map((p) => p.slug)).not.toContain(
+      "hidden-scheduled"
+    )
+    const adminView = await content.getPostBySlug("hidden-scheduled", true)
+    expect(adminView?.visible).toBe(false)
+    expect(adminView?.publishAt).toBe(FUTURE)
+  })
+})
+
 describe("setPostVisible", () => {
   it("hides and restores a live post across public queries", async () => {
     const slug = "visibility-toggle"
@@ -191,5 +233,20 @@ describe("setPostVisible", () => {
     const stored = await content.getPostBySlug(slug, true)
     expect(stored?.visible).toBe(false)
     expect(stored?.content).toBe("changed body")
+  })
+})
+
+describe("savePost rename", () => {
+  it("keeps a hidden post hidden across a slug change", async () => {
+    const oldSlug = "hidden-rename-old"
+    const newSlug = "hidden-rename-new"
+    // Rename INSERT takes visible from the Post the caller passes in —
+    // this pins that the editor's hidden state survives the new row.
+    await content.savePost(mkPost(oldSlug, { visible: false }), oldSlug)
+    await content.savePost(mkPost(newSlug, { visible: false }), oldSlug)
+
+    const adminView = await content.getPostBySlug(newSlug, true)
+    expect(adminView?.visible).toBe(false)
+    expect(await content.getPostBySlug(newSlug)).toBeNull()
   })
 })
