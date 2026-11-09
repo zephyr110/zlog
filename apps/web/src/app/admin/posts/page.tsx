@@ -1,14 +1,15 @@
 "use client"
 
-import { useEffect, useState, useMemo, Suspense } from "react"
+import { useEffect, useRef, useState, useMemo, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Download, Ellipsis, Search, SquarePen, Eye, Globe, FilePen, Trash2, Pin } from "lucide-react"
+import { Download, Ellipsis, Search, SquarePen, Eye, EyeOff, Globe, FilePen, Trash2, Pin } from "lucide-react"
 import { PostsListSkeleton } from "@/components/ui/loading"
 import { HeaderActions } from "@/components/admin/header-actions"
 import { PaginationBar } from "@/components/admin/pagination-bar"
 import { ConfirmDeleteDialog } from "@/components/admin/confirm-delete-dialog"
 import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -39,31 +40,108 @@ import { FormattedDate } from "@/components/blog/formatted-date"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
 import { categoryKeys, getCategoryLabel, resolveCategory } from "@/lib/categories"
-import { isPublic, isScheduled } from "@/lib/schedule"
+import { isPublic, isPublished, isScheduled } from "@/lib/schedule"
+import { cn } from "@/lib/utils"
 import { type PostSummary } from "@zlog/database"
 
-/** Draft / scheduled / published badge — shared by the mobile card and
- *  desktop table so the status palette can't drift between the variants. */
+const STATUS_FILTERS = ["all", "published", "scheduled", "drafts", "hidden"] as const
+type StatusFilter = (typeof STATUS_FILTERS)[number]
+
+const STATUS_LABELS = {
+  all: "admin.all",
+  published: "admin.published",
+  scheduled: "admin.statusScheduled",
+  drafts: "admin.drafts",
+  hidden: "admin.hidden",
+} as const satisfies Record<StatusFilter, string>
+
+const STATUS_PREDICATES: Record<
+  Exclude<StatusFilter, "all">,
+  (post: PostSummary) => boolean
+> = {
+  published: isPublished,
+  scheduled: (post) => !post.draft && isScheduled(post.publishAt),
+  drafts: (post) => post.draft,
+  hidden: (post) => !post.visible,
+}
+
+function parseStatusFilter(value: string | null): StatusFilter {
+  return (STATUS_FILTERS as readonly string[]).includes(value ?? "")
+    ? (value as StatusFilter)
+    : "all"
+}
+
+/** Must match the bulk endpoint's max array length. Selection survives
+ *  pagination, so a batch can span many pages and needs splitting. */
+const BULK_CHUNK_SIZE = 100
+
+/** Native checkbox (with indeterminate support) for row selection. */
+function SelectionCheckbox({
+  checked,
+  indeterminate = false,
+  onChange,
+  label,
+  disabled = false,
+  className,
+}: {
+  checked: boolean
+  indeterminate?: boolean
+  onChange: () => void
+  label?: string
+  disabled?: boolean
+  className?: string
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate
+  }, [indeterminate])
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      disabled={disabled}
+      onChange={onChange}
+      aria-label={label}
+      className={cn(
+        "size-4 shrink-0 cursor-pointer accent-primary",
+        className
+      )}
+    />
+  )
+}
+
+/** Draft / scheduled / published badge, plus a hidden marker — shared by
+ *  the mobile card and desktop table so the status palette can't drift
+ *  between the variants. */
 function StatusBadge({ post }: { post: PostSummary }) {
   const { t } = useT()
   const scheduled = !post.draft && isScheduled(post.publishAt)
   return (
-    <Badge
-      variant={post.draft ? "secondary" : "default"}
-      className={
-        post.draft
-          ? "bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <Badge
+        variant={post.draft ? "secondary" : "default"}
+        className={
+          post.draft
+            ? "bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+            : scheduled
+              ? "bg-sky-100 text-sky-700 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-400"
+              : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400"
+        }
+      >
+        {post.draft
+          ? (t("admin.draft"))
           : scheduled
-            ? "bg-sky-100 text-sky-700 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-400"
-            : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400"
-      }
-    >
-      {post.draft
-        ? (t("admin.draft"))
-        : scheduled
-          ? (t("admin.statusScheduled"))
-          : (t("admin.publishedStatus"))}
-    </Badge>
+            ? (t("admin.statusScheduled"))
+            : (t("admin.publishedStatus"))}
+      </Badge>
+      {!post.visible ? (
+        <Badge variant="outline" className="gap-1 text-muted-foreground">
+          <EyeOff className="size-3" />
+          {t("admin.hidden")}
+        </Badge>
+      ) : null}
+    </span>
   )
 }
 
@@ -97,14 +175,8 @@ function AdminPostsContent() {
   const [posts, setPosts] = useState<PostSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "published" | "scheduled" | "drafts"
-  >(
-    initialStatus === "published" ||
-      initialStatus === "scheduled" ||
-      initialStatus === "drafts"
-      ? initialStatus
-      : "all"
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() =>
+    parseStatusFilter(initialStatus)
   )
   // "all" or a category key (frontend, backend, ...) — tags roll up to
   // their topic via resolveCategory, same as the dashboard chart.
@@ -137,22 +209,15 @@ function AdminPostsContent() {
   const [prevInitialStatus, setPrevInitialStatus] = useState(initialStatus)
   if (prevInitialStatus !== initialStatus) {
     setPrevInitialStatus(initialStatus)
-    if (
-      initialStatus === "published" ||
-      initialStatus === "scheduled" ||
-      initialStatus === "drafts"
-    ) {
-      setStatusFilter(initialStatus)
-      setPage(1)
-    }
+    setStatusFilter(parseStatusFilter(initialStatus))
+    setPage(1)
   }
 
   const filteredPosts = useMemo(() => {
     let result = posts
-    if (statusFilter === "published") result = result.filter(isPublic)
-    if (statusFilter === "scheduled")
-      result = result.filter((p) => !p.draft && isScheduled(p.publishAt))
-    if (statusFilter === "drafts") result = result.filter((p) => p.draft)
+    if (statusFilter !== "all") {
+      result = result.filter(STATUS_PREDICATES[statusFilter])
+    }
     if (topicFilter !== "all") {
       result = result.filter((p) =>
         p.tags.some((tag) => resolveCategory(tag) === topicFilter)
@@ -171,6 +236,28 @@ function AdminPostsContent() {
   }, [filteredPosts, page, pageSize])
 
   const totalPages = Math.ceil(filteredPosts.length / pageSize)
+
+  // Selection is by slug and survives pagination; the header checkbox
+  // acts on the rows currently visible on this page.
+  const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(
+    () => new Set()
+  )
+  const [bulkPending, setBulkPending] = useState(false)
+  // Selection is scoped to the current filter/search and survives only
+  // pagination. Without this, rows picked in one view stay selected while
+  // another view shows none of them, and the bulk bar would act on
+  // invisible rows. Adjusting state during render matches the page/filter
+  // resets above.
+  const selectionScope = JSON.stringify([statusFilter, topicFilter, searchQuery])
+  const [prevSelectionScope, setPrevSelectionScope] = useState(selectionScope)
+  if (prevSelectionScope !== selectionScope) {
+    setPrevSelectionScope(selectionScope)
+    setSelectedSlugs((prev) => (prev.size > 0 ? new Set() : prev))
+  }
+  const pageSlugs = paginatedPosts.map((post) => post.slug)
+  const allPageSelected =
+    pageSlugs.length > 0 && pageSlugs.every((slug) => selectedSlugs.has(slug))
+  const somePageSelected = pageSlugs.some((slug) => selectedSlugs.has(slug))
 
   // Keep the page in bounds when the list shrinks — deleting a post,
   // toggling its draft (moves it out of the filtered view), or narrowing
@@ -204,6 +291,12 @@ function AdminPostsContent() {
         // pin/draft toggles that landed while the DELETE was in flight;
         // filtering a stale array would wipe them from the UI.
         setPosts((prev) => prev.filter((p) => p.slug !== target.slug))
+        setSelectedSlugs((prev) => {
+          if (!prev.has(target.slug)) return prev
+          const next = new Set(prev)
+          next.delete(target.slug)
+          return next
+        })
         toast.success(t("admin.deleteSuccess"))
       } else {
         toast.error(t("admin.deleteFailed"))
@@ -295,6 +388,121 @@ function AdminPostsContent() {
     }
   }
 
+  async function handleToggleVisible(slug: string, currentVisible: boolean) {
+    const nextVisible = !currentVisible
+    try {
+      const res = await apiFetch(
+        `/api/posts?slug=${encodeURIComponent(slug)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ visible: nextVisible }),
+        }
+      )
+      if (res.ok) {
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.slug === slug ? { ...p, visible: nextVisible } : p
+          )
+        )
+        toast.success(
+          nextVisible ? t("admin.showSuccess") : t("admin.hideSuccess")
+        )
+      } else {
+        toast.error(t("admin.updateFailed"))
+      }
+    } catch {
+      toast.error(t("admin.networkError"))
+    }
+  }
+
+  function toggleSlug(slug: string) {
+    setSelectedSlugs((prev) => {
+      const next = new Set(prev)
+      if (next.has(slug)) next.delete(slug)
+      else next.add(slug)
+      return next
+    })
+  }
+
+  function togglePageSelection() {
+    setSelectedSlugs((prev) => {
+      const next = new Set(prev)
+      if (pageSlugs.every((slug) => next.has(slug))) {
+        pageSlugs.forEach((slug) => next.delete(slug))
+      } else {
+        pageSlugs.forEach((slug) => next.add(slug))
+      }
+      return next
+    })
+  }
+
+  async function handleBulkAction(action: "hide" | "show" | "draft") {
+    const slugs = Array.from(selectedSlugs)
+    if (slugs.length === 0 || bulkPending) return
+    setBulkPending(true)
+    try {
+      const updated = new Set<string>()
+      const skipped = new Set<string>()
+      for (let i = 0; i < slugs.length; i += BULK_CHUNK_SIZE) {
+        const chunk = slugs.slice(i, i + BULK_CHUNK_SIZE)
+        try {
+          const res = await apiFetch("/api/posts/bulk", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slugs: chunk, action }),
+          })
+          if (!res.ok) {
+            chunk.forEach((slug) => skipped.add(slug))
+            continue
+          }
+          const data = (await res.json()) as {
+            updated?: string[]
+            missing?: string[]
+            failed?: string[]
+          }
+          for (const slug of data.updated ?? []) updated.add(slug)
+          for (const slug of data.missing ?? []) skipped.add(slug)
+          for (const slug of data.failed ?? []) skipped.add(slug)
+        } catch {
+          chunk.forEach((slug) => skipped.add(slug))
+        }
+      }
+
+      if (updated.size === 0) {
+        toast.error(t("admin.updateFailed"))
+        return
+      }
+
+      setPosts((prev) =>
+        prev.map((post) => {
+          if (!updated.has(post.slug)) return post
+          if (action === "hide") return { ...post, visible: false }
+          if (action === "show") return { ...post, visible: true }
+          // movePost(toDraft) keeps any pending schedule.
+          return { ...post, draft: true }
+        })
+      )
+      // Keep whatever did not go through selected — a stuck slug is then
+      // visible in the bar and can be retried instead of silently dropped.
+      setSelectedSlugs((prev) => {
+        const next = new Set(prev)
+        updated.forEach((slug) => next.delete(slug))
+        return next
+      })
+      toast.success(
+        action === "hide"
+          ? t("admin.bulkHideSuccess")(updated.size)
+          : action === "show"
+            ? t("admin.bulkShowSuccess")(updated.size)
+            : t("admin.bulkDraftSuccess")(updated.size)
+      )
+      if (skipped.size > 0) toast.error(t("admin.bulkPartial")(skipped.size))
+    } finally {
+      setBulkPending(false)
+    }
+  }
+
   // Row actions menu shared by the desktop table cell and the mobile card.
   function renderPostActions(post: PostSummary) {
     return (
@@ -322,10 +530,21 @@ function AdminPostsContent() {
             {post.draft ? <Globe /> : <FilePen />}
             {post.draft ? (t("admin.publish")) : (t("admin.unpublish"))}
           </DropdownMenuItem>
-          {/* Pinning is published-only — a pin on a draft would sit
-              invisible until publication, then silently jump the post to
-              the top of the homepage. */}
           {!post.draft && (
+            <DropdownMenuItem
+              onClick={() => handleToggleVisible(post.slug, post.visible)}
+            >
+              {post.visible ? <EyeOff /> : <Eye />}
+              {post.visible
+                ? t("admin.hideFromFrontend")
+                : t("admin.restoreToFrontend")}
+            </DropdownMenuItem>
+          )}
+          {/* Pinning is public-only — a pin on a draft or hidden post
+              would sit invisible until it goes public, then silently jump
+              to the top of the homepage. An existing pin stays reachable
+              so it can be removed. */}
+          {!post.draft && (post.visible || post.pinnedAt) && (
             <DropdownMenuItem
               onClick={() => handleTogglePin(post.slug, post.pinnedAt)}
             >
@@ -333,14 +552,18 @@ function AdminPostsContent() {
               {post.pinnedAt ? t("admin.unpin") : t("admin.pin")}
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem
-            onClick={() =>
-              router.push(`/posts/${encodeURIComponent(post.slug)}`)
-            }
-          >
-            <Eye />
-            {t("admin.view")}
-          </DropdownMenuItem>
+          {/* Only public posts have a live page — for the rest this link
+              would 404. */}
+          {isPublic(post) && (
+            <DropdownMenuItem
+              onClick={() =>
+                router.push(`/posts/${encodeURIComponent(post.slug)}`)
+              }
+            >
+              <Eye />
+              {t("admin.view")}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
@@ -392,7 +615,7 @@ function AdminPostsContent() {
           <div className="flex shrink-0 items-center gap-3 flex-wrap">
             {/* Status tabs */}
             <div className="inline-flex rounded-lg border p-0.5 bg-muted/30">
-              {(["all", "published", "scheduled", "drafts"] as const).map((s) => (
+              {STATUS_FILTERS.map((s) => (
                 <button
                   key={s}
                   onClick={() => {
@@ -412,13 +635,7 @@ function AdminPostsContent() {
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {s === "all"
-                    ? (t("admin.all"))
-                    : s === "published"
-                    ? (t("admin.published"))
-                    : s === "scheduled"
-                    ? (t("admin.statusScheduled"))
-                    : (t("admin.drafts"))}
+                  {t(STATUS_LABELS[s])}
                 </button>
               ))}
             </div>
@@ -468,6 +685,70 @@ function AdminPostsContent() {
             )}
           </div>
 
+          {/* Bulk bar — appears once something is checked. Selection is
+              keyed by slug and survives pagination, but the filter/search
+              scope reset above clears it when the visible set changes. */}
+          {selectedSlugs.size > 0 && (
+            <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+              <p className="text-sm font-medium">
+                {t("admin.bulkSelected")(selectedSlugs.size)}
+              </p>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleBulkAction("hide")}
+                  disabled={bulkPending}
+                >
+                  <EyeOff />
+                  {t("admin.bulkHide")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleBulkAction("show")}
+                  disabled={bulkPending}
+                >
+                  <Eye />
+                  {t("admin.bulkShow")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleBulkAction("draft")}
+                  disabled={bulkPending}
+                >
+                  <FilePen />
+                  {t("admin.bulkDraft")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedSlugs(new Set())}
+                  disabled={bulkPending}
+                >
+                  {t("admin.bulkClear")}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Mobile select-all — the table's header checkbox is desktop-only. */}
+          {paginatedPosts.length > 0 && (
+            <label className="flex items-center gap-2 md:hidden">
+              <SelectionCheckbox
+                checked={allPageSelected}
+                indeterminate={somePageSelected && !allPageSelected}
+                onChange={togglePageSelection}
+                label={t("admin.selectPage")}
+                disabled={bulkPending}
+              />
+              <span className="text-xs text-muted-foreground">
+                {t("admin.selectPage")}
+              </span>
+            </label>
+          )}
+
           {/* Mobile cards — below md the 6-column table can't fit, so each
               post becomes a stacked card: title + actions, a meta row
               (status / pin / date), then tags. */}
@@ -483,6 +764,13 @@ function AdminPostsContent() {
                   className="rounded-xl border bg-card p-4"
                 >
                   <div className="flex items-start justify-between gap-2">
+                    <SelectionCheckbox
+                      checked={selectedSlugs.has(post.slug)}
+                      onChange={() => toggleSlug(post.slug)}
+                      label={`${t("admin.selectPost")}: ${post.title}`}
+                      disabled={bulkPending}
+                      className="mt-0.5"
+                    />
                     <Link
                       href={`/admin/posts/edit?slug=${encodeURIComponent(
                         post.slug
@@ -546,6 +834,17 @@ function AdminPostsContent() {
             >
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
+                  <TableHead className="w-8">
+                    {pageSlugs.length > 0 && (
+                      <SelectionCheckbox
+                        checked={allPageSelected}
+                        indeterminate={somePageSelected && !allPageSelected}
+                        onChange={togglePageSelection}
+                        label={t("admin.selectPage")}
+                        disabled={bulkPending}
+                      />
+                    )}
+                  </TableHead>
                   <TableHead className="w-[32%] min-w-0">
                     {t("admin.title")}
                   </TableHead>
@@ -566,6 +865,14 @@ function AdminPostsContent() {
               <TableBody>
                   {paginatedPosts.map((post) => (
                     <TableRow key={post.slug}>
+                      <TableCell>
+                        <SelectionCheckbox
+                          checked={selectedSlugs.has(post.slug)}
+                          onChange={() => toggleSlug(post.slug)}
+                          label={`${t("admin.selectPost")}: ${post.title}`}
+                          disabled={bulkPending}
+                        />
+                      </TableCell>
                       {/* Title / Pin / Date / Tags share foreground + text-sm;
                           title uses weight alone for hierarchy. Status stays
                           a colored badge; empty pin/tag overflow stay muted. */}

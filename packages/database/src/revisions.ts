@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS post_revisions (
   description TEXT NOT NULL DEFAULT '',
   cover TEXT,
   draft INTEGER NOT NULL DEFAULT 0,
+  visible INTEGER NOT NULL DEFAULT 1,
   pinned_at TEXT,
   publish_at TEXT,
   content TEXT NOT NULL DEFAULT '',
@@ -40,6 +41,14 @@ async function ensureTable(db: Client): Promise<void> {
   if (!tableReady) {
     tableReady = (async () => {
       await db.executeMultiple(SCHEMA)
+      try {
+        await db.execute(
+          "ALTER TABLE post_revisions ADD COLUMN visible INTEGER NOT NULL DEFAULT 1"
+        )
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (!/duplicate column/i.test(msg)) throw err
+      }
     })().catch((err) => {
       tableReady = null // 失败重置，下次调用重试
       throw err
@@ -70,9 +79,9 @@ export function parseRevisionId(value: unknown): number | null {
   return Number.isInteger(id) && id > 0 ? id : null
 }
 
-/** 是否值得存快照：内容字段逐项比对。pinnedAt 不参与——置顶走
- *  setPostPinned 专用路径，编辑保存根本不触碰它；把置顶变化算作
- *  "内容变化"会让自动保存反复生成快照。 */
+/** 是否值得存快照：内容字段逐项比对。pinnedAt / visible 不参与——
+ *  置顶与前台可见性各有专用 setter，编辑保存不触碰它们；把这类
+ *  开关变化算作"内容变化"会让自动保存反复生成快照。 */
 export function samePostContent(a: Post, b: Post): boolean {
   return (
     a.title === b.title &&
@@ -101,8 +110,8 @@ export async function insertPostRevision(
   const slug = safeSlug(storeSlug ?? post.slug)
   await db.execute({
     sql: `INSERT INTO post_revisions
-            (slug, title, date, updated, tags, description, cover, draft, pinned_at, publish_at, content, word_count, reading_time)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (slug, title, date, updated, tags, description, cover, draft, visible, pinned_at, publish_at, content, word_count, reading_time)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       slug,
       p.title,
@@ -112,6 +121,7 @@ export async function insertPostRevision(
       p.description,
       p.cover,
       p.draft,
+      p.visible,
       p.pinned_at,
       p.publish_at,
       p.content,

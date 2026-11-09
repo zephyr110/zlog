@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { fromPublishAtUtc, isScheduled, toPublishAtUtc } from "@/lib/schedule"
+import {
+  fromPublishAtUtc,
+  isPublic,
+  isPublished,
+  isScheduled,
+  toPublishAtUtc,
+} from "@/lib/schedule"
 
 // vitest.config.ts pins TZ=UTC, so local == UTC in these tests.
 
@@ -51,5 +57,46 @@ describe("isScheduled", () => {
   it("is false when there is no schedule", () => {
     expect(isScheduled(null, now)).toBe(false)
     expect(isScheduled(undefined, now)).toBe(false)
+  })
+})
+
+describe("isPublished", () => {
+  it("is true for live posts regardless of visibility", () => {
+    expect(isPublished({ draft: false, publishAt: null })).toBe(true)
+    expect(
+      isPublished({ draft: false, publishAt: "2020-01-01 00:00:00" })
+    ).toBe(true)
+    const hidden = { draft: false, publishAt: null, visible: false }
+    expect(isPublished(hidden)).toBe(true)
+  })
+
+  it("is false for drafts and future-scheduled posts", () => {
+    expect(isPublished({ draft: true })).toBe(false)
+    expect(
+      isPublished({ draft: false, publishAt: "2999-01-01 00:00:00" })
+    ).toBe(false)
+  })
+})
+
+describe("isPublic", () => {
+  it("treats a missing visible flag as visible", () => {
+    expect(isPublic({ draft: false, publishAt: null })).toBe(true)
+  })
+
+  it("is false when the post is hidden", () => {
+    expect(
+      isPublic({ draft: false, publishAt: null, visible: false })
+    ).toBe(false)
+  })
+
+  it("is false for drafts and future-scheduled posts", () => {
+    expect(isPublic({ draft: true, visible: true })).toBe(false)
+    expect(
+      isPublic({
+        draft: false,
+        publishAt: "2999-01-01 00:00:00",
+        visible: true,
+      })
+    ).toBe(false)
   })
 })

@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS posts (
   description TEXT NOT NULL DEFAULT '',
   cover TEXT,
   draft INTEGER NOT NULL DEFAULT 0,
+  visible INTEGER NOT NULL DEFAULT 1,
   pinned_at TEXT,
   publish_at TEXT,
   content TEXT NOT NULL DEFAULT '',
@@ -46,8 +47,12 @@ async function ensureTable(db: Client): Promise<void> {
   if (!tableReady) {
     tableReady = (async () => {
       await db.executeMultiple(SCHEMA)
-      // Migrate existing DBs that predate pinned_at / publish_at.
-      for (const column of ["pinned_at TEXT", "publish_at TEXT"]) {
+      // Migrate existing DBs that predate pinned_at / publish_at / visible.
+      for (const column of [
+        "pinned_at TEXT",
+        "publish_at TEXT",
+        "visible INTEGER NOT NULL DEFAULT 1",
+      ]) {
         try {
           await db.execute(`ALTER TABLE posts ADD COLUMN ${column}`)
         } catch (err) {
@@ -70,11 +75,12 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (match) => `\\${match}`)
 }
 
-/** Public visibility, in one place: not a draft, and either unscheduled
- *  or past its publish time. publish_at shares the "YYYY-MM-DD HH:MM:SS"
- *  UTC format of datetime('now'), so the comparison is exact. */
+/** Public visibility, in one place: on the frontend, not a draft, and
+ *  either unscheduled or past its publish time. publish_at shares the
+ *  "YYYY-MM-DD HH:MM:SS" UTC format of datetime('now'), so the
+ *  comparison is exact. */
 const PUBLISHED_SQL =
-  "draft = 0 AND (publish_at IS NULL OR publish_at <= datetime('now'))"
+  "visible = 1 AND draft = 0 AND (publish_at IS NULL OR publish_at <= datetime('now'))"
 
 // ── Public API ──────────────────────────────────────────────────────────
 
@@ -212,13 +218,23 @@ export async function savePost(
   }
 
   const p = toParams(post)
-  // pinned_at is written on INSERT only. Updates must not touch it — pin /
-  // unpin goes through setPostPinned, and editor/auto-save RMW must not
-  // clobber a newer pin with a stale null from a prior read. publish_at,
-  // by contrast, is the editor's to change on every save.
+  // pinned_at and visible are written on INSERT only. Updates must not
+  // touch them — pin / hide / show go through their dedicated setters,
+  // and editor/auto-save RMW must not clobber a newer value with a stale
+  // one from a prior read. publish_at, by contrast, is the editor's to
+  // change on every save.
+  //
+  // A rename is DELETE + INSERT, so it re-creates the row instead of
+  // hitting ON CONFLICT. Both INSERT-only columns must come from the row
+  // read above, not the caller's Post, or a concurrent hide/show/pin
+  // would be silently reverted.
+  if (oldSlug !== clean && existing) {
+    p.visible = existing.visible ? 1 : 0
+    p.pinned_at = existing.pinnedAt
+  }
   const upsert = {
-    sql: `INSERT INTO posts (slug, title, date, updated, tags, description, cover, draft, pinned_at, publish_at, content, word_count, reading_time)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    sql: `INSERT INTO posts (slug, title, date, updated, tags, description, cover, draft, visible, pinned_at, publish_at, content, word_count, reading_time)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(slug) DO UPDATE SET
             title=excluded.title, date=excluded.date, updated=excluded.updated,
             tags=excluded.tags, description=excluded.description, cover=excluded.cover,
@@ -234,6 +250,7 @@ export async function savePost(
       p.description,
       p.cover,
       p.draft,
+      p.visible,
       p.pinned_at,
       p.publish_at,
       p.content,
@@ -323,6 +340,33 @@ export async function setPostPinned(
   const row = result.rows[0]
   if (row) scheduleSync()
   return row ? rowToPost(row) : null
+}
+
+export async function setPostVisible(
+  slug: string,
+  visible: boolean
+): Promise<Post | null> {
+  const db = requireDb()
+  await ensureTable(db)
+  const clean = safeSlug(slug)
+  const value = visible ? 1 : 0
+
+  // Conditional write, not read-then-check: two concurrent toggles used
+  // to both decide from the same old value and silently lose one update.
+  // Zero rows means "already in this state" or "no such post"; only then
+  // pay for the read that distinguishes them (and keeps the no-op from
+  // bumping updated_at).
+  const result = await db.execute({
+    sql: `UPDATE posts SET visible = ?, updated_at = datetime('now')
+          WHERE slug = ? AND visible <> ? RETURNING *`,
+    args: [value, clean, value],
+  })
+  const row = result.rows[0]
+  if (row) {
+    scheduleSync()
+    return rowToPost(row)
+  }
+  return getPostBySlug(clean, true)
 }
 
 /** Homepage "Latest" grid: pinned posts first, then the newest unpinned

@@ -24,6 +24,7 @@ function mkPost(
     tags,
     description: "",
     draft: false,
+    visible: true,
     pinnedAt: null,
     publishAt: null,
     wordCount: 0,

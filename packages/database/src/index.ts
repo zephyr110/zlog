@@ -7,6 +7,7 @@ export {
   deletePost,
   movePost,
   setPostPinned,
+  setPostVisible,
   getHomepageLatestPosts,
   getAllTags,
   getPostsByCategory,

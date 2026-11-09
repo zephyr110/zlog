@@ -44,12 +44,22 @@ export function toUtcStamp(date: Date): string {
   return date.toISOString().slice(0, 19).replace("T", " ")
 }
 
-/** Client-side mirror of the server's PUBLISHED_SQL predicate (draft = 0
- *  AND (publish_at IS NULL OR publish_at <= now)) — the two must stay in
- *  sync; this one just uses the browser clock. */
-export function isPublic(p: {
+/** 发布状态：草稿/定时之外即「已发布」。后台筛选项与统计使用它，
+ *  hidden 文章仍算已发布；前台的 isPublic 在其基础上再叠加可见性。 */
+export function isPublished(p: {
   draft: boolean
   publishAt?: string | null
 }): boolean {
   return !p.draft && !isScheduled(p.publishAt)
+}
+
+/** Client-side mirror of the server's PUBLISHED_SQL predicate (visible,
+ *  not a draft, not scheduled) — the two must stay in sync; this one just
+ *  uses the browser clock. */
+export function isPublic(p: {
+  draft: boolean
+  publishAt?: string | null
+  visible?: boolean
+}): boolean {
+  return p.visible !== false && isPublished(p)
 }

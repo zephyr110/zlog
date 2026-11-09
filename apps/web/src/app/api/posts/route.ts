@@ -11,6 +11,7 @@ import {
   deletePost,
   movePost,
   setPostPinned,
+  setPostVisible,
   slugify,
 } from "@zlog/database"
 import { computeReadingStats } from "@zlog/database"
@@ -120,6 +121,7 @@ export async function POST(request: NextRequest) {
     description: body.description || "",
     cover: body.cover || undefined,
     draft: body.draft ?? true,
+    visible: true,
     pinnedAt: null,
     publishAt: body.publishAt || null,
     content,
@@ -235,7 +237,7 @@ export async function DELETE(request: NextRequest) {
   return NextResponse.json({ success: true })
 }
 
-// PATCH /api/posts?slug=xxx — publish / unpublish and/or pin / unpin
+// PATCH /api/posts?slug=xxx — publish / unpublish, pin / unpin, and/or show / hide
 export async function PATCH(request: NextRequest) {
   const user = await requireAuth(request)
   if (!user) {
@@ -257,10 +259,17 @@ export async function PATCH(request: NextRequest) {
     .object({
       draft: z.boolean().optional(),
       pinned: z.boolean().optional(),
+      visible: z.boolean().optional(),
     })
-    .refine((b) => b.draft !== undefined || b.pinned !== undefined, {
-      message: "draft or pinned is required",
-    })
+    .refine(
+      (b) =>
+        b.draft !== undefined ||
+        b.pinned !== undefined ||
+        b.visible !== undefined,
+      {
+        message: "draft, pinned or visible is required",
+      }
+    )
     .safeParse(await request.json())
   if (!parseResult.success) {
     return NextResponse.json(
@@ -269,7 +278,24 @@ export async function PATCH(request: NextRequest) {
     )
   }
 
-  const { draft, pinned } = parseResult.data
+  const { draft, pinned, visible } = parseResult.data
+
+  // Validate before any setter runs. Applying draft first meant
+  // {draft:true,pinned:true} unpublished the post and then returned 400,
+  // leaving the client to believe nothing changed. A pin on a draft or a
+  // hidden post would sit invisible until it goes public, then silently
+  // jump to the top of the homepage — reject both.
+  if (pinned === true) {
+    const willBeDraft = draft ?? existingPost.draft
+    const willBeVisible = visible ?? existingPost.visible
+    if (willBeDraft || !willBeVisible) {
+      return NextResponse.json(
+        { error: "Publish and show the post before pinning it" },
+        { status: 400 }
+      )
+    }
+  }
+
   let updatedPost: Post | null = existingPost
 
   if (draft !== undefined) {
@@ -279,17 +305,16 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
-  if (pinned !== undefined) {
-    // A pin on a draft would sit invisible until publication, then
-    // silently jump the post to the top of the homepage — reject it.
-    // (draft:false + pinned:true together — publish-and-pin — is fine:
-    // the draft flip above already ran.)
-    if (pinned && updatedPost.draft) {
-      return NextResponse.json(
-        { error: "Publish the post before pinning it" },
-        { status: 400 }
-      )
+  // Visibility first, pin last: if this request both shows and pins a
+  // post, the pin must be applied to the row that is already public.
+  if (visible !== undefined) {
+    updatedPost = await setPostVisible(slug, visible)
+    if (!updatedPost) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 })
     }
+  }
+
+  if (pinned !== undefined) {
     updatedPost = await setPostPinned(slug, pinned)
     if (!updatedPost) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 })
