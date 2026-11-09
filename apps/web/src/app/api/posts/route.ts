@@ -279,6 +279,23 @@ export async function PATCH(request: NextRequest) {
   }
 
   const { draft, pinned, visible } = parseResult.data
+
+  // Validate before any setter runs. Applying draft first meant
+  // {draft:true,pinned:true} unpublished the post and then returned 400,
+  // leaving the client to believe nothing changed. A pin on a draft or a
+  // hidden post would sit invisible until it goes public, then silently
+  // jump to the top of the homepage — reject both.
+  if (pinned === true) {
+    const willBeDraft = draft ?? existingPost.draft
+    const willBeVisible = visible ?? existingPost.visible
+    if (willBeDraft || !willBeVisible) {
+      return NextResponse.json(
+        { error: "Publish and show the post before pinning it" },
+        { status: 400 }
+      )
+    }
+  }
+
   let updatedPost: Post | null = existingPost
 
   if (draft !== undefined) {
@@ -288,25 +305,17 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
-  if (pinned !== undefined) {
-    // A pin on a draft would sit invisible until publication, then
-    // silently jump the post to the top of the homepage — reject it.
-    // (draft:false + pinned:true together — publish-and-pin — is fine:
-    // the draft flip above already ran.)
-    if (pinned && updatedPost.draft) {
-      return NextResponse.json(
-        { error: "Publish the post before pinning it" },
-        { status: 400 }
-      )
-    }
-    updatedPost = await setPostPinned(slug, pinned)
+  // Visibility first, pin last: if this request both shows and pins a
+  // post, the pin must be applied to the row that is already public.
+  if (visible !== undefined) {
+    updatedPost = await setPostVisible(slug, visible)
     if (!updatedPost) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 })
     }
   }
 
-  if (visible !== undefined) {
-    updatedPost = await setPostVisible(slug, visible)
+  if (pinned !== undefined) {
+    updatedPost = await setPostPinned(slug, pinned)
     if (!updatedPost) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 })
     }

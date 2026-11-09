@@ -10,7 +10,12 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { DateTimePicker } from "@/components/ui/date-time-picker"
 import { apiFetch } from "@/lib/api-client"
-import { fromPublishAtUtc, isScheduled, toPublishAtUtc } from "@/lib/schedule"
+import {
+  fromPublishAtUtc,
+  isPublic,
+  isScheduled,
+  toPublishAtUtc,
+} from "@/lib/schedule"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
 import { computeReadingStats, type Post } from "@zlog/core"
@@ -172,6 +177,10 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
     fromPublishAtUtc(initialPost?.publishAt)
   )
   const [saving, setSaving] = useState(false)
+  // Separate from `saving`: the visibility PATCH must serialize its own
+  // clicks, otherwise two quick flips settle in response order and leave
+  // the switch opposite the row.
+  const [visibilityPending, setVisibilityPending] = useState(false)
   const [coverPickerOpen, setCoverPickerOpen] = useState(false)
   const [imagePickerOpen, setImagePickerOpen] = useState(false)
   const [previewCollapsed, setPreviewCollapsed] = useState(false)
@@ -651,9 +660,10 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
   /** 可见性是发布控制，不进入保存体：即时 PATCH，避免 30 秒自动保存
    *  用旧标签页里的状态覆盖刚做的隐藏/恢复。 */
   async function handleToggleVisible(nextVisible: boolean) {
-    if (isNew || !persistedSlug) return
+    if (isNew || !persistedSlug || visibilityPending) return
     const previous = visible
     setVisible(nextVisible)
+    setVisibilityPending(true)
     try {
       const res = await apiFetch(
         `/api/posts?slug=${encodeURIComponent(persistedSlug)}`,
@@ -668,14 +678,16 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
         toast.error(t("admin.updateFailed"))
         return
       }
-      const data = (await res.json()) as { post?: { visible?: boolean } }
-      setVisible(data.post?.visible ?? nextVisible)
+      // Do not echo the response: it can describe an older write if the
+      // user toggled from another tab while this request was in flight.
       toast.success(
         nextVisible ? t("admin.showSuccess") : t("admin.hideSuccess")
       )
     } catch {
       setVisible(previous)
       toast.error(t("admin.networkError"))
+    } finally {
+      setVisibilityPending(false)
     }
   }
 
@@ -689,6 +701,7 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
     setTags(post.tags)
     setCover(post.cover || "")
     setDraft(post.draft)
+    setVisible(post.visible)
     setPublishAt(restoredPublishAt)
     setPersistedSlug(post.slug)
     // 恢复本身就是一次服务端 savePost：编辑器状态此刻与库内一致，
@@ -759,7 +772,12 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
             <TooltipContent>{t("admin.historyTitle")}</TooltipContent>
           </Tooltip>
         )}
-        {!isNew && !draft && !scheduled && visible && (
+        {!isNew &&
+          isPublic({
+            draft,
+            publishAt: toPublishAtUtc(publishAt),
+            visible,
+          }) && (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -922,11 +940,11 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
         <span>
           {draft
             ? (t("admin.draftDesc"))
-            : scheduled
-              ? (t("admin.statusScheduledDesc"))
-              : visible
-                ? (t("admin.publishedDesc"))
-                : (t("admin.hiddenDesc"))}
+            : !visible
+              ? (t("admin.hiddenDesc"))
+              : scheduled
+                ? (t("admin.statusScheduledDesc"))
+                : (t("admin.publishedDesc"))}
         </span>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs">{t("admin.scheduleLabel")}</span>
@@ -945,7 +963,7 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
           <div className="flex w-full items-start gap-3 border-t pt-3">
             <Switch
               checked={visible}
-              disabled={draft || saving}
+              disabled={draft || saving || visibilityPending}
               onCheckedChange={handleToggleVisible}
               aria-label={t("admin.showOnFrontend")}
             />

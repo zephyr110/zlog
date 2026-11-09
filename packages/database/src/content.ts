@@ -223,6 +223,15 @@ export async function savePost(
   // and editor/auto-save RMW must not clobber a newer value with a stale
   // one from a prior read. publish_at, by contrast, is the editor's to
   // change on every save.
+  //
+  // A rename is DELETE + INSERT, so it re-creates the row instead of
+  // hitting ON CONFLICT. Both INSERT-only columns must come from the row
+  // read above, not the caller's Post, or a concurrent hide/show/pin
+  // would be silently reverted.
+  if (oldSlug !== clean && existing) {
+    p.visible = existing.visible ? 1 : 0
+    p.pinned_at = existing.pinnedAt
+  }
   const upsert = {
     sql: `INSERT INTO posts (slug, title, date, updated, tags, description, cover, draft, visible, pinned_at, publish_at, content, word_count, reading_time)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -340,19 +349,24 @@ export async function setPostVisible(
   const db = requireDb()
   await ensureTable(db)
   const clean = safeSlug(slug)
-  const existing = await getPostBySlug(clean, true)
-  if (!existing) return null
+  const value = visible ? 1 : 0
 
-  // Idempotent: re-affirming the current state must not bump updated_at.
-  if (visible === existing.visible) return existing
-
+  // Conditional write, not read-then-check: two concurrent toggles used
+  // to both decide from the same old value and silently lose one update.
+  // Zero rows means "already in this state" or "no such post"; only then
+  // pay for the read that distinguishes them (and keeps the no-op from
+  // bumping updated_at).
   const result = await db.execute({
-    sql: `UPDATE posts SET visible = ?, updated_at = datetime('now') WHERE slug = ? RETURNING *`,
-    args: [visible ? 1 : 0, clean],
+    sql: `UPDATE posts SET visible = ?, updated_at = datetime('now')
+          WHERE slug = ? AND visible <> ? RETURNING *`,
+    args: [value, clean, value],
   })
   const row = result.rows[0]
-  if (row) scheduleSync()
-  return row ? rowToPost(row) : null
+  if (row) {
+    scheduleSync()
+    return rowToPost(row)
+  }
+  return getPostBySlug(clean, true)
 }
 
 /** Homepage "Latest" grid: pinned posts first, then the newest unpinned

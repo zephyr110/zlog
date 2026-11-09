@@ -38,6 +38,7 @@ function mkPost(slug: string, overrides: Partial<Post> = {}): Post {
 // Imported lazily so the env vars above are set before the client is
 // created (getDb caches its client on first use).
 const content = await import("../src/content")
+const { requireDb } = await import("../src/db")
 
 beforeAll(async () => {
   await content.savePost(
@@ -213,11 +214,24 @@ describe("setPostVisible", () => {
     expect(await content.getPostBySlug(slug)).not.toBeNull()
   })
 
-  it("is idempotent when the state already matches", async () => {
+  it("is idempotent when the state already matches — no write, no updated_at bump", async () => {
     const slug = "visibility-idempotent"
     await content.savePost(mkPost(slug))
+    // Pin updated_at to a value datetime('now') can never produce, so an
+    // unconditional UPDATE is visible even within the same second.
+    const db = requireDb()
+    await db.execute({
+      sql: "UPDATE posts SET updated_at = '2000-01-01 00:00:00' WHERE slug = ?",
+      args: [slug],
+    })
+
     const same = await content.setPostVisible(slug, true)
     expect(same?.visible).toBe(true)
+    const raw = await db.execute({
+      sql: "SELECT updated_at FROM posts WHERE slug = ?",
+      args: [slug],
+    })
+    expect(raw.rows[0]?.updated_at).toBe("2000-01-01 00:00:00")
   })
 
   it("returns null for a missing post", async () => {
@@ -240,10 +254,34 @@ describe("savePost rename", () => {
   it("keeps a hidden post hidden across a slug change", async () => {
     const oldSlug = "hidden-rename-old"
     const newSlug = "hidden-rename-new"
-    // Rename INSERT takes visible from the Post the caller passes in —
-    // this pins that the editor's hidden state survives the new row.
     await content.savePost(mkPost(oldSlug, { visible: false }), oldSlug)
     await content.savePost(mkPost(newSlug, { visible: false }), oldSlug)
+
+    const adminView = await content.getPostBySlug(newSlug, true)
+    expect(adminView?.visible).toBe(false)
+    expect(await content.getPostBySlug(newSlug)).toBeNull()
+  })
+
+  it("rename keeps the stored pin across a slug change", async () => {
+    const oldSlug = "pin-rename-old"
+    const newSlug = "pin-rename-new"
+    await content.savePost(mkPost(oldSlug))
+    await content.setPostPinned(oldSlug, true)
+    // Stale caller: its Post predates the pin.
+    await content.savePost(mkPost(newSlug), oldSlug)
+
+    const adminView = await content.getPostBySlug(newSlug, true)
+    expect(adminView?.pinnedAt).not.toBeNull()
+  })
+
+  it("rename takes visibility from the stored row, not a stale caller", async () => {
+    const oldSlug = "hidden-rename-stale-old"
+    const newSlug = "hidden-rename-stale-new"
+    await content.savePost(mkPost(oldSlug, { visible: false }))
+    // The caller loaded the post before it was hidden elsewhere, so its
+    // Post still says visible: true. A rename is DELETE + INSERT — the
+    // new row must inherit the DB value, or the hide is silently undone.
+    await content.savePost(mkPost(newSlug, { visible: true }), oldSlug)
 
     const adminView = await content.getPostBySlug(newSlug, true)
     expect(adminView?.visible).toBe(false)
