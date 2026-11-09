@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Download, Ellipsis, Search, SquarePen, Eye, Globe, FilePen, Trash2, Pin } from "lucide-react"
+import { Download, Ellipsis, Search, SquarePen, Eye, EyeOff, Globe, FilePen, Trash2, Pin } from "lucide-react"
 import { PostsListSkeleton } from "@/components/ui/loading"
 import { HeaderActions } from "@/components/admin/header-actions"
 import { PaginationBar } from "@/components/admin/pagination-bar"
@@ -48,22 +48,30 @@ function StatusBadge({ post }: { post: PostSummary }) {
   const { t } = useT()
   const scheduled = !post.draft && isScheduled(post.publishAt)
   return (
-    <Badge
-      variant={post.draft ? "secondary" : "default"}
-      className={
-        post.draft
-          ? "bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <Badge
+        variant={post.draft ? "secondary" : "default"}
+        className={
+          post.draft
+            ? "bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+            : scheduled
+              ? "bg-sky-100 text-sky-700 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-400"
+              : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400"
+        }
+      >
+        {post.draft
+          ? (t("admin.draft"))
           : scheduled
-            ? "bg-sky-100 text-sky-700 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-400"
-            : "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400"
-      }
-    >
-      {post.draft
-        ? (t("admin.draft"))
-        : scheduled
-          ? (t("admin.statusScheduled"))
-          : (t("admin.publishedStatus"))}
-    </Badge>
+            ? (t("admin.statusScheduled"))
+            : (t("admin.publishedStatus"))}
+      </Badge>
+      {!post.visible ? (
+        <Badge variant="outline" className="gap-1 text-muted-foreground">
+          <EyeOff className="size-3" />
+          {t("admin.hidden")}
+        </Badge>
+      ) : null}
+    </span>
   )
 }
 
@@ -98,11 +106,12 @@ function AdminPostsContent() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<
-    "all" | "published" | "scheduled" | "drafts"
+    "all" | "published" | "scheduled" | "drafts" | "hidden"
   >(
     initialStatus === "published" ||
       initialStatus === "scheduled" ||
-      initialStatus === "drafts"
+      initialStatus === "drafts" ||
+      initialStatus === "hidden"
       ? initialStatus
       : "all"
   )
@@ -140,7 +149,8 @@ function AdminPostsContent() {
     if (
       initialStatus === "published" ||
       initialStatus === "scheduled" ||
-      initialStatus === "drafts"
+      initialStatus === "drafts" ||
+      initialStatus === "hidden"
     ) {
       setStatusFilter(initialStatus)
       setPage(1)
@@ -153,6 +163,7 @@ function AdminPostsContent() {
     if (statusFilter === "scheduled")
       result = result.filter((p) => !p.draft && isScheduled(p.publishAt))
     if (statusFilter === "drafts") result = result.filter((p) => p.draft)
+    if (statusFilter === "hidden") result = result.filter((p) => !p.visible)
     if (topicFilter !== "all") {
       result = result.filter((p) =>
         p.tags.some((tag) => resolveCategory(tag) === topicFilter)
@@ -295,6 +306,34 @@ function AdminPostsContent() {
     }
   }
 
+  async function handleToggleVisible(slug: string, currentVisible: boolean) {
+    const nextVisible = !currentVisible
+    try {
+      const res = await apiFetch(
+        `/api/posts?slug=${encodeURIComponent(slug)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ visible: nextVisible }),
+        }
+      )
+      if (res.ok) {
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.slug === slug ? { ...p, visible: nextVisible } : p
+          )
+        )
+        toast.success(
+          nextVisible ? t("admin.showSuccess") : t("admin.hideSuccess")
+        )
+      } else {
+        toast.error(t("admin.updateFailed"))
+      }
+    } catch {
+      toast.error(t("admin.networkError"))
+    }
+  }
+
   // Row actions menu shared by the desktop table cell and the mobile card.
   function renderPostActions(post: PostSummary) {
     return (
@@ -322,6 +361,16 @@ function AdminPostsContent() {
             {post.draft ? <Globe /> : <FilePen />}
             {post.draft ? (t("admin.publish")) : (t("admin.unpublish"))}
           </DropdownMenuItem>
+          {!post.draft && (
+            <DropdownMenuItem
+              onClick={() => handleToggleVisible(post.slug, post.visible)}
+            >
+              {post.visible ? <EyeOff /> : <Eye />}
+              {post.visible
+                ? t("admin.hideFromFrontend")
+                : t("admin.restoreToFrontend")}
+            </DropdownMenuItem>
+          )}
           {/* Pinning is published-only — a pin on a draft would sit
               invisible until publication, then silently jump the post to
               the top of the homepage. */}
@@ -392,7 +441,7 @@ function AdminPostsContent() {
           <div className="flex shrink-0 items-center gap-3 flex-wrap">
             {/* Status tabs */}
             <div className="inline-flex rounded-lg border p-0.5 bg-muted/30">
-              {(["all", "published", "scheduled", "drafts"] as const).map((s) => (
+              {(["all", "published", "scheduled", "drafts", "hidden"] as const).map((s) => (
                 <button
                   key={s}
                   onClick={() => {
@@ -418,7 +467,9 @@ function AdminPostsContent() {
                     ? (t("admin.published"))
                     : s === "scheduled"
                     ? (t("admin.statusScheduled"))
-                    : (t("admin.drafts"))}
+                    : s === "drafts"
+                    ? (t("admin.drafts"))
+                    : (t("admin.hidden"))}
                 </button>
               ))}
             </div>
