@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 
-import { isPublic } from "@/lib/schedule"
+import { isPublished } from "@/lib/schedule"
 import { publicTags } from "@/lib/series"
 
 import {
@@ -102,7 +102,7 @@ export function PostStats({ posts }: PostStatsProps) {
     [t]
   )
 
-  const publishedPosts = useMemo(() => posts.filter(isPublic), [posts])
+  const publishedPosts = useMemo(() => posts.filter(isPublished), [posts])
 
   const timeRangeLabels = useMemo<Record<TimeRange, string>>(
     () => ({

@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
 import { fetchAdminPosts } from "@/lib/admin-posts"
-import { isPublic, isScheduled } from "@/lib/schedule"
+import { isPublished, isScheduled } from "@/lib/schedule"
 import { publicTags } from "@/lib/series"
 import { useCommentUnread } from "@/components/admin/comment-unread"
 import { cn } from "@/lib/utils"
@@ -41,8 +41,9 @@ export default function AdminDashboardPage() {
   }, [])
 
   // Scheduled posts are public-facing "published" rows but not live yet —
-  // count them with neither, matching getPublishedCount on the site.
-  const published = posts.filter(isPublic)
+  // count them with neither. Visibility is ignored on purpose: a hidden
+  // post is still published here, unlike the site's public count.
+  const published = posts.filter(isPublished)
   const drafts = posts.filter((p) => p.draft)
   // Series tags are series metadata, not browsable topics — every public
   // surface strips them, and so must the tag count.

@@ -95,7 +95,7 @@ export default async function PostPage({ params }: PostPageProps) {
     getSiteConfig(),
   ])
 
-  if (!post || post.draft) notFound()
+  if (!post || post.draft || !post.visible) notFound()
 
   // 分享卡二维码用规范地址：桌面壳/本地预览下扫出来也指向线上文章
   const shareUrl = `${site.siteUrl}/posts/${encodeURIComponent(post.slug)}`
