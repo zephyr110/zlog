@@ -263,6 +263,32 @@
     color: #71717a;
   }
 }
+/* Banner grid: percentage cells end on a whole cell on both axes at any
+   viewport; the per-breakpoint counts keep cells near 56px. */
+.banner-grid {
+  --banner-grid-cols: 7;
+  --banner-grid-rows: 8;
+  background-size: calc(100% / var(--banner-grid-cols))
+    calc(100% / var(--banner-grid-rows));
+}
+@media (min-width: 30rem) {
+  .banner-grid { --banner-grid-cols: 9; --banner-grid-rows: 7; }
+}
+@media (min-width: 40rem) {
+  .banner-grid { --banner-grid-cols: 12; --banner-grid-rows: 7; }
+}
+@media (min-width: 48rem) {
+  .banner-grid { --banner-grid-cols: 14; --banner-grid-rows: 8; }
+}
+@media (min-width: 64rem) {
+  .banner-grid { --banner-grid-cols: 19; --banner-grid-rows: 10; }
+}
+@media (min-width: 80rem) {
+  .banner-grid { --banner-grid-cols: 26; }
+}
+@media (min-width: 96rem) {
+  .banner-grid { --banner-grid-cols: 34; }
+}
 /* ── Hero particle animations ── */
 @keyframes hero-rise {
   0% { transform: translateY(0); opacity: 0; }
