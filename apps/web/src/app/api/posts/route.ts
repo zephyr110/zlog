@@ -11,6 +11,7 @@ import {
   deletePost,
   movePost,
   setPostPinned,
+  setPostVisible,
   slugify,
 } from "@zlog/database"
 import { computeReadingStats } from "@zlog/database"
@@ -258,10 +259,17 @@ export async function PATCH(request: NextRequest) {
     .object({
       draft: z.boolean().optional(),
       pinned: z.boolean().optional(),
+      visible: z.boolean().optional(),
     })
-    .refine((b) => b.draft !== undefined || b.pinned !== undefined, {
-      message: "draft or pinned is required",
-    })
+    .refine(
+      (b) =>
+        b.draft !== undefined ||
+        b.pinned !== undefined ||
+        b.visible !== undefined,
+      {
+        message: "draft, pinned or visible is required",
+      }
+    )
     .safeParse(await request.json())
   if (!parseResult.success) {
     return NextResponse.json(
@@ -270,7 +278,7 @@ export async function PATCH(request: NextRequest) {
     )
   }
 
-  const { draft, pinned } = parseResult.data
+  const { draft, pinned, visible } = parseResult.data
   let updatedPost: Post | null = existingPost
 
   if (draft !== undefined) {
@@ -292,6 +300,13 @@ export async function PATCH(request: NextRequest) {
       )
     }
     updatedPost = await setPostPinned(slug, pinned)
+    if (!updatedPost) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 })
+    }
+  }
+
+  if (visible !== undefined) {
+    updatedPost = await setPostVisible(slug, visible)
     if (!updatedPost) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 })
     }
