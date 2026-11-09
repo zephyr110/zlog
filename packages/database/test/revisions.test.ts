@@ -219,4 +219,15 @@ describe("可见性与版本历史", () => {
       )
     ).toBe(true)
   })
+
+  it("快照记录生成时刻的可见性", async () => {
+    const slug = "rev-visibility-snapshot"
+    await content.savePost(mkPost(slug, { content: "v1", visible: false }))
+    await content.savePost(mkPost(slug, { content: "v2" }))
+
+    const list = await revisions.listPostRevisions(slug)
+    expect(list).toHaveLength(1)
+    const revision = await revisions.getPostRevision(list[0].id)
+    expect(revision?.visible).toBe(false)
+  })
 })
