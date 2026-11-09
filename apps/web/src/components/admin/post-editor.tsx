@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { DateTimePicker } from "@/components/ui/date-time-picker"
 import { apiFetch } from "@/lib/api-client"
 import { fromPublishAtUtc, isScheduled, toPublishAtUtc } from "@/lib/schedule"
@@ -164,6 +165,7 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
   const [tagInput, setTagInput] = useState("")
   const [cover, setCover] = useState(initialPost?.cover || "")
   const [draft, setDraft] = useState(initialPost?.draft ?? true)
+  const [visible, setVisible] = useState(initialPost?.visible ?? true)
   // Local "YYYY-MM-DDTHH:mm" as the datetime-local input speaks it; the
   // UTC <-> local conversion lives in lib/schedule.
   const [publishAt, setPublishAt] = useState(
@@ -646,6 +648,37 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
     }
   }
 
+  /** 可见性是发布控制，不进入保存体：即时 PATCH，避免 30 秒自动保存
+   *  用旧标签页里的状态覆盖刚做的隐藏/恢复。 */
+  async function handleToggleVisible(nextVisible: boolean) {
+    if (isNew || !persistedSlug) return
+    const previous = visible
+    setVisible(nextVisible)
+    try {
+      const res = await apiFetch(
+        `/api/posts?slug=${encodeURIComponent(persistedSlug)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ visible: nextVisible }),
+        }
+      )
+      if (!res.ok) {
+        setVisible(previous)
+        toast.error(t("admin.updateFailed"))
+        return
+      }
+      const data = (await res.json()) as { post?: { visible?: boolean } }
+      setVisible(data.post?.visible ?? nextVisible)
+      toast.success(
+        nextVisible ? t("admin.showSuccess") : t("admin.hideSuccess")
+      )
+    } catch {
+      setVisible(previous)
+      toast.error(t("admin.networkError"))
+    }
+  }
+
   /** 把恢复结果整体套用到编辑器（全字段 + clean 基线）。 */
   function applyRestoredPost(post: Post) {
     const restoredPublishAt = fromPublishAtUtc(post.publishAt)
@@ -726,7 +759,7 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
             <TooltipContent>{t("admin.historyTitle")}</TooltipContent>
           </Tooltip>
         )}
-        {!isNew && !draft && !scheduled && (
+        {!isNew && !draft && !scheduled && visible && (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -891,7 +924,9 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
             ? (t("admin.draftDesc"))
             : scheduled
               ? (t("admin.statusScheduledDesc"))
-              : (t("admin.publishedDesc"))}
+              : visible
+                ? (t("admin.publishedDesc"))
+                : (t("admin.hiddenDesc"))}
         </span>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs">{t("admin.scheduleLabel")}</span>
@@ -906,6 +941,26 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
             minuteLabel={t("admin.scheduleMinute")}
           />
         </div>
+        {!isNew && (
+          <div className="flex w-full items-start gap-3 border-t pt-3">
+            <Switch
+              checked={visible}
+              disabled={draft || saving}
+              onCheckedChange={handleToggleVisible}
+              aria-label={t("admin.showOnFrontend")}
+            />
+            <div className="min-w-0">
+              <p className="text-sm text-foreground">
+                {t("admin.showOnFrontend")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {draft
+                  ? t("admin.draftVisibilityHint")
+                  : t("admin.showOnFrontendHint")}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
       <p className="-mt-3 text-xs text-muted-foreground">
         {t("admin.scheduleHint")}
