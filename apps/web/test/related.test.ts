@@ -10,6 +10,7 @@ function mkPost(slug: string, tags: string[]): PostSummary {
     tags,
     description: "",
     draft: false,
+    visible: true,
     pinnedAt: null,
     publishAt: null,
     wordCount: 0,

@@ -25,6 +25,7 @@ function mkPost(slug: string, overrides: Partial<Post> = {}): Post {
     tags: [],
     description: "",
     draft: false,
+    visible: true,
     pinnedAt: null,
     publishAt: null,
     content: "body",
@@ -58,6 +59,14 @@ beforeAll(async () => {
     mkPost("draft-scheduled", { date: "2026-01-01", draft: true, publishAt: FUTURE })
   )
   await content.savePost(mkPost("flip", { date: "2025-12-31", publishAt: FUTURE }))
+  await content.savePost(
+    mkPost("hidden", {
+      date: "2026-01-06",
+      visible: false,
+      tags: ["Secret"],
+      content: "vault body",
+    })
+  )
 })
 
 afterAll(() => {
@@ -73,7 +82,7 @@ describe("public visibility with publish_at", () => {
   it("getAllPosts(includeDrafts) returns everything", async () => {
     const slugs = (await content.getAllPosts(true)).map((p) => p.slug)
     expect(slugs.sort()).toEqual(
-      ["draft", "draft-scheduled", "flip", "future", "live", "past"].sort()
+      ["draft", "draft-scheduled", "flip", "future", "hidden", "live", "past"].sort()
     )
   })
 
@@ -121,5 +130,66 @@ describe("movePost publishing semantics", () => {
     expect(moved?.draft).toBe(true)
     const back = await content.getPostBySlug("future", true)
     expect(back?.publishAt).toBe(FUTURE)
+  })
+})
+
+describe("hidden posts (visible = 0)", () => {
+  it("public readers never see a hidden post", async () => {
+    expect(await content.getPostBySlug("hidden")).toBeNull()
+    expect((await content.getAllPosts()).map((p) => p.slug)).not.toContain(
+      "hidden"
+    )
+    expect(
+      (await content.getHomepageLatestPosts(10)).map((p) => p.slug)
+    ).not.toContain("hidden")
+  })
+
+  it("admin readers still get it", async () => {
+    const post = await content.getPostBySlug("hidden", true)
+    expect(post?.visible).toBe(false)
+  })
+
+  it("hidden tags and bodies stay out of tags and search", async () => {
+    expect(await content.getAllTags()).not.toContain("secret")
+    expect(await content.searchPublishedPosts(["vault"])).toEqual([])
+  })
+})
+
+describe("setPostVisible", () => {
+  it("hides and restores a live post across public queries", async () => {
+    const slug = "visibility-toggle"
+    await content.savePost(mkPost(slug, { date: "2026-01-07" }))
+    expect(await content.getPostBySlug(slug)).not.toBeNull()
+
+    const hidden = await content.setPostVisible(slug, false)
+    expect(hidden?.visible).toBe(false)
+    expect(await content.getPostBySlug(slug)).toBeNull()
+    expect((await content.getAllPosts()).map((p) => p.slug)).not.toContain(slug)
+
+    const shown = await content.setPostVisible(slug, true)
+    expect(shown?.visible).toBe(true)
+    expect(await content.getPostBySlug(slug)).not.toBeNull()
+  })
+
+  it("is idempotent when the state already matches", async () => {
+    const slug = "visibility-idempotent"
+    await content.savePost(mkPost(slug))
+    const same = await content.setPostVisible(slug, true)
+    expect(same?.visible).toBe(true)
+  })
+
+  it("returns null for a missing post", async () => {
+    expect(await content.setPostVisible("no-such-post", false)).toBeNull()
+  })
+
+  it("savePost updates do not overwrite visibility", async () => {
+    const slug = "visibility-immutable"
+    await content.savePost(mkPost(slug, { visible: false }))
+    await content.savePost(
+      mkPost(slug, { visible: true, content: "changed body" })
+    )
+    const stored = await content.getPostBySlug(slug, true)
+    expect(stored?.visible).toBe(false)
+    expect(stored?.content).toBe("changed body")
   })
 })

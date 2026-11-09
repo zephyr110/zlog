@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS posts (
   description TEXT NOT NULL DEFAULT '',
   cover TEXT,
   draft INTEGER NOT NULL DEFAULT 0,
+  visible INTEGER NOT NULL DEFAULT 1,
   pinned_at TEXT,
   publish_at TEXT,
   content TEXT NOT NULL DEFAULT '',
@@ -47,7 +48,11 @@ async function ensureTable(db: Client): Promise<void> {
     tableReady = (async () => {
       await db.executeMultiple(SCHEMA)
       // Migrate existing DBs that predate pinned_at / publish_at.
-      for (const column of ["pinned_at TEXT", "publish_at TEXT"]) {
+      for (const column of [
+        "pinned_at TEXT",
+        "publish_at TEXT",
+        "visible INTEGER NOT NULL DEFAULT 1",
+      ]) {
         try {
           await db.execute(`ALTER TABLE posts ADD COLUMN ${column}`)
         } catch (err) {
@@ -70,11 +75,12 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (match) => `\\${match}`)
 }
 
-/** Public visibility, in one place: not a draft, and either unscheduled
- *  or past its publish time. publish_at shares the "YYYY-MM-DD HH:MM:SS"
- *  UTC format of datetime('now'), so the comparison is exact. */
+/** Public visibility, in one place: on the frontend, not a draft, and
+ *  either unscheduled or past its publish time. publish_at shares the
+ *  "YYYY-MM-DD HH:MM:SS" UTC format of datetime('now'), so the
+ *  comparison is exact. */
 const PUBLISHED_SQL =
-  "draft = 0 AND (publish_at IS NULL OR publish_at <= datetime('now'))"
+  "visible = 1 AND draft = 0 AND (publish_at IS NULL OR publish_at <= datetime('now'))"
 
 // ── Public API ──────────────────────────────────────────────────────────
 
@@ -212,13 +218,14 @@ export async function savePost(
   }
 
   const p = toParams(post)
-  // pinned_at is written on INSERT only. Updates must not touch it — pin /
-  // unpin goes through setPostPinned, and editor/auto-save RMW must not
-  // clobber a newer pin with a stale null from a prior read. publish_at,
-  // by contrast, is the editor's to change on every save.
+  // pinned_at and visible are written on INSERT only. Updates must not
+  // touch them — pin / hide / show go through their dedicated setters,
+  // and editor/auto-save RMW must not clobber a newer value with a stale
+  // one from a prior read. publish_at, by contrast, is the editor's to
+  // change on every save.
   const upsert = {
-    sql: `INSERT INTO posts (slug, title, date, updated, tags, description, cover, draft, pinned_at, publish_at, content, word_count, reading_time)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    sql: `INSERT INTO posts (slug, title, date, updated, tags, description, cover, draft, visible, pinned_at, publish_at, content, word_count, reading_time)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(slug) DO UPDATE SET
             title=excluded.title, date=excluded.date, updated=excluded.updated,
             tags=excluded.tags, description=excluded.description, cover=excluded.cover,
@@ -234,6 +241,7 @@ export async function savePost(
       p.description,
       p.cover,
       p.draft,
+      p.visible,
       p.pinned_at,
       p.publish_at,
       p.content,
@@ -319,6 +327,28 @@ export async function setPostPinned(
   const result = await db.execute({
     sql: `UPDATE posts SET pinned_at = ?, updated_at = datetime('now') WHERE slug = ? RETURNING *`,
     args: [pinnedAt, clean],
+  })
+  const row = result.rows[0]
+  if (row) scheduleSync()
+  return row ? rowToPost(row) : null
+}
+
+export async function setPostVisible(
+  slug: string,
+  visible: boolean
+): Promise<Post | null> {
+  const db = requireDb()
+  await ensureTable(db)
+  const clean = safeSlug(slug)
+  const existing = await getPostBySlug(clean, true)
+  if (!existing) return null
+
+  // Idempotent: re-affirming the current state must not bump updated_at.
+  if (visible === existing.visible) return existing
+
+  const result = await db.execute({
+    sql: `UPDATE posts SET visible = ?, updated_at = datetime('now') WHERE slug = ? RETURNING *`,
+    args: [visible ? 1 : 0, clean],
   })
   const row = result.rows[0]
   if (row) scheduleSync()

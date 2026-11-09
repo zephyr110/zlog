@@ -120,6 +120,7 @@ export async function POST(request: NextRequest) {
     description: body.description || "",
     cover: body.cover || undefined,
     draft: body.draft ?? true,
+    visible: true,
     pinnedAt: null,
     publishAt: body.publishAt || null,
     content,

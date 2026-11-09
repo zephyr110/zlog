@@ -19,6 +19,7 @@ function mkPost(slug: string, overrides: Partial<Post> = {}): Post {
     tags: [],
     description: "",
     draft: false,
+    visible: true,
     pinnedAt: null,
     publishAt: null,
     content: "body",

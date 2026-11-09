@@ -29,6 +29,7 @@ export function toPostSummary(post: Post): PostSummary {
     description: post.description,
     cover: post.cover,
     draft: post.draft,
+    visible: post.visible,
     pinnedAt: post.pinnedAt,
     publishAt: post.publishAt,
     wordCount: post.wordCount,

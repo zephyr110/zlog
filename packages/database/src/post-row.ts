@@ -21,6 +21,8 @@ export function rowToPost(row: any): Post {
     description: row.description,
     cover: row.cover ?? undefined,
     draft: Boolean(row.draft),
+    // 旧库/旧快照缺列时默认展示，避免迁移未到时误隐藏全部文章。
+    visible: row.visible == null ? true : Boolean(row.visible),
     pinnedAt: (row.pinned_at as string | null) ?? null,
     publishAt: (row.publish_at as string | null) ?? null,
     content: row.content,
@@ -39,6 +41,7 @@ export function toParams(post: Post) {
     description: post.description,
     cover: post.cover ?? null,
     draft: post.draft ? 1 : 0,
+    visible: post.visible ? 1 : 0,
     pinned_at: post.pinnedAt,
     publish_at: post.publishAt,
     content: post.content,
