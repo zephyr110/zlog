@@ -18,23 +18,21 @@ export function BannerArt({ className }: { className?: string }) {
       className={cn("pointer-events-none absolute inset-0 overflow-hidden", className)}
     >
       <div
-        className="absolute inset-0"
+        className="banner-grid absolute inset-0"
         style={{
           backgroundImage: `
             linear-gradient(to right, color-mix(in oklab, var(--color-foreground) 9%, transparent) 1px, transparent 1px),
             linear-gradient(to bottom, color-mix(in oklab, var(--color-foreground) 9%, transparent) 1px, transparent 1px)
           `,
-          backgroundSize: "56px 56px",
           maskImage: "radial-gradient(ellipse 95% 90% at 50% 0%, black 35%, transparent 80%)",
           WebkitMaskImage: "radial-gradient(ellipse 95% 90% at 50% 0%, black 35%, transparent 80%)",
         }}
       />
       <div
-        className="absolute inset-0 hidden opacity-[0.10] motion-safe:block dark:opacity-[0.16]"
+        className="banner-grid absolute inset-0 hidden opacity-[0.10] motion-safe:block dark:opacity-[0.16]"
         style={{
           backgroundImage:
             "conic-gradient(from 90deg at 2px 2px, transparent 90deg, oklch(0.6 0.2 290) 0)",
-          backgroundSize: "56px 56px",
           maskImage: "linear-gradient(90deg, transparent 30%, black 42%, black 58%, transparent 70%)",
           WebkitMaskImage:
             "linear-gradient(90deg, transparent 30%, black 42%, black 58%, transparent 70%)",

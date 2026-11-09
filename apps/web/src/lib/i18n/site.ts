@@ -8,6 +8,7 @@ heroTitleLine1: "思考、想法",
 heroTitleLine2: "和故事。",
 heroSubtitle:
   "一个探索技术、编程和构建 Web 的个人空间。",
+heroTerminalAlt: "zephyr110 的终端简介动画",
 articlesPublished: (n: number) => `${n} 篇文章`,
 latestPosts: "最新文章",
 viewAll: "查看全部",
@@ -53,6 +54,7 @@ heroTitleLine1: "Thoughts, ideas",
 heroTitleLine2: "and stories.",
 heroSubtitle:
   "A personal space for exploring technology, programming, and the craft of building things on the web.",
+heroTerminalAlt: "zephyr110's animated terminal intro",
 articlesPublished: (n: number) =>
   `${n} ${n === 1 ? "article" : "articles"}`,
 latestPosts: "Latest posts",
