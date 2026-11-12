@@ -74,27 +74,27 @@ export function Footer() {
               </p>
               <Link
                 href="/"
-                className="w-fit text-sm text-muted-foreground transition-colors hover:text-foreground"
+                className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
               >
                 {t("site.home")}
               </Link>
               <Link
                 href="/archive"
-                className="w-fit text-sm text-muted-foreground transition-colors hover:text-foreground"
+                className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
               >
                 {t("site.archive")}
               </Link>
               {site.projectsEnabled && (
                 <Link
                   href="/projects"
-                  className="w-fit text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
                 >
                   {t("site.projects")}
                 </Link>
               )}
               <Link
                 href="/about"
-                className="w-fit text-sm text-muted-foreground transition-colors hover:text-foreground"
+                className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
               >
                 {t("site.about")}
               </Link>
@@ -163,7 +163,7 @@ function FooterLink({
   internal?: boolean
 }) {
   const className =
-    "inline-flex w-fit items-center gap-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+    "inline-flex w-fit items-center gap-2.5 text-sm text-muted-foreground transition-colors hover:text-primary"
 
   return internal ? (
     <Link href={href} className={className}>

@@ -457,7 +457,7 @@ export function ArchiveFeed({ posts, allTags }: ArchiveFeedProps) {
         {years.length >= 2 && filteredPosts.length > 0 && (
           <button
             onClick={toggleAll}
-            className="inline-flex h-[38px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/60 bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/25 hover:text-foreground lg:ml-auto"
+            className="inline-flex h-[38px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/60 bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:ml-auto"
           >
             <svg
               className={`size-3 transition-transform duration-300 ${allCollapsed ? "" : "rotate-180"}`}

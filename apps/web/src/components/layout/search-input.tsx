@@ -56,7 +56,7 @@ export function SearchInput() {
     <form onSubmit={handleSubmit} className="relative ml-1 flex items-center">
       <div
         className={cn(
-          "relative flex h-9 items-center overflow-hidden rounded-lg transition-[width,background-color] duration-300 ease-out motion-reduce:transition-none",
+          "relative flex h-9 items-center overflow-hidden rounded-lg transition-[width,background-color] duration-300 ease-out focus-within:ring-1 focus-within:ring-primary/40 motion-reduce:transition-none",
           open ? "w-36 bg-muted/60 sm:w-44 lg:w-52" : "w-9 bg-transparent hover:bg-muted/50"
         )}
       >
@@ -71,7 +71,7 @@ export function SearchInput() {
           aria-expanded={open}
           aria-keyshortcuts="/"
           title={`${t("site.searchPosts")} (/)`}
-          className="relative flex size-9 shrink-0 cursor-pointer items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground"
+          className="relative flex size-9 shrink-0 cursor-pointer items-center justify-center text-muted-foreground outline-none transition-colors hover:text-primary"
         >
           <Search size={16} />
         </button>

@@ -40,7 +40,7 @@ export function LanguageSwitcher({
               type="button"
               onClick={toggle}
               aria-label={switchLabel}
-              className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               <Languages size={18} />
             </button>

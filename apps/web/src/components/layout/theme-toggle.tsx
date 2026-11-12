@@ -101,7 +101,7 @@ export function ThemeCycleButton() {
             type="button"
             onClick={cycle}
             aria-label={label}
-            className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
             <Icon size={18} className={current.iconClass} />
           </button>
