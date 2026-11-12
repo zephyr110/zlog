@@ -12,16 +12,22 @@ function mulberry32(seed: number) {
 type ParticleShape = "circle" | "square" | "diamond" | "triangle" | "ring" | "cross"
 
 const SHAPES: ParticleShape[] = ["circle", "square", "diamond", "triangle", "ring", "cross"]
-const HUES = [185, 190, 195, 200, 205, 210, 275, 280, 290, 300, 320, 330]
+// Offsets from --banner-hue: at the default 257° these reproduce the
+// original 185–330° cool palette; a theme color rotates the whole set.
+const HUE_OFFSETS = [-72, -67, -62, -57, -52, -47, 18, 23, 33, 43, 63, 73]
 
 interface ParticleDef {
   left: string
   top?: string
   size: number
-  hue: number
+  hueOffset: number
   delay: number
   duration: number
   shape: ParticleShape
+}
+
+function bannerHue(offset: number) {
+  return `calc(var(--banner-hue, 257) ${offset < 0 ? "-" : "+"} ${Math.abs(offset)})`
 }
 
 function shapeStyle(shape: ParticleShape, size: number, color: string, glow?: string): React.CSSProperties {
@@ -66,7 +72,7 @@ function makeParticles(
     left: `${(rand() * (100 - pad * 2) + pad).toFixed(1)}%`,
     ...(opts.includeTop ? { top: `${(rand() * 85 + 5).toFixed(1)}%` } : {}),
     size: Math.round(rand() * (szMax - szMin) + szMin),
-    hue: pick(rand, HUES),
+    hueOffset: pick(rand, HUE_OFFSETS),
     delay: +(rand() * (dMax - dMin) + dMin).toFixed(1),
     duration: +(rand() * (tMax - tMin) + tMin).toFixed(1),
     shape: pick(rand, SHAPES),
@@ -93,13 +99,14 @@ export const loginBlinkingParticles = makeParticles(99, 32, {
 })
 
 export function HeroParticle({ p, className }: { p: ParticleDef; className: string }) {
+  const h = bannerHue(p.hueOffset)
   return (
     <span
       className={`${className} absolute`}
       style={{
         left: p.left,
         bottom: "-8px",
-        ...shapeStyle(p.shape, p.size, `oklch(0.78 0.18 ${p.hue})`, `0 0 ${p.size * 3}px ${p.size}px oklch(0.78 0.18 ${p.hue} / 0.45)`),
+        ...shapeStyle(p.shape, p.size, `oklch(0.78 0.18 ${h})`, `0 0 ${p.size * 3}px ${p.size}px oklch(0.78 0.18 ${h} / 0.45)`),
         // backwards fill: during the delay the 0% frame (opacity 0) applies,
         // so a particle never renders fully opaque before its animation starts.
         animation: `hero-rise ${p.duration}s linear ${p.delay}s infinite backwards`,
@@ -109,6 +116,7 @@ export function HeroParticle({ p, className }: { p: ParticleDef; className: stri
 }
 
 export function HeroPixel({ p }: { p: ParticleDef }) {
+  const h = bannerHue(p.hueOffset)
   return (
     <span
       className="hero-pixel absolute"
@@ -116,7 +124,7 @@ export function HeroPixel({ p }: { p: ParticleDef }) {
         left: p.left,
         top: p.top,
         opacity: 0,
-        ...shapeStyle(p.shape, p.size, `oklch(0.72 0.17 ${p.hue} / 0.5)`, `0 0 ${p.size}px oklch(0.72 0.17 ${p.hue} / 0.3)`),
+        ...shapeStyle(p.shape, p.size, `oklch(0.72 0.17 ${h} / 0.5)`, `0 0 ${p.size}px oklch(0.72 0.17 ${h} / 0.3)`),
         animation: `hero-pixel-blink ${p.duration}s steps(1, end) ${p.delay}s infinite backwards`,
       }}
     />

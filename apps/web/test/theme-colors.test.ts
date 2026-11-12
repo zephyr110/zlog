@@ -199,7 +199,7 @@ describe("默认零回归（Neutral 与 globals.css :root/.dark 除图表色外�
   const rootVars = cssVarsOf(rootBlock)
   const darkVars = cssVarsOf(darkBlock)
 
-  it(":root：除 chart-1..5 外逐键相等（仅允许自定义 --login-glow）", () => {
+  it(":root：除 chart-1..5 外逐键相等（仅允许自定义 --login-glow / --banner-hue）", () => {
     expect(rootBlock).not.toBe("")
     for (const [key, value] of Object.entries(catalog.bases.neutral.light)) {
       if (CHART_SITE_KEYS.includes(key)) continue
@@ -214,9 +214,10 @@ describe("默认零回归（Neutral 与 globals.css :root/.dark 除图表色外�
     for (const k of CHART_SITE_KEYS) {
       expect(rootVars[k]).toBe(GRAY_LIGHT[k])
     }
+    // 手工变量：登录页光晕、banner 粒子/扫光色相基准。
     expect(
       Object.keys(rootVars).filter((k) => !(k in catalog.bases.neutral.light))
-    ).toEqual(["login-glow"])
+    ).toEqual(["login-glow", "banner-hue"])
   })
 
   it(".dark：同上（差异集合恰为 chart-1..5，图表值 == gray.dark）", () => {
@@ -235,5 +236,21 @@ describe("默认零回归（Neutral 与 globals.css :root/.dark 除图表色外�
     expect(
       Object.keys(darkVars).filter((k) => !(k in catalog.bases.neutral.dark))
     ).toEqual(["login-glow"])
+  })
+
+  it("主题色 --banner-hue 跟随 catalog 主色相（四舍五入）", () => {
+    const themes = catalog.themes as Record<string, { light: { primary: string } }>
+    for (const id of THEME_COLOR_IDS.filter((i) => i !== "default")) {
+      const hue = Math.round(
+        Number(/oklch\([\d.]+ [\d.]+ ([\d.]+)\)/.exec(themes[id].light.primary)?.[1])
+      )
+      const block =
+        GLOBALS_CSS.match(
+          new RegExp(
+            `html\\[data-theme-color="${id}"\\],\\s*\\[data-theme-color="${id}"\\]\\s*\\{([\\s\\S]*?)\\n\\}`
+          )
+        )?.[1] ?? ""
+      expect(cssVarsOf(block)["banner-hue"], id).toBe(String(hue))
+    }
   })
 })

@@ -68,6 +68,9 @@
   /* Top elliptical glow (login + page headers) — bright airy amber on
      light (high lightness, low chroma so it reads as warm light). */
   --login-glow: oklch(0.96 0.05 97);
+  /* Base hue for banner particles and the sweeping grid. 257 keeps the
+     original cool palette when no theme color is chosen. */
+  --banner-hue: 257;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -129,6 +132,37 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* Banner hues follow each theme-color primary (theme-catalog.json); the
+   light/dark variants share the same hue, so one override per theme. */
+html[data-theme-color="amber"],
+[data-theme-color="amber"] {
+  --banner-hue: 49;
+}
+html[data-theme-color="blue"],
+[data-theme-color="blue"] {
+  --banner-hue: 264;
+}
+html[data-theme-color="green"],
+[data-theme-color="green"] {
+  --banner-hue: 150;
+}
+html[data-theme-color="orange"],
+[data-theme-color="orange"] {
+  --banner-hue: 38;
+}
+html[data-theme-color="rose"],
+[data-theme-color="rose"] {
+  --banner-hue: 17;
+}
+html[data-theme-color="teal"],
+[data-theme-color="teal"] {
+  --banner-hue: 186;
+}
+html[data-theme-color="violet"],
+[data-theme-color="violet"] {
+  --banner-hue: 293;
 }
 
 @layer base {

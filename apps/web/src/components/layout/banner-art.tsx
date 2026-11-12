@@ -32,7 +32,7 @@ export function BannerArt({ className }: { className?: string }) {
         className="banner-grid absolute inset-0 hidden opacity-[0.10] motion-safe:block dark:opacity-[0.16]"
         style={{
           backgroundImage:
-            "conic-gradient(from 90deg at 2px 2px, transparent 90deg, oklch(0.6 0.2 290) 0)",
+            "conic-gradient(from 90deg at 2px 2px, transparent 90deg, oklch(0.6 0.2 calc(var(--banner-hue, 257) + 33)) 0)",
           maskImage: "linear-gradient(90deg, transparent 30%, black 42%, black 58%, transparent 70%)",
           WebkitMaskImage:
             "linear-gradient(90deg, transparent 30%, black 42%, black 58%, transparent 70%)",
