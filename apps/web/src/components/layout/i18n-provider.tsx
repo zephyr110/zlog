@@ -90,6 +90,12 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // SSR always emits lang="zh"; keep the document language in sync once
+  // the client resolves a different locale (screen readers + spellcheck).
+  useEffect(() => {
+    document.documentElement.lang = locale
+  }, [locale])
+
   const setLocale = useCallback((l: Locale) => {
     userPickedRef.current = true
     setLocaleState(l)

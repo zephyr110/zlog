@@ -5,6 +5,7 @@ import Link from "next/link"
 import { getPublishedPosts } from "@zlog/database"
 import { Container } from "@/components/ui/container"
 import { PageHeader } from "@/components/layout/page-header"
+import { PageHeaderDecor } from "@/components/layout/page-header-decor"
 import { FormattedDate } from "@/components/blog/formatted-date"
 import { Trans } from "@/components/layout/trans"
 import { defaultLocale, t } from "@/lib/i18n"
@@ -79,6 +80,7 @@ export default async function SeriesPage({ params }: SeriesPageProps) {
         icon={<Layers size={24} />}
         title={displayName}
         description={<Trans k="site.postsCount" args={[posts.length]} />}
+        decor={<PageHeaderDecor variant="series" />}
       />
 
       <Container className="py-10 pb-16">

@@ -298,6 +298,9 @@ export default function AdminMediaPage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder={t("admin.searchMedia")}
+              aria-label={t("admin.searchMedia")}
+              aria-keyshortcuts="/"
+              data-search-input="page"
               className="h-8 w-44 pl-8 text-xs"
             />
           </div>
@@ -430,6 +433,9 @@ export default function AdminMediaPage() {
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
                     placeholder={t("admin.searchMedia")}
+                    aria-label={t("admin.searchMedia")}
+                    aria-keyshortcuts="/"
+                    data-search-input="page"
                     className="h-8 w-full pl-8 text-xs"
                   />
                 </div>

@@ -13,10 +13,15 @@ export default function TimelineLoading() {
         )}
       >
         <BannerArt />
-        <div className="container relative mx-auto flex max-w-5xl flex-1 flex-col justify-center px-4 py-12 md:py-16 2xl:max-w-7xl">
-          <Skeleton className="h-4 w-32 mb-6" />
-          <Skeleton className="h-10 w-40 mb-3" />
-          <Skeleton className="h-4 w-28" />
+        <div className="container relative mx-auto flex max-w-5xl flex-1 items-center gap-8 px-4 py-12 md:py-16 xl:gap-12 2xl:max-w-7xl">
+          <div className="min-w-0 flex-1">
+            <Skeleton className="h-4 w-32 mb-6" />
+            <Skeleton className="h-10 w-40 mb-3" />
+            <Skeleton className="h-4 w-28" />
+          </div>
+          <div className="hidden w-56 shrink-0 lg:block xl:w-64 2xl:w-72">
+            <Skeleton className="aspect-square w-full rounded-3xl" />
+          </div>
         </div>
       </section>
 

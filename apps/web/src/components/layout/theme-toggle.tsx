@@ -11,16 +11,12 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 
-export function ThemeToggle() {
+function useThemeOptions() {
   const { theme, setTheme } = useTheme()
   const { t } = useT()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => { setMounted(true) }, []) // eslint-disable-line react-hooks/set-state-in-effect -- hydration guard: theme is only known client-side
-
-  if (!mounted) {
-    return <div className="size-9" />
-  }
 
   const options = [
     { key: "light", label: t("admin.light"), icon: Sun, iconClass: "text-amber-500" },
@@ -29,11 +25,25 @@ export function ThemeToggle() {
   ] as const
 
   const current = options.find((o) => o.key === theme) || options[2]
+  return { theme, setTheme, options, current, mounted, t }
+}
+
+/** Header / mobile-nav control: opens a three-option menu. */
+export function ThemeToggle() {
+  const { theme, setTheme, options, current, mounted, t } = useThemeOptions()
+
+  if (!mounted) {
+    return <div className="size-9" />
+  }
+
   const Icon = current.icon
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="inline-flex items-center justify-center size-9 rounded-lg hover:bg-muted/60 transition-colors text-muted-foreground hover:text-foreground cursor-pointer outline-none">
+      <DropdownMenuTrigger
+        aria-label={`${t("admin.theme")}: ${current.label}`}
+        className="inline-flex items-center justify-center size-9 rounded-lg hover:bg-muted/60 transition-colors text-muted-foreground hover:text-foreground cursor-pointer outline-none"
+      >
         <Icon size={18} className={current.iconClass} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8} className="w-36">
@@ -58,5 +68,39 @@ export function ThemeToggle() {
         })}
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+/** Footer control: one click advances light → dark → system, no menu. */
+export function ThemeCycleButton() {
+  const { theme, setTheme, options, current, mounted, t } = useThemeOptions()
+
+  if (!mounted) {
+    return <div className="h-8 w-full" />
+  }
+
+  const Icon = current.icon
+  const label = `${t("admin.theme")}: ${current.label}`
+
+  function cycle() {
+    const index = options.findIndex((o) => o.key === theme)
+    const next = options[(index + 1) % options.length] ?? options[0]
+    setTheme(next.key)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={cycle}
+      aria-label={label}
+      title={label}
+      className="inline-flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+    >
+      <Icon size={18} className={current.iconClass} />
+      <span>{t("admin.theme")}</span>
+      <span className="ml-auto text-xs text-muted-foreground/70">
+        {current.label}
+      </span>
+    </button>
   )
 }

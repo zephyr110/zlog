@@ -1,14 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { ThemeToggle } from "@/components/layout/theme-toggle"
-import { LanguageSwitcher } from "@/components/layout/language-switcher"
 import { IconButton } from "@/components/ui/icon-button"
 import { useSiteConfig } from "@/components/layout/site-config-provider"
-import { siteLogoSrc, defaultSiteConfig } from "@/lib/site-config"
+import { siteLogoSrc } from "@/lib/site-config"
 import { SiteLogo } from "@/components/layout/site-logo"
 import { useT } from "@/components/layout/trans"
 import {
@@ -18,7 +16,6 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { Menu, X, ChevronDown } from "lucide-react"
-import { GithubIcon } from "@/components/ui/brand-icons"
 import { categoryMeta } from "@/lib/categories"
 import { SearchInput } from "@/components/layout/search-input"
 import { MobileNav } from "@/components/layout/mobile-nav"
@@ -32,8 +29,9 @@ export function Header({ categories }: { categories: NavCategory[] }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mobileTopicsOpen, setMobileTopicsOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [topicsOpen, setTopicsOpen] = useState(false)
+  const topicsCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const logoSrc = siteLogoSrc(site)
-  const githubUrl = site.social.github || defaultSiteConfig.social.github
 
   useEffect(() => {
     function handleScroll() {
@@ -49,6 +47,31 @@ export function Header({ categories }: { categories: NavCategory[] }) {
     return () => { document.body.style.overflow = "" }
   }, [mobileOpen])
 
+  // Hover menu needs a grace period so the pointer can cross the 12px
+  // gap between the trigger and the popup without closing it.
+  function clearTopicsClose() {
+    if (topicsCloseTimer.current) {
+      clearTimeout(topicsCloseTimer.current)
+      topicsCloseTimer.current = null
+    }
+  }
+  function openTopics() {
+    clearTopicsClose()
+    setTopicsOpen(true)
+  }
+  function scheduleTopicsClose() {
+    clearTopicsClose()
+    topicsCloseTimer.current = setTimeout(() => {
+      topicsCloseTimer.current = null
+      setTopicsOpen(false)
+    }, 160)
+  }
+  useEffect(() => {
+    return () => {
+      if (topicsCloseTimer.current) clearTimeout(topicsCloseTimer.current)
+    }
+  }, [])
+
   if (pathname?.startsWith("/admin")) return null
 
   const atHome = pathname === "/"
@@ -57,15 +80,24 @@ export function Header({ categories }: { categories: NavCategory[] }) {
 
   return (
     <>
+      {/* Floating navbar: the outer bar keeps a constant height (it is
+          sticky, so changing it would shift the whole document); once the
+          page scrolls, the full-width backing fades out and the inner pill
+          contracts onto the page container with a glass layer. */}
       <header
         className={cn(
-          "sticky top-0 z-50 w-full transition-all duration-300",
-          scrolled
-            ? "border-b border-border/40 bg-background/85 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75"
-            : "border-transparent bg-background"
+          "sticky top-0 z-50 flex h-14 w-full items-center px-3 transition-colors duration-300 md:h-16 md:px-4",
+          scrolled ? "bg-transparent" : "bg-background"
         )}
       >
-        <div className="container mx-auto flex h-14 items-center justify-between gap-4 px-4 md:h-16">
+        <div
+          className={cn(
+            "relative mx-auto flex h-11 w-full items-center justify-between gap-3 rounded-full border px-2.5 transition-[max-width,background-color,border-color,box-shadow] duration-300 ease-out motion-reduce:transition-none md:h-12 md:px-3",
+            scrolled
+              ? "max-w-5xl border-border/60 bg-background/80 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-background/65 2xl:max-w-7xl"
+              : "max-w-6xl border-transparent bg-transparent 2xl:max-w-[88rem]"
+          )}
+        >
           {/* Brand lockup — sized like lucide.dev nav (36px mark, 21px name). */}
           <Link
             href="/"
@@ -90,9 +122,24 @@ export function Header({ categories }: { categories: NavCategory[] }) {
               {t("site.home")}
             </NavLink>
 
-            {/* Topics dropdown */}
-            <DropdownMenu>
+            {/* Topics dropdown — opens on hover (with a small close delay)
+                and still supports click + keyboard. modal={false} keeps the
+                page scrollable while the pointer is merely passing over. */}
+            <DropdownMenu
+              modal={false}
+              open={topicsOpen}
+              onOpenChange={(open) => {
+                clearTopicsClose()
+                setTopicsOpen(open)
+              }}
+            >
               <DropdownMenuTrigger
+                onPointerEnter={(e) => {
+                  if (e.pointerType === "mouse") openTopics()
+                }}
+                onPointerLeave={(e) => {
+                  if (e.pointerType === "mouse") scheduleTopicsClose()
+                }}
                 className={cn(
                   "relative hidden cursor-pointer items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium outline-none transition-all duration-200 md:flex",
                   atTopics
@@ -101,9 +148,25 @@ export function Header({ categories }: { categories: NavCategory[] }) {
                 )}
               >
                 <span>{t("site.topics")}</span>
-                <ChevronDown aria-hidden className="size-3.5 opacity-45" />
+                <ChevronDown
+                  aria-hidden
+                  className={cn(
+                    "size-3.5 opacity-45 transition-transform duration-200",
+                    topicsOpen && "rotate-180"
+                  )}
+                />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" sideOffset={12} className="w-64 p-2">
+              <DropdownMenuContent
+                align="start"
+                sideOffset={12}
+                className="w-64 p-2"
+                onPointerEnter={(e) => {
+                  if (e.pointerType === "mouse") openTopics()
+                }}
+                onPointerLeave={(e) => {
+                  if (e.pointerType === "mouse") scheduleTopicsClose()
+                }}
+              >
                 {categories.length === 0 ? (
                   <p className="px-3 py-4 text-xs text-muted-foreground text-center">
                     {t("site.noTopics")}
@@ -166,27 +229,9 @@ export function Header({ categories }: { categories: NavCategory[] }) {
               {t("site.about")}
             </NavLink>
 
-            {/* Soft divider between navigation and utility tools */}
-            <span
-              className="mx-1.5 hidden h-3.5 w-px bg-border/70 md:block"
-              aria-hidden="true"
-            />
-
-            {/* Tools — search + icon controls */}
+            {/* Utility — search stays last at the far right; theme and
+                language live in the footer and mobile menu. */}
             <SearchInput />
-            <ThemeToggle />
-            <LanguageSwitcher />
-
-            {/* GitHub — hidden on small screens; footer / mobile nav cover it */}
-            <a
-              href={githubUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground sm:inline-flex"
-              aria-label="GitHub"
-            >
-              <GithubIcon size={17} />
-            </a>
 
             {/* Mobile menu toggle */}
             <IconButton

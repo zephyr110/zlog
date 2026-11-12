@@ -6,12 +6,10 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { LanguageSwitcher } from "@/components/layout/language-switcher"
-import { GithubIcon } from "@/components/ui/brand-icons"
 import { ChevronDown } from "lucide-react"
 import { useT } from "@/components/layout/trans"
 import { useSiteConfig } from "@/components/layout/site-config-provider"
 import { categoryMeta } from "@/lib/categories"
-import { defaultSiteConfig } from "@/lib/site-config"
 import type { NavCategory } from "@/lib/nav-links"
 import type { TranslationPath } from "@/lib/i18n"
 
@@ -48,7 +46,6 @@ export function MobileNav({
   const site = useSiteConfig()
   const pathname = usePathname()
   const topicsId = useId()
-  const githubUrl = site.social.github || defaultSiteConfig.social.github
 
   // Escape closes the menu (the backdrop is mouse-only; keyboard users
   // need a way out without tabbing through the whole panel).
@@ -67,7 +64,7 @@ export function MobileNav({
         className="fixed inset-0 z-40 bg-black/15 backdrop-blur-[2px] md:hidden"
         onClick={onClose}
       />
-      <div className="fixed inset-x-0 top-16 z-50 md:hidden border-b bg-background/95 backdrop-blur-xl animate-in slide-in-from-top-1 duration-200 shadow-lg shadow-black/5">
+      <div className="fixed inset-x-0 top-14 z-50 md:hidden border-b bg-background/95 backdrop-blur-xl animate-in slide-in-from-top-1 duration-200 shadow-lg shadow-black/5">
         <nav className="container mx-auto px-4 py-3 space-y-1">
           {navLinks
             .filter((link) => !link.requiresProjects || site.projectsEnabled)
@@ -145,15 +142,6 @@ export function MobileNav({
             </>
           )}
           <div className="my-2 mx-3 border-t" />
-          <a
-            href={githubUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-150"
-          >
-            <GithubIcon size={16} />
-            GitHub
-          </a>
           <div className="flex items-center justify-between px-3 py-2">
             <span className="text-sm text-muted-foreground">
               {t("admin.theme")}

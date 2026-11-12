@@ -9,22 +9,16 @@ import { useSiteConfig } from "@/components/layout/site-config-provider"
 import { siteLogoSrc, defaultSiteConfig } from "@/lib/site-config"
 import { SiteLogo } from "@/components/layout/site-logo"
 import { useT } from "@/components/layout/trans"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { ThemeCycleButton } from "@/components/layout/theme-toggle"
+import { LanguageSwitcher } from "@/components/layout/language-switcher"
 import { hasAdminSession } from "@/lib/api-client"
 
-const iconButtonClass =
-  "inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-
 /**
- * Site footer — brand block + quick nav + icon actions, sitting on a
- * gradient that fades from the page background into the muted panel tone.
- * A hairline top border separates it from the page content. The admin entry
- * is a quiet icon button (lock when signed out, dashboard when signed in):
- * invisible to readers, always where the admin expects it.
+ * Site footer — brand block + three link columns (navigate / links /
+ * settings), sitting on a gradient that fades from the page background into
+ * the muted panel tone. The admin entry is a quiet row (lock when signed
+ * out, dashboard when signed in): invisible to readers, always where the
+ * admin expects it.
  */
 export function Footer() {
   const pathname = usePathname()
@@ -72,7 +66,7 @@ export function Footer() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-8 sm:flex-row sm:gap-16">
+          <div className="flex flex-col gap-8 sm:flex-row sm:gap-12 lg:gap-16">
             {/* Quick nav */}
             <nav className="flex flex-col gap-2.5">
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
@@ -106,30 +100,30 @@ export function Footer() {
               </Link>
             </nav>
 
-            {/* Icon actions */}
+            {/* Links — labelled rows, stacked */}
             <div className="flex flex-col gap-2.5">
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
                 {t("site.links")}
               </p>
-              <div className="flex items-center gap-1">
-                <FooterIconButton
+              <div className="flex flex-col gap-2.5">
+                <FooterLink
                   href={githubUrl}
                   label="GitHub"
-                  icon={<GithubIcon size={18} />}
+                  icon={<GithubIcon size={16} />}
                 />
                 {site.social.twitter ? (
-                  <FooterIconButton
+                  <FooterLink
                     href={site.social.twitter}
                     label="Twitter"
-                    icon={<XIcon size={18} />}
+                    icon={<XIcon size={16} />}
                   />
                 ) : null}
-                <FooterIconButton
+                <FooterLink
                   href="/feed.xml"
                   label="RSS"
-                  icon={<Rss size={18} />}
+                  icon={<Rss size={16} />}
                 />
-                <FooterIconButton
+                <FooterLink
                   href={loggedIn ? "/admin/dashboard" : "/admin/login"}
                   label={
                     loggedIn
@@ -137,10 +131,21 @@ export function Footer() {
                       : (t("admin.signIn"))
                   }
                   icon={
-                    loggedIn ? <LayoutDashboard size={18} /> : <UserRoundKey size={18} />
+                    loggedIn ? <LayoutDashboard size={16} /> : <UserRoundKey size={16} />
                   }
                   internal
                 />
+              </div>
+            </div>
+
+            {/* Display settings */}
+            <div className="flex w-40 flex-col gap-2.5">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
+                {t("site.settings")}
+              </p>
+              <div className="flex flex-col gap-0.5">
+                <ThemeCycleButton />
+                <LanguageSwitcher variant="footer" />
               </div>
             </div>
           </div>
@@ -150,10 +155,8 @@ export function Footer() {
   )
 }
 
-/** Icon action wrapped in a tooltip — the four footer icons share this
- *  chrome. External links open in a new tab; `internal` renders a Next
- *  Link for client-side navigation. */
-function FooterIconButton({
+/** Footer link row — icon + label, opening in a new tab unless internal. */
+function FooterLink({
   href,
   label,
   icon,
@@ -164,26 +167,23 @@ function FooterIconButton({
   icon: React.ReactNode
   internal?: boolean
 }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          internal ? (
-            <Link href={href} className={iconButtonClass} aria-label={label} />
-          ) : (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={iconButtonClass}
-              aria-label={label}
-            />
-          )
-        }
-      >
-        {icon}
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
+  const className =
+    "inline-flex w-fit items-center gap-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+
+  return internal ? (
+    <Link href={href} className={className}>
+      {icon}
+      {label}
+    </Link>
+  ) : (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+    >
+      {icon}
+      {label}
+    </a>
   )
 }

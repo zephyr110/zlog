@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/layout/theme-provider"
 import { I18nProvider } from "@/components/layout/i18n-provider"
 import { SiteConfigProvider } from "@/components/layout/site-config-provider"
 import { DocumentTitle } from "@/components/layout/document-title"
+import { SearchShortcut } from "@/components/layout/search-shortcut"
 import { SiteAnalytics } from "@/components/layout/site-analytics"
 import { ReplyNotifications } from "@/components/blog/reply-notifications"
 import { getSiteConfig } from "@/lib/get-site-config"
@@ -135,6 +136,7 @@ export default async function RootLayout({
           <I18nProvider>
             <SiteConfigProvider value={site}>
               <DocumentTitle />
+              <SearchShortcut />
               <Header categories={displayCategories} />
               <main className="flex-1">{children}</main>
               <Footer />

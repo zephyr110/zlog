@@ -4,6 +4,7 @@ import { FolderGit2 } from "lucide-react"
 import { listVisibleProjects } from "@zlog/database"
 import { getSiteConfig } from "@/lib/get-site-config"
 import { PageHeader } from "@/components/layout/page-header"
+import { PageHeaderDecor } from "@/components/layout/page-header-decor"
 import { ProjectCard } from "@/components/blog/project-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Trans } from "@/components/layout/trans"
@@ -41,6 +42,7 @@ export default async function ProjectsPage() {
         icon={<FolderGit2 size={22} />}
         title={<Trans k="projects.title" />}
         description={<Trans k="projects.description" />}
+        decor={<PageHeaderDecor variant="projects" />}
       />
 
       <div className="container mx-auto max-w-5xl px-4 py-12 md:py-16 2xl:max-w-7xl">

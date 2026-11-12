@@ -340,6 +340,8 @@ export function ArchiveFeed({ posts, allTags }: ArchiveFeedProps) {
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={t("site.searchPosts")}
             aria-label={t("site.searchPosts")}
+            aria-keyshortcuts="/"
+            data-search-input="page"
             className={cn(
               searchOpen
                 ? "pl-9 pr-8"
