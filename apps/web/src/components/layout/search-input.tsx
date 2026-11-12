@@ -74,14 +74,6 @@ export function SearchInput() {
           className="relative flex size-9 shrink-0 cursor-pointer items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground"
         >
           <Search size={16} />
-          {!open && (
-            <kbd
-              aria-hidden
-              className="absolute -bottom-0.5 -right-0.5 hidden rounded border border-border/70 bg-background px-1 font-mono text-[9px] leading-3 text-muted-foreground/60 lg:block"
-            >
-              /
-            </kbd>
-          )}
         </button>
 
         <input

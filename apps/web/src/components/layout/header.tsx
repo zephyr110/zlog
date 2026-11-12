@@ -86,13 +86,13 @@ export function Header({ categories }: { categories: NavCategory[] }) {
           contracts onto the page container with a glass layer. */}
       <header
         className={cn(
-          "sticky top-0 z-50 flex h-14 w-full items-center px-3 transition-colors duration-300 md:h-16 md:px-4",
+          "sticky top-0 z-50 flex h-16 w-full items-center px-3 transition-colors duration-300 md:h-[4.5rem] md:px-4",
           scrolled ? "bg-transparent" : "bg-background"
         )}
       >
         <div
           className={cn(
-            "relative mx-auto flex h-11 w-full items-center justify-between gap-3 rounded-full border px-2.5 transition-[max-width,background-color,border-color,box-shadow] duration-300 ease-out motion-reduce:transition-none md:h-12 md:px-3",
+            "relative mx-auto flex h-12 w-full items-center justify-between gap-3 rounded-full border px-2.5 transition-[max-width,background-color,border-color,box-shadow] duration-300 ease-out motion-reduce:transition-none md:h-14 md:px-3",
             scrolled
               ? "max-w-5xl border-border/60 bg-background/80 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-background/65 2xl:max-w-7xl"
               : "max-w-6xl border-transparent bg-transparent 2xl:max-w-[88rem]"

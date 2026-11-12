@@ -64,7 +64,7 @@ export function MobileNav({
         className="fixed inset-0 z-40 bg-black/15 backdrop-blur-[2px] md:hidden"
         onClick={onClose}
       />
-      <div className="fixed inset-x-0 top-14 z-50 md:hidden border-b bg-background/95 backdrop-blur-xl animate-in slide-in-from-top-1 duration-200 shadow-lg shadow-black/5">
+      <div className="fixed inset-x-0 top-16 z-50 md:hidden border-b bg-background/95 backdrop-blur-xl animate-in slide-in-from-top-1 duration-200 shadow-lg shadow-black/5">
         <nav className="container mx-auto px-4 py-3 space-y-1">
           {navLinks
             .filter((link) => !link.requiresProjects || site.projectsEnabled)

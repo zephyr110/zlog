@@ -76,7 +76,7 @@ export function ThemeCycleButton() {
   const { theme, setTheme, options, current, mounted, t } = useThemeOptions()
 
   if (!mounted) {
-    return <div className="h-8 w-full" />
+    return <div className="size-9" />
   }
 
   const Icon = current.icon
@@ -94,13 +94,9 @@ export function ThemeCycleButton() {
       onClick={cycle}
       aria-label={label}
       title={label}
-      className="inline-flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+      className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
     >
       <Icon size={18} className={current.iconClass} />
-      <span>{t("admin.theme")}</span>
-      <span className="ml-auto text-xs text-muted-foreground/70">
-        {current.label}
-      </span>
     </button>
   )
 }

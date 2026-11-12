@@ -138,15 +138,10 @@ export function Footer() {
               </div>
             </div>
 
-            {/* Display settings */}
-            <div className="flex w-40 flex-col gap-2.5">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
-                {t("site.settings")}
-              </p>
-              <div className="flex flex-col gap-0.5">
-                <ThemeCycleButton />
-                <LanguageSwitcher variant="footer" />
-              </div>
+            {/* Display settings — icon-only, no column heading */}
+            <div className="flex items-start gap-1">
+              <ThemeCycleButton />
+              <LanguageSwitcher variant="footer" />
             </div>
           </div>
         </div>

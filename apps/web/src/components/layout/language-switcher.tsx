@@ -33,13 +33,9 @@ export function LanguageSwitcher({
         onClick={toggle}
         aria-label={switchLabel}
         title={switchLabel}
-        className="inline-flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+        className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
       >
-        <Languages size={18} className="text-foreground/70" />
-        <span>{t("admin.language")}</span>
-        <span lang={locale} className="ml-auto text-xs text-muted-foreground/70">
-          {localeLabels[locale]}
-        </span>
+        <Languages size={18} />
       </button>
     )
   }
