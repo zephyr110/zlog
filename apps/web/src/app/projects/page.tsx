@@ -33,7 +33,7 @@ export default async function ProjectsPage() {
   const projects = await listVisibleProjects()
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeader
         breadcrumb={[
           { href: "/", label: <Trans k="site.home" /> },

@@ -16,9 +16,8 @@ import { hasAdminSession } from "@/lib/api-client"
 /**
  * Site footer — brand block + three link columns (navigate / links /
  * settings), sitting on a gradient that fades from the page background into
- * the muted panel tone. The admin entry is a quiet row (lock when signed
- * out, dashboard when signed in): invisible to readers, always where the
- * admin expects it.
+ * the muted panel tone. The admin entry sits in the links column as a quiet
+ * row: sign-in when signed out, dashboard when signed in.
  */
 export function Footer() {
   const pathname = usePathname()

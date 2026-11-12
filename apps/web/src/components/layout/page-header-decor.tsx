@@ -99,7 +99,7 @@ function ArchiveArt() {
             <div className="mb-4 flex items-center justify-between">
               <span className="h-1.5 w-10 rounded-full bg-foreground/25" />
               <span className="font-mono text-[9px] tracking-widest text-muted-foreground/70">
-                2026
+                {new Date().getFullYear()}
               </span>
             </div>
             {[92, 76, 84, 58].map((w, i) => (

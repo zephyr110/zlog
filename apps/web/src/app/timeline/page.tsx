@@ -24,7 +24,7 @@ export default async function TimelinePage() {
   const grouped = groupPostsByUtcYear(posts, { sortYears: "desc" })
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeader
         breadcrumb={[{ href: "/", label: <Trans k="site.home" /> }]}
         icon={<History size={22} className="text-primary" />}

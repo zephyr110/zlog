@@ -1,5 +1,9 @@
 import { Skeleton } from "@/components/ui/skeleton"
-import { BannerArt, pageBannerMinClass } from "@/components/layout/banner-art"
+import {
+  BannerArt,
+  pageBannerDecorClass,
+  pageBannerMinClass,
+} from "@/components/layout/banner-art"
 import { cn } from "@/lib/utils"
 
 /** Shared PageHeader loading chrome — breadcrumb, icon + title/desc. */
@@ -38,7 +42,7 @@ export function PageHeaderSkeleton({
             </div>
           )}
         </div>
-        <div className="hidden w-56 shrink-0 lg:block xl:w-64 2xl:w-72">
+        <div className={pageBannerDecorClass}>
           <Skeleton className="aspect-square w-full rounded-3xl" />
         </div>
       </div>

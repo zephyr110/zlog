@@ -6,7 +6,7 @@ import { useT } from "@/components/layout/trans"
 import { cn } from "@/lib/utils"
 
 /** Sticky year-jump bar for the archive feed — sits under the site header
- *  (h-16) while scrolling, highlights the section currently in view, and
+ *  (--header-h) while scrolling, highlights the section currently in view, and
  *  jumps to a year section on click. Rendered only when there are 2+
  *  year groups (a single year needs no navigation). Extra actions
  *  (e.g. collapse-all on the archive page) ride on the same row via
@@ -26,7 +26,7 @@ export function YearNavBar({
   if (years.length < 2) return null
 
   return (
-    <div className="sticky top-16 z-30 mb-8">
+    <div className="sticky top-[var(--header-h)] z-30 mb-8">
       {/* w-fit on mobile keeps the floating pill look; lg:w-full spans the
           row so trailing actions (collapse-all) can anchor to the far
           right via ml-auto. */}

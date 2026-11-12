@@ -1,29 +1,10 @@
 import { Skeleton } from "@/components/ui/skeleton"
-import { BannerArt, pageBannerMinClass } from "@/components/layout/banner-art"
-import { cn } from "@/lib/utils"
+import { PageHeaderSkeleton } from "@/components/layout/page-header-skeleton"
 
 export default function TimelineLoading() {
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
-      {/* Header */}
-      <section
-        className={cn(
-          "relative flex flex-col overflow-hidden border-b bg-background",
-          pageBannerMinClass
-        )}
-      >
-        <BannerArt />
-        <div className="container relative mx-auto flex max-w-5xl flex-1 items-center gap-8 px-4 py-12 md:py-16 xl:gap-12 2xl:max-w-7xl">
-          <div className="min-w-0 flex-1">
-            <Skeleton className="h-4 w-32 mb-6" />
-            <Skeleton className="h-10 w-40 mb-3" />
-            <Skeleton className="h-4 w-28" />
-          </div>
-          <div className="hidden w-56 shrink-0 lg:block xl:w-64 2xl:w-72">
-            <Skeleton className="aspect-square w-full rounded-3xl" />
-          </div>
-        </div>
-      </section>
+    <div className="min-h-[calc(100vh-var(--header-h))]">
+      <PageHeaderSkeleton />
 
       {/* Timeline */}
       <div className="container mx-auto px-4 py-16 md:py-20 max-w-5xl 2xl:max-w-7xl">

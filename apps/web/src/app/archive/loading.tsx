@@ -52,7 +52,7 @@ export function ArchiveFeedSkeleton() {
 
 export default function ArchiveLoading() {
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeaderSkeleton />
       <div className="container mx-auto max-w-5xl px-4 py-8 md:py-12 2xl:max-w-7xl">
         <ArchiveFeedSkeleton />

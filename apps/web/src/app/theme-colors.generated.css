@@ -348,6 +348,7 @@ html[data-theme-color="amber"], [data-theme-color="amber"] {
   --chart-5: oklch(0.473 0.137 46.201);
   --sidebar-primary: oklch(0.666 0.179 58.318);
   --sidebar-primary-foreground: oklch(0.987 0.022 95.277);
+  --banner-hue: 49;
 }
 
 html.dark[data-theme-color="amber"], .dark [data-theme-color="amber"] {
@@ -362,6 +363,7 @@ html.dark[data-theme-color="amber"], .dark [data-theme-color="amber"] {
   --chart-5: oklch(0.473 0.137 46.201);
   --sidebar-primary: oklch(0.769 0.188 70.08);
   --sidebar-primary-foreground: oklch(0.279 0.077 45.635);
+  --banner-hue: 49;
 }
 
 html[data-theme-color="blue"], [data-theme-color="blue"] {
@@ -376,6 +378,7 @@ html[data-theme-color="blue"], [data-theme-color="blue"] {
   --chart-5: oklch(0.424 0.199 265.638);
   --sidebar-primary: oklch(0.546 0.245 262.881);
   --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
+  --banner-hue: 264;
 }
 
 html.dark[data-theme-color="blue"], .dark [data-theme-color="blue"] {
@@ -390,6 +393,7 @@ html.dark[data-theme-color="blue"], .dark [data-theme-color="blue"] {
   --chart-5: oklch(0.424 0.199 265.638);
   --sidebar-primary: oklch(0.623 0.214 259.815);
   --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
+  --banner-hue: 264;
 }
 
 html[data-theme-color="green"], [data-theme-color="green"] {
@@ -404,6 +408,7 @@ html[data-theme-color="green"], [data-theme-color="green"] {
   --chart-5: oklch(0.448 0.119 151.328);
   --sidebar-primary: oklch(0.627 0.194 149.214);
   --sidebar-primary-foreground: oklch(0.982 0.018 155.826);
+  --banner-hue: 150;
 }
 
 html.dark[data-theme-color="green"], .dark [data-theme-color="green"] {
@@ -418,6 +423,7 @@ html.dark[data-theme-color="green"], .dark [data-theme-color="green"] {
   --chart-5: oklch(0.448 0.119 151.328);
   --sidebar-primary: oklch(0.723 0.219 149.579);
   --sidebar-primary-foreground: oklch(0.982 0.018 155.826);
+  --banner-hue: 150;
 }
 
 html[data-theme-color="orange"], [data-theme-color="orange"] {
@@ -432,6 +438,7 @@ html[data-theme-color="orange"], [data-theme-color="orange"] {
   --chart-5: oklch(0.47 0.157 37.304);
   --sidebar-primary: oklch(0.646 0.222 41.116);
   --sidebar-primary-foreground: oklch(0.98 0.016 73.684);
+  --banner-hue: 38;
 }
 
 html.dark[data-theme-color="orange"], .dark [data-theme-color="orange"] {
@@ -446,6 +453,7 @@ html.dark[data-theme-color="orange"], .dark [data-theme-color="orange"] {
   --chart-5: oklch(0.47 0.157 37.304);
   --sidebar-primary: oklch(0.705 0.213 47.604);
   --sidebar-primary-foreground: oklch(0.98 0.016 73.684);
+  --banner-hue: 38;
 }
 
 html[data-theme-color="rose"], [data-theme-color="rose"] {
@@ -460,6 +468,7 @@ html[data-theme-color="rose"], [data-theme-color="rose"] {
   --chart-5: oklch(0.455 0.188 13.697);
   --sidebar-primary: oklch(0.586 0.253 17.585);
   --sidebar-primary-foreground: oklch(0.969 0.015 12.422);
+  --banner-hue: 17;
 }
 
 html.dark[data-theme-color="rose"], .dark [data-theme-color="rose"] {
@@ -475,6 +484,7 @@ html.dark[data-theme-color="rose"], .dark [data-theme-color="rose"] {
   --sidebar: oklch(0.21 0.006 285.885);
   --sidebar-primary: oklch(0.645 0.246 16.439);
   --sidebar-primary-foreground: oklch(0.969 0.015 12.422);
+  --banner-hue: 17;
 }
 
 html[data-theme-color="teal"], [data-theme-color="teal"] {
@@ -489,6 +499,7 @@ html[data-theme-color="teal"], [data-theme-color="teal"] {
   --chart-5: oklch(0.437 0.078 188.216);
   --sidebar-primary: oklch(0.6 0.118 184.704);
   --sidebar-primary-foreground: oklch(0.984 0.014 180.72);
+  --banner-hue: 186;
 }
 
 html.dark[data-theme-color="teal"], .dark [data-theme-color="teal"] {
@@ -503,6 +514,7 @@ html.dark[data-theme-color="teal"], .dark [data-theme-color="teal"] {
   --chart-5: oklch(0.437 0.078 188.216);
   --sidebar-primary: oklch(0.704 0.14 182.503);
   --sidebar-primary-foreground: oklch(0.277 0.046 192.524);
+  --banner-hue: 186;
 }
 
 html[data-theme-color="violet"], [data-theme-color="violet"] {
@@ -517,6 +529,7 @@ html[data-theme-color="violet"], [data-theme-color="violet"] {
   --chart-5: oklch(0.432 0.232 292.759);
   --sidebar-primary: oklch(0.541 0.281 293.009);
   --sidebar-primary-foreground: oklch(0.969 0.016 293.756);
+  --banner-hue: 293;
 }
 
 html.dark[data-theme-color="violet"], .dark [data-theme-color="violet"] {
@@ -531,4 +544,5 @@ html.dark[data-theme-color="violet"], .dark [data-theme-color="violet"] {
   --chart-5: oklch(0.432 0.232 292.759);
   --sidebar-primary: oklch(0.606 0.25 292.717);
   --sidebar-primary-foreground: oklch(0.969 0.016 293.756);
+  --banner-hue: 293;
 }

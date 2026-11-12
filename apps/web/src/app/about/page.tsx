@@ -58,7 +58,7 @@ const techStack: {
 export default async function AboutPage() {
   const site = await getSiteConfig()
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeader
         breadcrumb={[
           { href: "/", label: <Trans k="site.home" /> },

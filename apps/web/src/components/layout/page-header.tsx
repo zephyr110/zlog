@@ -1,7 +1,11 @@
 import Link from "next/link"
 import type { ReactNode } from "react"
 import { Container } from "@/components/ui/container"
-import { BannerArt, pageBannerMinClass } from "@/components/layout/banner-art"
+import {
+  BannerArt,
+  pageBannerDecorClass,
+  pageBannerMinClass,
+} from "@/components/layout/banner-art"
 import { cn } from "@/lib/utils"
 
 interface BreadcrumbItem {
@@ -96,8 +100,8 @@ export function PageHeader({
         </div>
 
         {decor && (
-          <div className="hidden w-56 shrink-0 lg:block xl:w-64 2xl:w-72">
-            <div className="animate-in fade-in zoom-in-95 duration-700">
+          <div className={pageBannerDecorClass}>
+            <div className="motion-safe:animate-in fade-in zoom-in-95 duration-700">
               {decor}
             </div>
           </div>

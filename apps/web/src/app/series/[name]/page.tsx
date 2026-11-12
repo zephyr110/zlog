@@ -67,7 +67,7 @@ export default async function SeriesPage({ params }: SeriesPageProps) {
   const displayName = tag ? seriesName(tag) : decoded
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeader
         breadcrumb={[
           { href: "/", label: <Trans k="site.home" /> },

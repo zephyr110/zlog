@@ -85,11 +85,19 @@ export function ThemeCycleButton() {
   }
 
   const Icon = current.icon
-  const label = `${t("admin.theme")}: ${current.label}`
+  const index = options.findIndex((o) => o.key === theme)
+  const next = options[(index + 1) % options.length]
+  // State lives in the icon; the accessible name announces the action,
+  // matching LanguageSwitcher's "Switch to X" convention.
+  const label = (
+    next.key === "light"
+      ? t("admin.commandToLight")
+      : next.key === "dark"
+        ? t("admin.commandToDark")
+        : t("admin.commandToSystem")
+  ) as string
 
   function cycle() {
-    const index = options.findIndex((o) => o.key === theme)
-    const next = options[(index + 1) % options.length] ?? options[0]
     setTheme(next.key)
   }
 

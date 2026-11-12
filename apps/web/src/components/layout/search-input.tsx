@@ -33,9 +33,9 @@ export function SearchInput() {
 
   function expand() {
     setOpen(true)
-    // The input is always mounted (value survives collapse); focus after
-    // the state flip so the width transition starts from the open state.
-    requestAnimationFrame(() => inputRef.current?.focus())
+    // The input is always mounted, so focus synchronously; onFocus also
+    // opens, keeping this correct if the click lands mid-transition.
+    inputRef.current?.focus()
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -53,7 +53,17 @@ export function SearchInput() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="relative ml-1 flex items-center">
+    <form
+      onSubmit={handleSubmit}
+      // Close only when focus leaves the whole form, so Tab can reach the
+      // clear button (which unmounts when `open` flips).
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setOpen(false)
+        }
+      }}
+      className="relative ml-1 flex items-center"
+    >
       <div
         className={cn(
           "relative flex h-9 items-center overflow-hidden rounded-lg transition-[width,background-color] duration-300 ease-out focus-within:ring-1 focus-within:ring-primary/40 motion-reduce:transition-none",
@@ -82,7 +92,6 @@ export function SearchInput() {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
           onKeyDown={(e) => {
             // While an IME composes, Escape cancels the candidate window.
             if (e.key === "Escape" && !e.nativeEvent.isComposing) {
@@ -96,7 +105,7 @@ export function SearchInput() {
           aria-keyshortcuts="/"
           data-search-input="header"
           className={cn(
-            "peer h-full min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-opacity duration-150",
+            "peer h-full min-w-0 flex-1 bg-transparent text-base text-foreground placeholder:text-muted-foreground/50 outline-none transition-opacity duration-150 md:text-sm",
             value ? "pr-7" : "pr-2",
             open ? "opacity-100" : "opacity-0"
           )}

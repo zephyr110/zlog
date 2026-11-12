@@ -6,7 +6,7 @@ import { PageHeaderSkeleton } from "@/components/layout/page-header-skeleton"
  *  sub-tags + post card grid. */
 export default function TopicsLoading() {
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeaderSkeleton withStats />
 
       <div className="container mx-auto max-w-5xl space-y-4 px-4 py-6 2xl:max-w-7xl">

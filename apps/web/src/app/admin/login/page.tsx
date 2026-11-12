@@ -17,6 +17,7 @@ import { setToken } from "@/lib/api-client"
 import { Eye, EyeOff, ArrowLeft } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import {
+  bannerHue,
   HeroParticle,
   HeroPixel,
   loginBlinkingParticles,
@@ -78,8 +79,7 @@ function LoginCellsSweep() {
       aria-hidden
       className="pointer-events-none absolute inset-0 motion-safe:block hidden opacity-[0.08] dark:opacity-[0.14]"
       style={{
-        backgroundImage:
-          "conic-gradient(from 90deg at 2px 2px, transparent 90deg, oklch(0.6 0.2 290) 0)",
+        backgroundImage: `conic-gradient(from 90deg at 2px 2px, transparent 90deg, oklch(0.6 0.2 ${bannerHue(33)}) 0)`,
         backgroundSize: "50px 50px",
         backgroundPosition: "calc(50% - (var(--card-w) / 2)) top",
         maskImage:

@@ -1,20 +1,15 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { IconButton } from "@/components/ui/icon-button"
 import { useSiteConfig } from "@/components/layout/site-config-provider"
 import { siteLogoSrc } from "@/lib/site-config"
 import { SiteLogo } from "@/components/layout/site-logo"
 import { useT } from "@/components/layout/trans"
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu"
+import { NavigationMenu } from "@base-ui/react/navigation-menu"
 import { Menu, X, ChevronDown } from "lucide-react"
 import { categoryMeta } from "@/lib/categories"
 import { SearchInput } from "@/components/layout/search-input"
@@ -25,12 +20,9 @@ export function Header({ categories }: { categories: NavCategory[] }) {
   const { t } = useT()
   const site = useSiteConfig()
   const pathname = usePathname()
-  const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mobileTopicsOpen, setMobileTopicsOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const [topicsOpen, setTopicsOpen] = useState(false)
-  const topicsCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const logoSrc = siteLogoSrc(site)
 
   useEffect(() => {
@@ -47,31 +39,6 @@ export function Header({ categories }: { categories: NavCategory[] }) {
     return () => { document.body.style.overflow = "" }
   }, [mobileOpen])
 
-  // Hover menu needs a grace period so the pointer can cross the 12px
-  // gap between the trigger and the popup without closing it.
-  function clearTopicsClose() {
-    if (topicsCloseTimer.current) {
-      clearTimeout(topicsCloseTimer.current)
-      topicsCloseTimer.current = null
-    }
-  }
-  function openTopics() {
-    clearTopicsClose()
-    setTopicsOpen(true)
-  }
-  function scheduleTopicsClose() {
-    clearTopicsClose()
-    topicsCloseTimer.current = setTimeout(() => {
-      topicsCloseTimer.current = null
-      setTopicsOpen(false)
-    }, 160)
-  }
-  useEffect(() => {
-    return () => {
-      if (topicsCloseTimer.current) clearTimeout(topicsCloseTimer.current)
-    }
-  }, [])
-
   if (pathname?.startsWith("/admin")) return null
 
   const atHome = pathname === "/"
@@ -86,7 +53,7 @@ export function Header({ categories }: { categories: NavCategory[] }) {
           contracts onto the page container with a glass layer. */}
       <header
         className={cn(
-          "sticky top-0 z-50 flex h-16 w-full items-center px-3 transition-colors duration-300 md:h-[4.5rem] md:px-4",
+          "sticky top-0 z-50 flex h-[var(--header-h)] w-full items-center px-3 transition-colors duration-300 md:px-4",
           scrolled ? "bg-transparent" : "bg-background"
         )}
       >
@@ -122,95 +89,88 @@ export function Header({ categories }: { categories: NavCategory[] }) {
               {t("site.home")}
             </NavLink>
 
-            {/* Topics dropdown — opens on hover (with a small close delay)
-                and still supports click + keyboard. modal={false} keeps the
-                page scrollable while the pointer is merely passing over. */}
-            <DropdownMenu
-              modal={false}
-              open={topicsOpen}
-              onOpenChange={(open) => {
-                clearTopicsClose()
-                setTopicsOpen(open)
-              }}
+            {/* Topics dropdown — NavigationMenu owns hover, click, focus
+                and the pointer gap, so hovering never steals focus from the
+                search box. */}
+            <NavigationMenu.Root
+              delay={100}
+              closeDelay={160}
+              className="hidden md:block"
             >
-              <DropdownMenuTrigger
-                onPointerEnter={(e) => {
-                  if (e.pointerType === "mouse") openTopics()
-                }}
-                onPointerLeave={(e) => {
-                  if (e.pointerType === "mouse") scheduleTopicsClose()
-                }}
-                className={cn(
-                  "relative hidden cursor-pointer items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium outline-none transition-all duration-200 md:flex",
-                  atTopics
-                    ? "bg-muted/60 text-foreground"
-                    : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-                )}
-              >
-                <span>{t("site.topics")}</span>
-                <ChevronDown
-                  aria-hidden
-                  className={cn(
-                    "size-3.5 opacity-45 transition-transform duration-200",
-                    topicsOpen && "rotate-180"
-                  )}
-                />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                sideOffset={12}
-                className="w-64 p-2"
-                onPointerEnter={(e) => {
-                  if (e.pointerType === "mouse") openTopics()
-                }}
-                onPointerLeave={(e) => {
-                  if (e.pointerType === "mouse") scheduleTopicsClose()
-                }}
-              >
-                {categories.length === 0 ? (
-                  <p className="px-3 py-4 text-xs text-muted-foreground text-center">
-                    {t("site.noTopics")}
-                  </p>
-                ) : (
-                  categories.map((cat) => {
-                    const meta = categoryMeta[cat.key as keyof typeof categoryMeta]
-                    if (!meta) return null
-                    const Icon = meta.icon
-                    const active = pathname === `/topics/${encodeURIComponent(cat.key)}`
-                    return (
-                      <DropdownMenuItem
-                        key={cat.key}
-                        onClick={() => router.push(`/topics/${encodeURIComponent(cat.key)}`)}
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors",
-                          active && "bg-primary/5"
-                        )}
-                      >
-                        <div className={cn(
-                          "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                          active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                        )}>
-                          <Icon size={16} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className={cn(
-                              "text-sm font-medium",
-                              active ? "text-primary" : "text-foreground"
-                            )}>
-                              {t(meta.i18nKey) as string}
-                            </span>
-                            <span className="text-[11px] text-muted-foreground/60 tabular-nums font-mono">
-                              {cat.count}
-                            </span>
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                    )
-                  })
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              <NavigationMenu.List className="flex items-center">
+                <NavigationMenu.Item>
+                  <NavigationMenu.Trigger
+                    className={cn(
+                      "group relative flex cursor-pointer items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium outline-none transition-all duration-200",
+                      atTopics
+                        ? "bg-muted/60 text-foreground"
+                        : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                    )}
+                  >
+                    <span>{t("site.topics")}</span>
+                    <ChevronDown
+                      aria-hidden
+                      className="size-3.5 opacity-45 transition-transform duration-200 group-data-[popup-open]:rotate-180"
+                    />
+                  </NavigationMenu.Trigger>
+                  <NavigationMenu.Content>
+                    <div className="flex flex-col gap-0.5">
+                      {categories.length === 0 ? (
+                        <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                          {t("site.noTopics")}
+                        </p>
+                      ) : (
+                        categories.map((cat) => {
+                          const meta = categoryMeta[cat.key as keyof typeof categoryMeta]
+                          if (!meta) return null
+                          const Icon = meta.icon
+                          const active = pathname === `/topics/${encodeURIComponent(cat.key)}`
+                          return (
+                            <NavigationMenu.Link
+                              key={cat.key}
+                              active={active}
+                              closeOnClick
+                              render={<Link href={`/topics/${encodeURIComponent(cat.key)}`} />}
+                              className={cn(
+                                "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 outline-none transition-colors hover:bg-muted focus:bg-muted",
+                                active && "bg-primary/5"
+                              )}
+                            >
+                              <div className={cn(
+                                "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                                active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                              )}>
+                                <Icon size={16} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <span className={cn(
+                                    "text-sm font-medium",
+                                    active ? "text-primary" : "text-foreground"
+                                  )}>
+                                    {t(meta.i18nKey) as string}
+                                  </span>
+                                  <span className="text-[11px] text-muted-foreground/60 tabular-nums font-mono">
+                                    {cat.count}
+                                  </span>
+                                </div>
+                              </div>
+                            </NavigationMenu.Link>
+                          )
+                        })
+                      )}
+                    </div>
+                  </NavigationMenu.Content>
+                </NavigationMenu.Item>
+              </NavigationMenu.List>
+              <NavigationMenu.Portal>
+                <NavigationMenu.Positioner align="start" sideOffset={12} className="z-50">
+                  <NavigationMenu.Popup className="w-64 rounded-lg bg-popover p-2 text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none duration-100 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+                    <NavigationMenu.Viewport className="w-full" />
+                  </NavigationMenu.Popup>
+                </NavigationMenu.Positioner>
+              </NavigationMenu.Portal>
+            </NavigationMenu.Root>
 
             {/* 归档 */}
             <NavLink href="/archive" active={pathname === "/archive"}>

@@ -25,7 +25,7 @@ export default async function SeriesIndexPage() {
   const series = listSeries(await getPublishedPosts())
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeader
         breadcrumb={[
           { href: "/", label: <Trans k="site.home" /> },

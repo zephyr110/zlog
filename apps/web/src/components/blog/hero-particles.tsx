@@ -26,7 +26,7 @@ interface ParticleDef {
   shape: ParticleShape
 }
 
-function bannerHue(offset: number) {
+export function bannerHue(offset: number) {
   return `calc(var(--banner-hue, 257) ${offset < 0 ? "-" : "+"} ${Math.abs(offset)})`
 }
 

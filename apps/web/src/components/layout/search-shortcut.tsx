@@ -24,8 +24,17 @@ export function SearchShortcut() {
       // Leave modified chords alone (browser/OS shortcuts) and never steal
       // "/" from an IME composition — some layouts use it while composing.
       if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return
-      if (e.isComposing) return
+      if (e.isComposing || e.defaultPrevented) return
       if (isEditable(e.target as Element | null)) return
+      // Background under a modal is only aria-hidden, not inert, so it is
+      // still focusable; taking focus there would escape the dialog.
+      if (
+        document.querySelector(
+          '[data-slot="dialog-content"], [aria-modal="true"]'
+        )
+      ) {
+        return
+      }
 
       const inputs = Array.from(
         document.querySelectorAll<HTMLInputElement>("input[data-search-input]")
