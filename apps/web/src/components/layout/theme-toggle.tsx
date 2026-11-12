@@ -10,6 +10,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip"
 
 function useThemeOptions() {
   const { theme, setTheme } = useTheme()
@@ -89,14 +94,22 @@ export function ThemeCycleButton() {
   }
 
   return (
-    <button
-      type="button"
-      onClick={cycle}
-      aria-label={label}
-      title={label}
-      className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-    >
-      <Icon size={18} className={current.iconClass} />
-    </button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            onClick={cycle}
+            aria-label={label}
+            className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            <Icon size={18} className={current.iconClass} />
+          </button>
+        }
+      />
+      <TooltipContent side="top" sideOffset={6}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
   )
 }

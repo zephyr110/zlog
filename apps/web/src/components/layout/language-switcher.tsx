@@ -5,6 +5,11 @@ import { useLocale } from "@/components/layout/i18n-provider"
 import { localeLabels, locales } from "@/lib/i18n"
 import { IconButton } from "@/components/ui/icon-button"
 import { useT } from "@/components/layout/trans"
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip"
 
 export function LanguageSwitcher({
   variant = "icon",
@@ -28,15 +33,23 @@ export function LanguageSwitcher({
 
   if (variant === "footer") {
     return (
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={switchLabel}
-        title={switchLabel}
-        className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-      >
-        <Languages size={18} />
-      </button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              onClick={toggle}
+              aria-label={switchLabel}
+              className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            >
+              <Languages size={18} />
+            </button>
+          }
+        />
+        <TooltipContent side="top" sideOffset={6}>
+          {switchLabel}
+        </TooltipContent>
+      </Tooltip>
     )
   }
 

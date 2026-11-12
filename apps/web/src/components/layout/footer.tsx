@@ -138,8 +138,8 @@ export function Footer() {
               </div>
             </div>
 
-            {/* Display settings — icon-only, no column heading */}
-            <div className="flex items-start gap-1">
+            {/* Display settings — icon-only stack, no column heading */}
+            <div className="flex flex-col items-start gap-1">
               <ThemeCycleButton />
               <LanguageSwitcher variant="footer" />
             </div>

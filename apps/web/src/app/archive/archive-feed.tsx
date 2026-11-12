@@ -452,12 +452,12 @@ export function ArchiveFeed({ posts, allTags }: ArchiveFeedProps) {
           The collapse-all toggle rides on the same row: it stays fixed
           (shrink-0) while the year pills scroll on narrow screens. */}
       <YearNavBar years={years} activeYear={currentYear} onSelect={jumpToYear}>
-        {/* h-7 matches the year pills' height so the row reads as one
-            unit; lg:ml-auto anchors the action to the row's right end. */}
+        {/* h-[38px] matches the year strip's outer height (h-7 pills + p-1 +
+            border); lg:ml-auto anchors the action to the row's right end. */}
         {years.length >= 2 && filteredPosts.length > 0 && (
           <button
             onClick={toggleAll}
-            className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/60 bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/25 hover:text-foreground lg:ml-auto"
+            className="inline-flex h-[38px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/60 bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/25 hover:text-foreground lg:ml-auto"
           >
             <svg
               className={`size-3 transition-transform duration-300 ${allCollapsed ? "" : "rotate-180"}`}
