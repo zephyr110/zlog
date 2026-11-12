@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest"
-import { compareVersions, pickAssetUrl, classifyLatestHttpStatus, ensureParentDir } from "../electron/updater"
+import {
+  compareVersions,
+  pickAssetUrl,
+  classifyLatestHttpStatus,
+  ensureParentDir,
+  installerCommand,
+} from "../electron/updater"
 import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -93,6 +99,36 @@ describe("classifyLatestHttpStatus", () => {
   it("其他非 2xx 映射为 http", () => {
     expect(classifyLatestHttpStatus(403)).toBe("http")
     expect(classifyLatestHttpStatus(500)).toBe("http")
+  })
+})
+
+describe("installerCommand", () => {
+  it("Windows 静默安装；选择「稍后重启」时不重新拉起应用", () => {
+    expect(installerCommand("win32", "C:\\updates\\Zlog-Setup-1.0.9.exe", false)).toEqual({
+      file: "C:\\updates\\Zlog-Setup-1.0.9.exe",
+      args: ["--updated", "/S"],
+    })
+  })
+
+  it("Windows「立即重启」：静默安装后用 --force-run 重新拉起应用", () => {
+    expect(installerCommand("win32", "C:\\updates\\Zlog-Setup-1.0.9.exe", true)).toEqual({
+      file: "C:\\updates\\Zlog-Setup-1.0.9.exe",
+      args: ["--updated", "/S", "--force-run"],
+    })
+  })
+
+  it("macOS 用 open 打开 dmg（未签名无法自动替换）", () => {
+    expect(installerCommand("darwin", "/tmp/Zlog-1.0.9-arm64.dmg", true)).toEqual({
+      file: "open",
+      args: ["/tmp/Zlog-1.0.9-arm64.dmg"],
+    })
+  })
+
+  it("Linux 打开安装包所在目录", () => {
+    expect(installerCommand("linux", "/tmp/updates/Zlog-1.0.9-x86_64.AppImage", false)).toEqual({
+      file: "xdg-open",
+      args: ["/tmp/updates"],
+    })
   })
 })
 
