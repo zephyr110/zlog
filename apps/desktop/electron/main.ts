@@ -10,14 +10,14 @@ import {
 import { randomBytes } from "node:crypto"
 import { appendFileSync, mkdirSync } from "node:fs"
 import bcrypt from "bcryptjs"
-import { join, resolve, sep } from "node:path"
+import { join } from "node:path"
 import { ConfigStore, type DesktopConfig } from "./config-store"
 import { LangFile, isLangPref, type LangPref, type ResolvedLang } from "./lang"
 import {
   compareVersions,
   downloadUpdate,
   fetchLatestRelease,
-  openDownloadedUpdate,
+  launchInstaller,
   pickAssetUrl,
   updatesDir,
   type UpdateCheckResult,
@@ -645,8 +645,11 @@ async function main() {
       later: string
       ok: string
       downloadFailed: string
-      downloaded: (v: string) => string
-      openPackage: string
+      restartTitle: string
+      restartMessage: (v: string) => string
+      restartDetail: string
+      restartNow: string
+      restartLater: string
     }
   > = {
     zh: {
@@ -661,8 +664,11 @@ async function main() {
       later: "稍后",
       ok: "好的",
       downloadFailed: "下载失败，请稍后重试或到设置 → 关于中再试",
-      downloaded: (v) => `v${v} 已下载完成`,
-      openPackage: "打开安装包",
+      restartTitle: "更新已就绪",
+      restartMessage: (v) => `v${v} 已下载完成，重启应用即可完成更新`,
+      restartDetail: "选择「稍后重启」后，退出应用时会自动启动安装程序",
+      restartNow: "立即重启",
+      restartLater: "稍后重启",
     },
     en: {
       title: "Check for Updates",
@@ -676,9 +682,35 @@ async function main() {
       later: "Later",
       ok: "OK",
       downloadFailed: "Download failed — try again later or use Settings → About",
-      downloaded: (v) => `v${v} downloaded`,
-      openPackage: "Open Installer",
+      restartTitle: "Update Ready",
+      restartMessage: (v) => `v${v} has been downloaded. Restart the app to finish updating`,
+      restartDetail: "If you choose Restart Later, the installer launches automatically when you quit the app",
+      restartNow: "Restart Now",
+      restartLater: "Restart Later",
     },
+  }
+
+  // 已下载待安装的安装包。选「稍后重启」后保留，用户自行退出时在 will-quit 安装
+  let pendingUpdateInstaller: { dest: string; relaunch: boolean } | null = null
+
+  /** 下载完成后提示重启；「立即重启」退出并重新拉起，「稍后」等下次退出。 */
+  async function offerRestartAfterDownload(dest: string, latest: string): Promise<void> {
+    // 先登记再弹窗：用户在提示未答时退出应用，也应安装已下载的版本
+    pendingUpdateInstaller = { dest, relaunch: false }
+    const copy = TRAY_UPDATE_COPY[currentLang]
+    const { response } = await dialog.showMessageBox({
+      type: "info",
+      title: copy.restartTitle,
+      message: copy.restartMessage(latest || "?"),
+      detail: copy.restartDetail,
+      buttons: [copy.restartNow, copy.restartLater],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    if (response === 0) {
+      pendingUpdateInstaller = { dest, relaunch: true }
+      app.quit()
+    }
   }
 
   let trayUpdateBusy = false
@@ -734,15 +766,7 @@ async function main() {
           new URL(res.downloadUrl).pathname.split("/").pop() || "update"
         )
         await downloadUpdate(res.downloadUrl, dest, () => {})
-        const done = await dialog.showMessageBox({
-          type: "info",
-          title: copy.title,
-          message: copy.downloaded(res.latest),
-          buttons: [copy.openPackage, copy.later],
-          defaultId: 0,
-          cancelId: 1,
-        })
-        if (done.response === 0) openDownloadedUpdate(dest)
+        await offerRestartAfterDownload(dest, res.latest)
       } catch {
         await dialog.showMessageBox({
           type: "error",
@@ -757,7 +781,7 @@ async function main() {
   }
 
   ipcMain.handle("update:check", () => performUpdateCheck())
-  ipcMain.handle("update:download", async (_e, url: unknown) => {
+  ipcMain.handle("update:download", async (_e, url: unknown, latest: unknown) => {
     if (typeof url !== "string" || !url.startsWith("https://")) {
       return { ok: false, error: "invalid url" }
     }
@@ -779,22 +803,17 @@ async function main() {
     }
     try {
       await downloadUpdate(url, dest, sendProgress)
-      // 只下载不自动打开：由用户在设置窗口确认后触发（update:open）
-      return { ok: true, dest }
+      await offerRestartAfterDownload(dest, typeof latest === "string" ? latest : "")
+      return { ok: true }
     } catch (err) {
       return { ok: false, error: String(err) }
     }
   })
-  ipcMain.handle("update:open", (_e, dest: unknown) => {
-    // 只允许打开 updatesDir 内的文件（渲染层传路径不可信）。
-    // resolve 后校验：前缀匹配防不住 "../" 段，须归一化再比较
-    if (typeof dest !== "string") return { ok: false, error: "invalid dest" }
-    const base = resolve(updatesDir())
-    const target = resolve(dest)
-    if (target !== base && !target.startsWith(`${base}${sep}`)) {
-      return { ok: false, error: "outside updates dir" }
-    }
-    openDownloadedUpdate(target)
+  // 设置窗口的「立即重启」：退出走 will-quit 的安装分支
+  ipcMain.handle("update:install", () => {
+    if (!pendingUpdateInstaller) return { ok: false, error: "no pending update" }
+    pendingUpdateInstaller.relaunch = true
+    app.quit()
     return { ok: true }
   })
 
@@ -878,6 +897,10 @@ async function main() {
   app.on("will-quit", () => {
     markAppQuitting()
     serverManager.stop()
+    // 立即重启与用户自行退出走同一条安装路径；取走后清空，避免重复启动
+    const pending = pendingUpdateInstaller
+    pendingUpdateInstaller = null
+    if (pending) launchInstaller(pending.dest, pending.relaunch)
   })
 
   // 同步状态轮询（30s，仅供托盘 tooltip）。同时从 lang.json 重读生效

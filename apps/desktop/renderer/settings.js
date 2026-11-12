@@ -124,8 +124,9 @@ const I18N = {
     "about.found": "发现新版本",
     "about.download": "下载",
     "about.downloading": "下载中",
-    "about.downloaded": "下载完成",
-    "about.openPackage": "打开安装包",
+    "about.downloaded": "已下载",
+    "about.restartNow": "立即重启",
+    "about.installOnQuit": "退出应用时启动安装程序",
     "about.checkFailed": "检查更新失败，请检查网络后重试",
     "about.noRelease": "暂无已发布的更新（草稿 Release 不会出现在检查结果中）",
     "about.checkUnavailable": "暂时无法获取更新信息，请稍后重试",
@@ -274,8 +275,9 @@ const I18N = {
     "about.found": "New version available",
     "about.download": "Download",
     "about.downloading": "Downloading",
-    "about.downloaded": "Download complete",
-    "about.openPackage": "Open Installer",
+    "about.downloaded": "Downloaded",
+    "about.restartNow": "Restart Now",
+    "about.installOnQuit": "installer launches on quit",
     "about.checkFailed": "Update check failed — check your network and retry",
     "about.noRelease": "No published release yet (drafts are hidden from update checks)",
     "about.checkUnavailable": "Could not fetch update info — please try again later",
@@ -372,7 +374,6 @@ let currentPref = "system" // 语言偏好（select 显示值；applyLang 渲染
 let updateInfo = null // 最近一次检查结果（含 downloadUrl）
 let updateChecked = false // 本窗口会话是否已自动检查过（失败也算一次）
 let updateBusy = false // 检查/下载进行中（按钮禁用）
-let updateDest = null // 下载完成后的本地路径
 let updateUiState = "idle" // 派生 UI 状态（renderUpdateState 的唯一输入）
 let updatePercent = 0 // 下载进度（downloading 状态用）
 // 部署面板 UI 状态（renderDeployState 的唯一输入）也在此声明：applyLang
@@ -420,9 +421,9 @@ function renderUpdateState() {
       updateStatus.classList.remove("error")
       break
     case "downloaded":
-      updateBtn.textContent = t("about.openPackage")
+      updateBtn.textContent = t("about.restartNow")
       updateBtn.disabled = false
-      updateStatus.textContent = `${t("about.downloaded")} v${latest}`
+      updateStatus.textContent = `${t("about.downloaded")} v${latest} · ${t("about.installOnQuit")}`
       updateStatus.classList.remove("error")
       break
     case "checkFailed":
@@ -829,14 +830,15 @@ async function downloadUpdatePackage() {
   updatePercent = 0
   updateUiState = "downloading"
   renderUpdateState()
-  const res = await zlogApi.downloadUpdate(updateInfo.downloadUrl).catch(() => null)
+  const res = await zlogApi
+    .downloadUpdate(updateInfo.downloadUrl, updateInfo.latest ?? "")
+    .catch(() => null)
   updateBusy = false
   if (!res || !res.ok) {
     updateUiState = "downloadFailed"
     renderUpdateState()
     return
   }
-  updateDest = res.dest
   updateUiState = "downloaded"
   renderUpdateState()
 }
@@ -849,8 +851,8 @@ zlogApi?.onUpdateProgress?.(({ percent }) => {
 
 updateBtn.addEventListener("click", () => {
   if (updateBtn.disabled) return
-  if (updateDest) {
-    void zlogApi.openUpdate(updateDest)
+  if (updateUiState === "downloaded") {
+    void zlogApi.installUpdate()
   } else if (updateInfo?.hasUpdate && updateInfo.downloadUrl) {
     void downloadUpdatePackage()
   } else {

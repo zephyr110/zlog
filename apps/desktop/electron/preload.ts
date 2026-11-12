@@ -11,8 +11,9 @@ contextBridge.exposeInMainWorld("zlog", {
   getLang: () => ipcRenderer.invoke("lang:get"),
   setLang: (pref: string) => ipcRenderer.invoke("lang:set", pref),
   checkForUpdates: () => ipcRenderer.invoke("update:check"),
-  downloadUpdate: (url: string) => ipcRenderer.invoke("update:download", url),
-  openUpdate: (dest: string) => ipcRenderer.invoke("update:open", dest),
+  downloadUpdate: (url: string, latest: string) =>
+    ipcRenderer.invoke("update:download", url, latest),
+  installUpdate: () => ipcRenderer.invoke("update:install"),
   onUpdateProgress: (cb: (p: { percent: number }) => void) => {
     const listener = (_e: unknown, p: { percent: number }) => cb(p)
     ipcRenderer.on("update:progress", listener)

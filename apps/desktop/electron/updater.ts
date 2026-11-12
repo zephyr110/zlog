@@ -1,7 +1,7 @@
 import { createWriteStream, mkdirSync, unlinkSync } from "node:fs"
 import { spawn } from "node:child_process"
 import { dirname, join } from "node:path"
-import { app, net, shell } from "electron"
+import { app, net } from "electron"
 
 /**
  * 轻量更新检查：GitHub Releases "latest" API + 平台资产匹配。
@@ -9,8 +9,8 @@ import { app, net, shell } from "electron"
  * 为什么不用 electron-updater：产物经 `--publish never` + softprops 上传，
  * 没有 electron-builder 的 latest-mac.yml 等更新元数据；且 macOS 产物未
  * 签名（Squirrel.Mac 自动替换要求签名）。这里做"检查 + 下载 + 引导安装"
- * 的完整子集：发现新版本 → 下载对应平台安装包 → 打开（macOS 打开 dmg /
- * Windows 静默安装 / Linux 打开文件）。
+ * 的完整子集：发现新版本 → 下载对应平台安装包 → 提示重启，退出应用时
+ * 启动安装（Windows 静默安装 / macOS 打开 dmg / Linux 打开目录）。
  *
  * 网络走 electron 的 net.fetch（Chromium 栈，自动跟随系统代理——直连
  * GitHub API 在国内网络会被拦，Node fetch 不读系统代理）。
@@ -193,22 +193,36 @@ export const CHECK_TIMEOUT_MS = 10_000
 /** 下载超时（133MB dmg 在慢网/代理下较久；网络挂死时兜底返回失败）。 */
 export const DOWNLOAD_TIMEOUT_MS = 15 * 60_000
 
-/** 下载完成后按平台打开安装包。 */
-export function openDownloadedUpdate(dest: string): void {
-  if (process.platform === "win32") {
-    // NSIS 静默安装（/S）；未签名会被 SmartScreen 拦，属预期。
-    // spawn 失败（安装包被删/被杀软隔离）没有 error 监听会以
-    // uncaughtException 拖垮主进程——监听后回退打开所在目录
-    const child = spawn(dest, ["/S"], { detached: true, stdio: "ignore" })
-    child.on("error", () => {
-      void shell.openPath(join(dest, ".."))
-    })
+/**
+ * 退出时启动安装包的指令（win32 为 NSIS 静默安装）。
+ * relaunch 仅 Windows 生效：--force-run 让静默安装结束后重新拉起应用。
+ */
+export function installerCommand(
+  platform: NodeJS.Platform,
+  dest: string,
+  relaunch: boolean
+): { file: string; args: string[] } {
+  if (platform === "win32") {
+    return { file: dest, args: relaunch ? ["--updated", "/S", "--force-run"] : ["--updated", "/S"] }
+  }
+  // dmg：Finder 打开，用户拖入 Applications（未签名无法自动替换）
+  if (platform === "darwin") return { file: "open", args: [dest] }
+  return { file: "xdg-open", args: [dirname(dest)] } // Linux：打开文件所在目录
+}
+
+/**
+ * 启动安装程序。只在退出路径调用：进程随即结束，异步 shell.openPath
+ * 的回调来不及执行，必须 spawn 独立进程。
+ */
+export function launchInstaller(dest: string, relaunch: boolean): void {
+  const { file, args } = installerCommand(process.platform, dest, relaunch)
+  try {
+    const child = spawn(file, args, { detached: true, stdio: "ignore" })
+    // 安装包被删/被杀软隔离时没有 error 监听会以 uncaughtException 拖垮主进程
+    child.on("error", () => {})
     child.unref()
-  } else if (process.platform === "darwin") {
-    // dmg：Finder 打开，用户拖入 Applications（未签名无法自动替换）
-    void shell.openPath(dest)
-  } else {
-    void shell.openPath(join(dest, "..")) // Linux：打开文件所在目录
+  } catch {
+    // 启动失败不阻塞退出；用户可重开应用重新下载
   }
 }
 
