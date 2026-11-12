@@ -5,6 +5,7 @@ import { getPostsByTag, getAllTags } from "@zlog/database"
 import { PostCard } from "@/components/blog/post-card"
 import { Trans } from "@/components/layout/trans"
 import { PageHeader } from "@/components/layout/page-header"
+import { PageHeaderDecor } from "@/components/layout/page-header-decor"
 import { Container } from "@/components/ui/container"
 import { defaultLocale, t } from "@/lib/i18n"
 import { isSeriesTag, seriesName } from "@/lib/series"
@@ -71,7 +72,7 @@ export default async function TagPage({ params }: TagPageProps) {
   const posts = await getPostsByTag(decodedTag)
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeader
         breadcrumb={[
           { href: "/", label: <Trans k="site.home" /> },
@@ -85,6 +86,7 @@ export default async function TagPage({ params }: TagPageProps) {
           </>
         }
         description={<Trans k="site.postsCount" args={[posts.length]} />}
+        decor={<PageHeaderDecor variant="tags" label={decodedTag} />}
       />
 
       {/* Tags bar */}

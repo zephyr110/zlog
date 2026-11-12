@@ -1,7 +1,11 @@
 import Link from "next/link"
 import type { ReactNode } from "react"
 import { Container } from "@/components/ui/container"
-import { BannerArt, pageBannerMinClass } from "@/components/layout/banner-art"
+import {
+  BannerArt,
+  pageBannerDecorClass,
+  pageBannerMinClass,
+} from "@/components/layout/banner-art"
 import { cn } from "@/lib/utils"
 
 interface BreadcrumbItem {
@@ -18,6 +22,8 @@ interface PageHeaderProps {
   icon?: ReactNode
   /** Extra content on the right side of the title row (actions, counts). */
   actions?: ReactNode
+  /** Decorative artwork on the banner's right side (lg+). */
+  decor?: ReactNode
   children?: ReactNode
 }
 
@@ -28,6 +34,7 @@ export function PageHeader({
   description,
   icon,
   actions,
+  decor,
   children,
 }: PageHeaderProps) {
   return (
@@ -38,8 +45,8 @@ export function PageHeader({
       )}
     >
       <BannerArt />
-      <Container className="relative flex flex-1 flex-col justify-center py-12 md:py-16">
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <Container className="relative flex flex-1 items-center gap-8 py-12 md:py-16 xl:gap-12">
+        <div className="min-w-0 flex-1 animate-in fade-in slide-in-from-bottom-4 duration-700">
           {breadcrumb && breadcrumb.length > 0 && (
             <nav
               aria-label="Breadcrumb"
@@ -91,6 +98,14 @@ export function PageHeader({
 
           {children}
         </div>
+
+        {decor && (
+          <div className={pageBannerDecorClass}>
+            <div className="motion-safe:animate-in fade-in zoom-in-95 duration-700">
+              {decor}
+            </div>
+          </div>
+        )}
       </Container>
     </section>
   )

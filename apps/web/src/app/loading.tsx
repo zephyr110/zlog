@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 export default function HomeLoading() {
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       {/* Hero skeleton — avoid "0 articles" flash */}
       <section
         className={cn(

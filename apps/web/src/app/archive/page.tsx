@@ -5,6 +5,7 @@ import { getPublishedPosts } from "@zlog/database"
 import { Trans } from "@/components/layout/trans"
 import { defaultLocale, t } from "@/lib/i18n"
 import { PageHeader } from "@/components/layout/page-header"
+import { PageHeaderDecor } from "@/components/layout/page-header-decor"
 import { Container } from "@/components/ui/container"
 import { ArchiveFeed } from "./archive-feed"
 import { ArchiveFeedSkeleton } from "./loading"
@@ -29,7 +30,7 @@ export default async function ArchivePage() {
   )
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeader
         breadcrumb={[
           { href: "/", label: <Trans k="site.home" /> },
@@ -38,6 +39,7 @@ export default async function ArchivePage() {
         icon={<Archive size={22} />}
         title={<Trans k="archive.title" />}
         description={<Trans k="archive.total" args={[posts.length]} />}
+        decor={<PageHeaderDecor variant="archive" />}
       />
 
       <Container className="py-8 md:py-12">

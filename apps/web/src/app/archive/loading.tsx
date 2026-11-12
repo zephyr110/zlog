@@ -23,8 +23,8 @@ export function ArchiveFeedSkeleton() {
           anchored right on desktop (mirrors YearNavBar's lg:w-full +
           lg:ml-auto layout); w-fit keeps the floating pill on mobile. */}
       <div className="mb-8 flex w-fit max-w-full items-center gap-2 lg:w-full">
-        <Skeleton className="h-9 w-44 shrink-0 rounded-full" />
-        <Skeleton className="h-7 w-24 shrink-0 rounded-full lg:ml-auto" />
+        <Skeleton className="h-[38px] w-44 shrink-0 rounded-full" />
+        <Skeleton className="h-[38px] w-24 shrink-0 rounded-full lg:ml-auto" />
       </div>
       {/* Year heading — accent bar + year + count + chevron */}
       <div className="mb-4 flex items-center gap-3">
@@ -52,7 +52,7 @@ export function ArchiveFeedSkeleton() {
 
 export default function ArchiveLoading() {
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeaderSkeleton />
       <div className="container mx-auto max-w-5xl px-4 py-8 md:py-12 2xl:max-w-7xl">
         <ArchiveFeedSkeleton />

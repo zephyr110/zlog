@@ -5,6 +5,7 @@ import { Trans } from "@/components/layout/trans"
 import { defaultLocale, t } from "@/lib/i18n"
 import { groupPostsByUtcYear } from "@/lib/date"
 import { PageHeader } from "@/components/layout/page-header"
+import { PageHeaderDecor } from "@/components/layout/page-header-decor"
 import { Container } from "@/components/ui/container"
 import { EmptyState } from "@/components/ui/empty-state"
 import { YearSection } from "./year-section"
@@ -23,12 +24,13 @@ export default async function TimelinePage() {
   const grouped = groupPostsByUtcYear(posts, { sortYears: "desc" })
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeader
         breadcrumb={[{ href: "/", label: <Trans k="site.home" /> }]}
         icon={<History size={22} className="text-primary" />}
         title={<Trans k="timeline.title" />}
         description={<Trans k="timeline.total" args={[posts.length]} />}
+        decor={<PageHeaderDecor variant="timeline" />}
       />
 
       {/* Timeline */}

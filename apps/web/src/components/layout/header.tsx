@@ -2,23 +2,15 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { ThemeToggle } from "@/components/layout/theme-toggle"
-import { LanguageSwitcher } from "@/components/layout/language-switcher"
 import { IconButton } from "@/components/ui/icon-button"
 import { useSiteConfig } from "@/components/layout/site-config-provider"
-import { siteLogoSrc, defaultSiteConfig } from "@/lib/site-config"
+import { siteLogoSrc } from "@/lib/site-config"
 import { SiteLogo } from "@/components/layout/site-logo"
 import { useT } from "@/components/layout/trans"
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu"
+import { NavigationMenu } from "@base-ui/react/navigation-menu"
 import { Menu, X, ChevronDown } from "lucide-react"
-import { GithubIcon } from "@/components/ui/brand-icons"
 import { categoryMeta } from "@/lib/categories"
 import { SearchInput } from "@/components/layout/search-input"
 import { MobileNav } from "@/components/layout/mobile-nav"
@@ -28,12 +20,10 @@ export function Header({ categories }: { categories: NavCategory[] }) {
   const { t } = useT()
   const site = useSiteConfig()
   const pathname = usePathname()
-  const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mobileTopicsOpen, setMobileTopicsOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const logoSrc = siteLogoSrc(site)
-  const githubUrl = site.social.github || defaultSiteConfig.social.github
 
   useEffect(() => {
     function handleScroll() {
@@ -57,15 +47,24 @@ export function Header({ categories }: { categories: NavCategory[] }) {
 
   return (
     <>
+      {/* Floating navbar: the outer bar keeps a constant height (it is
+          sticky, so changing it would shift the whole document); once the
+          page scrolls, the full-width backing fades out and the inner pill
+          contracts onto the page container with a glass layer. */}
       <header
         className={cn(
-          "sticky top-0 z-50 w-full transition-all duration-300",
-          scrolled
-            ? "border-b border-border/40 bg-background/85 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75"
-            : "border-transparent bg-background"
+          "sticky top-0 z-50 flex h-[var(--header-h)] w-full items-center px-3 transition-colors duration-300 md:px-4",
+          scrolled ? "bg-transparent" : "bg-background"
         )}
       >
-        <div className="container mx-auto flex h-14 items-center justify-between gap-4 px-4 md:h-16">
+        <div
+          className={cn(
+            "relative mx-auto flex h-12 w-full items-center justify-between gap-3 rounded-full border px-2.5 transition-[max-width,background-color,border-color,box-shadow] duration-300 ease-out motion-reduce:transition-none md:h-14 md:px-3",
+            scrolled
+              ? "max-w-5xl border-border/60 bg-background/80 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-background/65 2xl:max-w-7xl"
+              : "max-w-6xl border-transparent bg-transparent 2xl:max-w-[88rem]"
+          )}
+        >
           {/* Brand lockup — sized like lucide.dev nav (36px mark, 21px name). */}
           <Link
             href="/"
@@ -90,64 +89,88 @@ export function Header({ categories }: { categories: NavCategory[] }) {
               {t("site.home")}
             </NavLink>
 
-            {/* Topics dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                className={cn(
-                  "relative hidden cursor-pointer items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium outline-none transition-all duration-200 md:flex",
-                  atTopics
-                    ? "bg-muted/60 text-foreground"
-                    : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-                )}
-              >
-                <span>{t("site.topics")}</span>
-                <ChevronDown aria-hidden className="size-3.5 opacity-45" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" sideOffset={12} className="w-64 p-2">
-                {categories.length === 0 ? (
-                  <p className="px-3 py-4 text-xs text-muted-foreground text-center">
-                    {t("site.noTopics")}
-                  </p>
-                ) : (
-                  categories.map((cat) => {
-                    const meta = categoryMeta[cat.key as keyof typeof categoryMeta]
-                    if (!meta) return null
-                    const Icon = meta.icon
-                    const active = pathname === `/topics/${encodeURIComponent(cat.key)}`
-                    return (
-                      <DropdownMenuItem
-                        key={cat.key}
-                        onClick={() => router.push(`/topics/${encodeURIComponent(cat.key)}`)}
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors",
-                          active && "bg-primary/5"
-                        )}
-                      >
-                        <div className={cn(
-                          "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                          active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                        )}>
-                          <Icon size={16} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className={cn(
-                              "text-sm font-medium",
-                              active ? "text-primary" : "text-foreground"
-                            )}>
-                              {t(meta.i18nKey) as string}
-                            </span>
-                            <span className="text-[11px] text-muted-foreground/60 tabular-nums font-mono">
-                              {cat.count}
-                            </span>
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                    )
-                  })
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Topics dropdown — NavigationMenu owns hover, click, focus
+                and the pointer gap, so hovering never steals focus from the
+                search box. */}
+            <NavigationMenu.Root
+              delay={100}
+              closeDelay={160}
+              className="hidden md:block"
+            >
+              <NavigationMenu.List className="flex items-center">
+                <NavigationMenu.Item>
+                  <NavigationMenu.Trigger
+                    className={cn(
+                      "group relative flex cursor-pointer items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium outline-none transition-all duration-200",
+                      atTopics
+                        ? "bg-muted/60 text-foreground"
+                        : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                    )}
+                  >
+                    <span>{t("site.topics")}</span>
+                    <ChevronDown
+                      aria-hidden
+                      className="size-3.5 opacity-45 transition-transform duration-200 group-data-[popup-open]:rotate-180"
+                    />
+                  </NavigationMenu.Trigger>
+                  <NavigationMenu.Content>
+                    <div className="flex flex-col gap-0.5">
+                      {categories.length === 0 ? (
+                        <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                          {t("site.noTopics")}
+                        </p>
+                      ) : (
+                        categories.map((cat) => {
+                          const meta = categoryMeta[cat.key as keyof typeof categoryMeta]
+                          if (!meta) return null
+                          const Icon = meta.icon
+                          const active = pathname === `/topics/${encodeURIComponent(cat.key)}`
+                          return (
+                            <NavigationMenu.Link
+                              key={cat.key}
+                              active={active}
+                              closeOnClick
+                              render={<Link href={`/topics/${encodeURIComponent(cat.key)}`} />}
+                              className={cn(
+                                "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 outline-none transition-colors hover:bg-muted focus:bg-muted",
+                                active && "bg-primary/5"
+                              )}
+                            >
+                              <div className={cn(
+                                "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                                active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                              )}>
+                                <Icon size={16} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <span className={cn(
+                                    "text-sm font-medium",
+                                    active ? "text-primary" : "text-foreground"
+                                  )}>
+                                    {t(meta.i18nKey) as string}
+                                  </span>
+                                  <span className="text-[11px] text-muted-foreground/60 tabular-nums font-mono">
+                                    {cat.count}
+                                  </span>
+                                </div>
+                              </div>
+                            </NavigationMenu.Link>
+                          )
+                        })
+                      )}
+                    </div>
+                  </NavigationMenu.Content>
+                </NavigationMenu.Item>
+              </NavigationMenu.List>
+              <NavigationMenu.Portal>
+                <NavigationMenu.Positioner align="start" sideOffset={12} className="z-50">
+                  <NavigationMenu.Popup className="w-64 rounded-lg bg-popover p-2 text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none duration-100 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+                    <NavigationMenu.Viewport className="w-full" />
+                  </NavigationMenu.Popup>
+                </NavigationMenu.Positioner>
+              </NavigationMenu.Portal>
+            </NavigationMenu.Root>
 
             {/* 归档 */}
             <NavLink href="/archive" active={pathname === "/archive"}>
@@ -166,27 +189,9 @@ export function Header({ categories }: { categories: NavCategory[] }) {
               {t("site.about")}
             </NavLink>
 
-            {/* Soft divider between navigation and utility tools */}
-            <span
-              className="mx-1.5 hidden h-3.5 w-px bg-border/70 md:block"
-              aria-hidden="true"
-            />
-
-            {/* Tools — search + icon controls */}
+            {/* Utility — search stays last at the far right; theme and
+                language live in the footer and mobile menu. */}
             <SearchInput />
-            <ThemeToggle />
-            <LanguageSwitcher />
-
-            {/* GitHub — hidden on small screens; footer / mobile nav cover it */}
-            <a
-              href={githubUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground sm:inline-flex"
-              aria-label="GitHub"
-            >
-              <GithubIcon size={17} />
-            </a>
 
             {/* Mobile menu toggle */}
             <IconButton

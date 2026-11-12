@@ -4,6 +4,7 @@ import { getSiteConfig } from "@/lib/get-site-config"
 import { Trans } from "@/components/layout/trans"
 import { defaultLocale, t } from "@/lib/i18n"
 import { PageHeader } from "@/components/layout/page-header"
+import { PageHeaderDecor } from "@/components/layout/page-header-decor"
 import { Sparkles, Palette, FileCode, Cloud, Rocket, Database, UserRound } from "lucide-react"
 import { GithubIcon, XIcon } from "@/components/ui/brand-icons"
 import type { TranslationPath } from "@/lib/i18n"
@@ -57,7 +58,7 @@ const techStack: {
 export default async function AboutPage() {
   const site = await getSiteConfig()
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeader
         breadcrumb={[
           { href: "/", label: <Trans k="site.home" /> },
@@ -66,6 +67,7 @@ export default async function AboutPage() {
         icon={<UserRound size={22} />}
         title={<Trans k="about.title" />}
         description={<Trans k="about.description" />}
+        decor={<PageHeaderDecor variant="about" />}
       />
 
       <div className="container mx-auto px-4 py-16 md:py-20 max-w-5xl 2xl:max-w-7xl space-y-16">

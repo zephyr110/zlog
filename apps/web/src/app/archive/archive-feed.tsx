@@ -235,7 +235,7 @@ export function ArchiveFeed({ posts, allTags }: ArchiveFeedProps) {
       },
       // Detection band just below the site header + sticky year bar;
       // the bottom -70% keeps it narrow so only one section is active.
-      { rootMargin: "-108px 0px -70% 0px", threshold: 0 }
+      { rootMargin: "-116px 0px -70% 0px", threshold: 0 }
     )
     const lastYear = grouped[grouped.length - 1]?.[0]
     // A short final section can never enter the narrow detection band —
@@ -340,6 +340,8 @@ export function ArchiveFeed({ posts, allTags }: ArchiveFeedProps) {
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={t("site.searchPosts")}
             aria-label={t("site.searchPosts")}
+            aria-keyshortcuts="/"
+            data-search-input="page"
             className={cn(
               searchOpen
                 ? "pl-9 pr-8"
@@ -450,12 +452,12 @@ export function ArchiveFeed({ posts, allTags }: ArchiveFeedProps) {
           The collapse-all toggle rides on the same row: it stays fixed
           (shrink-0) while the year pills scroll on narrow screens. */}
       <YearNavBar years={years} activeYear={currentYear} onSelect={jumpToYear}>
-        {/* h-7 matches the year pills' height so the row reads as one
-            unit; lg:ml-auto anchors the action to the row's right end. */}
+        {/* self-stretch matches the year strip's height without copying its
+            internals; lg:ml-auto anchors the action to the row's right end. */}
         {years.length >= 2 && filteredPosts.length > 0 && (
           <button
             onClick={toggleAll}
-            className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/60 bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/25 hover:text-foreground lg:ml-auto"
+            className="inline-flex shrink-0 items-center gap-1.5 self-stretch whitespace-nowrap rounded-full border border-border/60 bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:ml-auto"
           >
             <svg
               className={`size-3 transition-transform duration-300 ${allCollapsed ? "" : "rotate-180"}`}

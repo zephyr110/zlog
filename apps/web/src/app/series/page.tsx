@@ -3,6 +3,7 @@ import Link from "next/link"
 import { getPublishedPosts } from "@zlog/database"
 import { Container } from "@/components/ui/container"
 import { PageHeader } from "@/components/layout/page-header"
+import { PageHeaderDecor } from "@/components/layout/page-header-decor"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Trans } from "@/components/layout/trans"
 import { defaultLocale, t } from "@/lib/i18n"
@@ -24,7 +25,7 @@ export default async function SeriesIndexPage() {
   const series = listSeries(await getPublishedPosts())
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeader
         breadcrumb={[
           { href: "/", label: <Trans k="site.home" /> },
@@ -33,6 +34,7 @@ export default async function SeriesIndexPage() {
         icon={<Layers size={24} />}
         title={<Trans k="post.seriesAllTitle" />}
         description={<Trans k="post.seriesAllDesc" />}
+        decor={<PageHeaderDecor variant="series" />}
       />
 
       <Container className="py-10 pb-16">

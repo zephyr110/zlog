@@ -675,6 +675,9 @@ function AdminPostsContent() {
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setPage(1) }}
                 placeholder={t("admin.searchPosts")}
+                aria-label={t("admin.searchPosts")}
+                aria-keyshortcuts="/"
+                data-search-input="page"
                 className="pl-9"
               />
             </div>

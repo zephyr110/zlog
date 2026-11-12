@@ -33,12 +33,12 @@ export default async function HomePage() {
     : []
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <HeroSection postCount={postCount} />
 
       <section
         id="post-feed"
-        className="container mx-auto max-w-5xl scroll-mt-16 px-4 py-8 md:py-12 2xl:max-w-7xl"
+        className="container mx-auto max-w-5xl scroll-mt-[var(--header-h)] px-4 py-8 md:py-12 2xl:max-w-7xl"
       >
         {!featured ? (
           <EmptyState

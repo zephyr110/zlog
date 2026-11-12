@@ -5,6 +5,7 @@ import { getPostsByCategory, getAllTags } from "@zlog/database"
 import { PostCard } from "@/components/blog/post-card"
 import { Container } from "@/components/ui/container"
 import { PageHeader } from "@/components/layout/page-header"
+import { PageHeaderDecor } from "@/components/layout/page-header-decor"
 import { Trans } from "@/components/layout/trans"
 import { defaultLocale, t } from "@/lib/i18n"
 import { categoryMeta, categoryKeys, type CategoryKey } from "@/lib/categories"
@@ -49,7 +50,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const Icon = meta.icon
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-[calc(100vh-var(--header-h))]">
       <PageHeader
         breadcrumb={[
           { href: "/", label: <Trans k="site.home" /> },
@@ -61,6 +62,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         icon={<Icon size={24} />}
         title={<Trans k={meta.i18nKey} />}
         description={meta.desc}
+        decor={<PageHeaderDecor variant="topics" icon={<Icon size={24} />} />}
       >
         <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
           <span>

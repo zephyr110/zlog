@@ -54,12 +54,24 @@ export function generateThemeCss(catalog) {
   }
 
   // accent 段 — 7 色，无 default。
+  // banner 色相取亮色 primary；亮暗 primary 的四舍五入结果可能差 1–3°，
+  // 统一用亮色值才能让同一主题在两种模式下保持一个色相。
+  const primaryHue = (primary) => {
+    const match = /^oklch\(\s*[\d.]+\s+[\d.]+\s+([\d.]+)\s*\)$/.exec(primary)
+    if (!match) {
+      throw new Error(
+        `generate-theme-css: cannot read primary hue from "${primary}"`
+      )
+    }
+    return String(Math.round(Number(match[1])))
+  }
   for (const [name, { light, dark }] of Object.entries(catalog.themes)) {
+    const bannerHue = primaryHue(light.primary)
     emit(
       `html[data-theme-color="${name}"], [data-theme-color="${name}"]`,
       `html.dark[data-theme-color="${name}"], .dark [data-theme-color="${name}"]`,
-      light,
-      dark
+      { ...light, "banner-hue": bannerHue },
+      { ...dark, "banner-hue": bannerHue }
     )
   }
 
