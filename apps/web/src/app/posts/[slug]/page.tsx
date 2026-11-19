@@ -19,6 +19,7 @@ import { Calendar, ChevronLeft, ChevronRight, Clock, Layers } from "lucide-react
 import { rankRelatedPosts } from "@/lib/related"
 import { buildSeriesNav, publicTags, sameSeries } from "@/lib/series"
 import { POST_PROSE_CLASSES } from "@/lib/prose"
+import { skipStaticParamsAtBuild } from "@/lib/build-mode"
 
 /** 线上 ISR：内容变更最长 60s 后自动重新生成（桌面 standalone 构建注入
  *  force-dynamic，优先级更高、每请求实时，不受此影响）。 */
@@ -29,9 +30,9 @@ interface PostPageProps {
 }
 
 export async function generateStaticParams() {
-  // 桌面 standalone 构建（NEXT_DESKTOP=true）无数据库：不枚举静态路径，
-  // 运行时按需渲染（force-dynamic 不跳过 generateStaticParams，Task 12 CI 实测）
-  if (process.env.NEXT_DESKTOP === "true") return []
+  // 构建期无可用数据库：不枚举静态路径，运行时按需渲染
+  // （force-dynamic 不跳过 generateStaticParams，Task 12 CI 实测）
+  if (skipStaticParamsAtBuild()) return []
   const posts = await getPublishedPosts()
   return posts.map((post) => ({ slug: post.slug }))
 }
