@@ -159,7 +159,7 @@ const I18N = {
     "status.rawErrorClose": "）",
     "error.invalidState": "本地数据库由纯本地模式创建，无法原地启用同步。请删除用户数据目录中的 zlog.db（先备份）后重启应用",
     "error.walConflict": "同步冲突（WalConflict）：本地与云端的写入并发撞帧，数据不会丢失。点「立即同步」重试；若持续出现，重启应用即可恢复",
-    "error.readsBlocked": "云端暂时拒绝了读取（reads are blocked）：通常是控制台用量限制，确认恢复后点「立即同步」",
+    "error.readsBlocked": "云端暂时拒绝了读取（reads are blocked）：通常是控制台用量限制。桌面端已改用本地数据，恢复后点「立即同步」即可追平",
   },
   en: {
     "nav.sync": "Sync",
@@ -310,7 +310,7 @@ const I18N = {
     "status.rawErrorClose": ")",
     "error.invalidState": "This local database was created in local-only mode and cannot enable sync in place. Delete zlog.db in the user data folder (back it up first) and restart the app",
     "error.walConflict": "Sync conflict (WalConflict): concurrent local/cloud writes collided. No data is lost. Click \"Sync Now\" to retry; if it persists, restarting the app clears it",
-    "error.readsBlocked": "Cloud reads are temporarily blocked (usually console usage limits). Click \"Sync Now\" once it recovers",
+    "error.readsBlocked": "Cloud reads are temporarily blocked (usually console usage limits). The desktop app has switched to local data; click \"Sync Now\" once it recovers",
   },
 }
 let lang = "zh"

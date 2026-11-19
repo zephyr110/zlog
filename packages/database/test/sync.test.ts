@@ -14,7 +14,7 @@ vi.mock("../src/db", () => ({
   })),
 }))
 
-import { runSync, scheduleSync, getSyncStatus, isSyncConfigured } from "../src/sync"
+import { runSync, scheduleSync, getSyncStatus, isSyncConfigured, startSyncRetry } from "../src/sync"
 import { requireDb } from "../src/db"
 
 describe("sync", () => {
@@ -57,6 +57,29 @@ describe("sync", () => {
     })
     await expect(runSync()).rejects.toThrow("boom")
     expect(getSyncStatus().lastSyncError).toBe("boom")
+  })
+
+  it("startSyncRetry 按周期触发同步，stop 后不再触发", async () => {
+    process.env.TURSO_SYNC_URL = "libsql://example.turso.io"
+    const syncsBefore = mockSyncLog.length
+
+    const stop = startSyncRetry(1000)
+    await vi.advanceTimersByTimeAsync(999)
+    expect(mockSyncLog.length).toBe(syncsBefore)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(mockSyncLog.length).toBe(syncsBefore + 1)
+
+    stop()
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(mockSyncLog.length).toBe(syncsBefore + 1)
+  })
+
+  it("未配置同步时 startSyncRetry 是空操作", async () => {
+    const syncsBefore = mockSyncLog.length
+    const stop = startSyncRetry(1000)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(mockSyncLog.length).toBe(syncsBefore)
+    stop()
   })
 
   it("scheduleSync 3 秒防抖后触发一次同步", async () => {

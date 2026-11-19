@@ -19,5 +19,8 @@ export async function register() {
   ) {
     const { backgroundArchiveAllSoon } = await import("@/lib/analytics-archiver")
     backgroundArchiveAllSoon()
+    // offline 模式不自动拉帧，云端恢复后靠定时同步追平
+    const { startSyncRetry } = await import("@zlog/database")
+    startSyncRetry()
   }
 }

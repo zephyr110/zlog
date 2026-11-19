@@ -9,14 +9,17 @@ export function getDb(): Client | null {
   client = createClient({
     url,
     authToken: process.env.TURSO_AUTH_TOKEN,
-    // Desktop (embedded replica): TURSO_SYNC_URL 存在时启用双向同步；
-    // syncInterval 由 libsql 客户端内置（秒），readYourWrites 保证本
-    // 端写入立即可读。Web/Vercel 部署不设该变量 → 完全不受影响。
+    // Desktop (embedded replica): TURSO_SYNC_URL 存在时启用双向同步。
+    // offline 让读写都走本地副本，远端故障（断网/配额封禁）时照常可用，
+    // 由 sync() 稍后推送/拉取；关闭 readYourWrites，否则每次读都会先向
+    // 云端拉帧，云端拒绝读取时每个查询都抛 Sync(...)、整站 500。
+    // Web/Vercel 部署不设该变量 → 完全不受影响。
     ...(process.env.TURSO_SYNC_URL
       ? {
           syncUrl: process.env.TURSO_SYNC_URL,
           syncInterval: Number(process.env.TURSO_SYNC_INTERVAL ?? 300),
-          readYourWrites: true,
+          offline: true,
+          readYourWrites: false,
         }
       : {}),
   })

@@ -83,7 +83,7 @@ export type {
 export { slugify, computeReadingStats } from "@zlog/core"
 export type { Post, PostSummary } from "@zlog/core"
 export type { UserRecord } from "./users"
-export { runSync, scheduleSync, getSyncStatus, isSyncConfigured } from "./sync"
+export { runSync, scheduleSync, startSyncRetry, getSyncStatus, isSyncConfigured } from "./sync"
 export {
   upsertMonthlyAnalytics,
   listArchivedMonths,
