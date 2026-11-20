@@ -37,6 +37,18 @@ export function scheduleSync(): void {
   }, 3000)
 }
 
+/**
+ * 周期重试同步。offline 模式下 libsql 不再自动拉帧，云端恢复后要靠
+ * 这里推送本地改动、拉取远端更新；失败静默，下个周期再试。
+ */
+export function startSyncRetry(intervalMs = 5 * 60_000): () => void {
+  if (!isSyncConfigured()) return () => {}
+  const timer = setInterval(() => {
+    void runSync().catch(() => {})
+  }, intervalMs)
+  return () => clearInterval(timer)
+}
+
 export function getSyncStatus() {
   return {
     configured: isSyncConfigured(),
