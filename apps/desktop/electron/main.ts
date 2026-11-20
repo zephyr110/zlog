@@ -3,7 +3,9 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  Menu,
   Notification,
+  screen,
   session,
   shell,
 } from "electron"
@@ -34,6 +36,15 @@ import {
   shouldReloadMainWindow,
 } from "./window-lifecycle"
 import { createTray, updateTrayLanguage, updateTraySyncStatus, type TrayActions } from "./tray"
+import {
+  clampWindowBounds,
+  WindowStateStore,
+} from "./window-state"
+import {
+  APP_NAV_PATHS,
+  buildAppMenuTemplate,
+  type AppNavCommand,
+} from "./app-menu"
 import {
   COMMENT_NOTIFY_COPY,
   dockBadgeFor,
@@ -86,6 +97,7 @@ if (!gotLock) {
 
 async function main() {
   const configStore = new ConfigStore(app.getPath("userData"))
+  const windowStateStore = new WindowStateStore(app.getPath("userData"))
   const dbPath = join(app.getPath("userData"), "zlog.db")
   // standalone 产物嵌套路径（Task 1 spike 结论）：trace root 为 workspace 根。
   // 用 __dirname 而非 app.getAppPath()：`electron .` 时两者一致，但
@@ -125,6 +137,8 @@ async function main() {
     onQuit: () => app.quit(),
   }
   const tray = createTray(trayActions, currentLang)
+  // 语言切换或 web 端改语言后据此重建菜单（每 30s 轮询会同步 currentLang）
+  let menuLang: ResolvedLang | null = null
 
   // 同步异常主动告警：lastSyncError 会在下次成功同步前持续存在，
   // 因此只在"新错误出现"时通知一次（同一错误被成功清除后再次出现
@@ -185,6 +199,8 @@ async function main() {
   }
 
   const serverManager = new ServerManager(serverJsPath, logDir, onServerExit)
+  // 菜单在服务启动前即可用（设置/更新），导航项由根壳判断服务是否就绪
+  installApplicationMenu()
 
   async function startServerAndShow(cfg: DesktopConfig) {
     const httpsProxy = await resolveDesktopHttpProxy({
@@ -203,15 +219,50 @@ async function main() {
     // url 恒为真（端口 0 时返回 http://127.0.0.1:0），必须用 port 判断服务是否已启动
     if (serverManager.port <= 0) return
     if (!mainWindow || mainWindow.isDestroyed()) {
+      // 恢复上次窗口几何；外接屏拔出/分辨率变化后把旧坐标夹回可见区域
+      const savedState = windowStateStore.load()
+      const restored = savedState
+        ? clampWindowBounds(
+            savedState.bounds,
+            screen.getAllDisplays().map((d) => d.workArea),
+            screen.getPrimaryDisplay().workArea
+          )
+        : null
       mainWindow = new BrowserWindow({
-        width: 1280,
-        height: 800,
+        ...(restored ?? { width: 1280, height: 800 }),
         title: "Zlog",
         autoHideMenuBar: true,
         // 博客窗口渲染用户可发布的内容，不给 preload：window.zlog 会暴露
         // sessionSecret / adminPasswordHash / desktopKey / syncToken，
         // 博客侧任何 XSS 都可能把这些密钥送出（settings / 首启向导窗口才需要）。
       })
+      const win = mainWindow
+      if (savedState?.maximized) win.maximize()
+
+      // 拖动/缩放期间节流写入，关闭时再补一次最终几何
+      let stateTimer: NodeJS.Timeout | null = null
+      const saveWindowState = () => {
+        if (win.isDestroyed()) return
+        try {
+          windowStateStore.save({
+            bounds: win.getNormalBounds(),
+            maximized: win.isMaximized(),
+          })
+        } catch {
+          // 磁盘异常不阻断关闭流程
+        }
+      }
+      const scheduleSave = () => {
+        if (stateTimer) clearTimeout(stateTimer)
+        stateTimer = setTimeout(() => {
+          stateTimer = null
+          saveWindowState()
+        }, 400)
+      }
+      win.on("resize", scheduleSave)
+      win.on("move", scheduleSave)
+      win.on("maximize", saveWindowState)
+      win.on("unmaximize", saveWindowState)
       // 站内跳转策略：admin 的「查看线上」等链接是相对路径（target=_blank，
       // 解析后指向本地 origin）——在应用内导航而非丢给浏览器；外部链接
       // （GitHub/社交/远程站点，仅 http/https）仍走系统浏览器。同窗口点击
@@ -238,13 +289,17 @@ async function main() {
           openExternalIfWeb(url)
         }
       })
-      mainWindow.on("close", (e) => {
+      win.on("close", (e) => {
+        saveWindowState()
         if (shouldHideMainWindowOnClose(isAppQuitting())) {
           e.preventDefault()
-          mainWindow?.hide()
+          win.hide()
         }
       })
-      mainWindow.on("closed", () => { mainWindow = null })
+      win.on("closed", () => {
+        if (stateTimer) clearTimeout(stateTimer)
+        mainWindow = null
+      })
       void mainWindow.loadURL(serverManager.url)
     } else if (
       shouldReloadMainWindow(mainWindow.webContents.getURL(), serverManager.url)
@@ -344,6 +399,77 @@ async function main() {
     } catch {
       return { configured: false, error: "server-down" }
     }
+  }
+
+  // ── 原生应用菜单 ──
+  function installApplicationMenu(): void {
+    menuLang = currentLang
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate(
+        buildAppMenuTemplate({
+          lang: currentLang,
+          platform: process.platform,
+          actions: {
+            navigate: (command) => runAppNav(command),
+            openSettings: () => openSettingsWindow(),
+            syncNow: () => void requestSyncNow(),
+            checkUpdates: () => void checkUpdatesFromTray(),
+            openInBrowser: () => openCurrentPageInBrowser(),
+          },
+        })
+      )
+    )
+  }
+
+  function localPageUrl(path: string): string | null {
+    if (serverManager.port <= 0) return null
+    try {
+      return new URL(path, serverManager.url).toString()
+    } catch {
+      return null
+    }
+  }
+
+  /** 导航命令先交给渲染层的桌面根壳做站内跳转（保留草稿）；
+   *  根壳未挂载（页面还在加载/崩溃）时退回整页加载。 */
+  function runAppNav(command: AppNavCommand): void {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      showMainWindow()
+      return
+    }
+    const win = mainWindow
+    win.show()
+    win.focus()
+    const fallback = () => {
+      const url = localPageUrl(APP_NAV_PATHS[command])
+      if (url && !win.isDestroyed()) void win.loadURL(url)
+    }
+    void win.webContents
+      .executeJavaScript(
+        `window.dispatchEvent(new CustomEvent("zlog-desktop-command", { detail: ${JSON.stringify(command)} })); window.__zlogDesktopShell === true`
+      )
+      .then((handled) => {
+        if (handled !== true) fallback()
+      })
+      .catch(fallback)
+  }
+
+  /** 「在浏览器中打开当前页」：只放行本地服务 origin，避免把任意 URL 交给系统。 */
+  function openCurrentPageInBrowser(): void {
+    const win = mainWindow
+    if (!win || win.isDestroyed()) return
+    void win.webContents
+      .executeJavaScript("location.href")
+      .then((raw: unknown) => {
+        if (typeof raw !== "string" || serverManager.port <= 0) return
+        try {
+          if (new URL(raw).origin !== new URL(serverManager.url).origin) return
+          void shell.openExternal(raw)
+        } catch {
+          // 非法 URL 不打开
+        }
+      })
+      .catch(() => {})
   }
 
   // ── 评论未读轮询 → 系统通知 / Dock 角标 ──
@@ -823,8 +949,9 @@ async function main() {
     if (!isLangPref(pref)) return { ok: false, error: "invalid pref" }
     const state = langFile.setPref(pref, systemLocale)
     currentLang = state.resolved
-    // 设置类窗口标题 + 托盘菜单 + tooltip 后缀跟随新语言
+    // 设置类窗口标题 + 托盘菜单 + 原生菜单跟随新语言
     updateTrayLanguage(tray, currentLang, trayActions)
+    installApplicationMenu()
     for (const w of [settingsWindow, firstRunWindow]) {
       if (w && !w.isDestroyed()) {
         const isFirstRun = w === firstRunWindow
@@ -909,6 +1036,7 @@ async function main() {
   setInterval(() => {
     currentLang = langFile.loadOrInit(systemLocale).resolved
     updateTrayLanguage(tray, currentLang, trayActions)
+    if (menuLang !== currentLang) installApplicationMenu()
     void getSyncStatus().then((s) => {
       updateTraySyncStatus(tray, "idle", s, currentLang)
       maybeNotifySyncError(s)

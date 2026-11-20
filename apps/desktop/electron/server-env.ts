@@ -37,6 +37,9 @@ export function buildServerEnv(
     ADMIN_USERNAME: cfg.adminUsername,
     ADMIN_PASSWORD_HASH: encodeEnvHash(cfg.adminPasswordHash),
     ZLOG_DESKTOP_KEY: cfg.desktopKey,
+    // 桌面能力开关的服务端求值副本：客户端由构建期内联，运行时注入到
+    // 不了浏览器；这里只为 SSR 首帧与客户端取值一致（避免水合不一致）。
+    NEXT_PUBLIC_DESKTOP: "1",
   }
   // 语言单一事实源（lang.json）路径：web 端 /api/lang 读它接入统一语言源
   if (langFilePath) env.DESKTOP_LANG_FILE = langFilePath
