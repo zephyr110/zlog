@@ -10,6 +10,7 @@ import { FormattedDate } from "@/components/blog/formatted-date"
 import { Trans } from "@/components/layout/trans"
 import { defaultLocale, t } from "@/lib/i18n"
 import { collectSeriesPosts, listSeries, seriesName, seriesTagOf } from "@/lib/series"
+import { skipStaticParamsAtBuild } from "@/lib/build-mode"
 import { Calendar, Clock, Layers } from "lucide-react"
 
 /** 线上 ISR：内容变更最长 60s 后自动重新生成（桌面 standalone 构建注入
@@ -25,9 +26,9 @@ interface SeriesPageProps {
 const getSeriesSource = cache(getPublishedPosts)
 
 export async function generateStaticParams() {
-  // 桌面 standalone 构建（NEXT_DESKTOP=true）无数据库：不枚举静态路径，
-  // 运行时按需渲染（与 posts/[slug]、tags/[tag] 同款处理）。
-  if (process.env.NEXT_DESKTOP === "true") return []
+  // 构建期无可用数据库：不枚举静态路径，运行时按需渲染（与 posts/[slug]、
+  // tags/[tag] 同款处理）。
+  if (skipStaticParamsAtBuild()) return []
   const series = listSeries(await getSeriesSource())
   // 导出构建要求动态路由至少产出一个路径——空数组会被判 "missing
   // generateStaticParams()" 直接终止构建（Next 16 实测：判定条件是

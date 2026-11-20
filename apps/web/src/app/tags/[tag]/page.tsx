@@ -10,6 +10,7 @@ import { Container } from "@/components/ui/container"
 import { defaultLocale, t } from "@/lib/i18n"
 import { isSeriesTag, seriesName } from "@/lib/series"
 import { EmptyState } from "@/components/ui/empty-state"
+import { skipStaticParamsAtBuild } from "@/lib/build-mode"
 
 /** 线上 ISR：内容变更最长 60s 后自动重新生成（桌面 standalone 构建注入
  *  force-dynamic，优先级更高、每请求实时，不受此影响）。 */
@@ -20,9 +21,9 @@ interface TagPageProps {
 }
 
 export async function generateStaticParams() {
-  // 桌面 standalone 构建（NEXT_DESKTOP=true）无数据库：不枚举静态路径，
-  // 运行时按需渲染（force-dynamic 不跳过 generateStaticParams，Task 12 CI 实测）
-  if (process.env.NEXT_DESKTOP === "true") return []
+  // 构建期无可用数据库：不枚举静态路径，运行时按需渲染
+  // （force-dynamic 不跳过 generateStaticParams，Task 12 CI 实测）
+  if (skipStaticParamsAtBuild()) return []
   const tags = await getAllTags()
   // 系列 tag 同样生成静态路径：预渲染时页面里的 permanentRedirect 会被
   // 导出成跳转 HTML（与 category/[name] 同款兜底），否则导出构建里旧的
