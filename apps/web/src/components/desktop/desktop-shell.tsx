@@ -3,7 +3,11 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { isDesktopBuild } from "@/lib/desktop"
-import { DESKTOP_NAV_PATHS, isDesktopNavCommand } from "@/lib/desktop-commands"
+import {
+  DESKTOP_NAV_PATHS,
+  confirmDesktopNavigation,
+  isDesktopNavCommand,
+} from "@/lib/desktop-commands"
 import { useT } from "@/components/layout/trans"
 
 declare global {
@@ -28,9 +32,7 @@ export function DesktopShell() {
     const onCommand = (event: Event) => {
       const command = (event as CustomEvent<unknown>).detail
       if (!isDesktopNavCommand(command)) return
-      if (window.__zlogEditorDirty && !window.confirm(t("site.desktopLeaveUnsaved"))) {
-        return
-      }
+      if (!confirmDesktopNavigation(t("site.desktopLeaveUnsaved"))) return
       router.push(DESKTOP_NAV_PATHS[command])
     }
 

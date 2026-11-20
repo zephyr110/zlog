@@ -56,6 +56,34 @@ describe("buildAppMenuTemplate", () => {
     expect(a.navigate).toHaveBeenCalledWith("nav.posts")
   })
 
+  it("开发构建在视图菜单补回调试项，打包后不出现", () => {
+    const viewRoles = (devTools: boolean) => {
+      const template = buildAppMenuTemplate({
+        lang: "zh",
+        platform: "darwin",
+        devTools,
+        actions: actions(),
+      })
+      const view = template.find((i) => i.label === "视图")!
+      return (view.submenu as Array<Record<string, unknown>>).map((i) => i.role)
+    }
+    expect(viewRoles(true)).toEqual(
+      expect.arrayContaining(["reload", "forceReload", "toggleDevTools"])
+    )
+    expect(viewRoles(false)).not.toContain("toggleDevTools")
+  })
+
+  it("窗口菜单的 zoom 角色只在 macOS 出现", () => {
+    const windowRoles = (platform: NodeJS.Platform) => {
+      const template = buildAppMenuTemplate({ lang: "en", platform, actions: actions() })
+      const win = template.find((i) => i.label === "Window")!
+      return (win.submenu as Array<Record<string, unknown>>).map((i) => i.role)
+    }
+    expect(windowRoles("darwin")).toContain("zoom")
+    expect(windowRoles("win32")).not.toContain("zoom")
+    expect(windowRoles("linux")).not.toContain("zoom")
+  })
+
   it("Windows 不设应用菜单，设置与退出放进文件菜单", () => {
     const template = buildAppMenuTemplate({ lang: "en", platform: "win32", actions: actions() })
     expect(labels(template)).not.toContain("Zlog")
@@ -85,6 +113,7 @@ describe("buildAppMenuTemplate", () => {
     expect(main).toContain("installApplicationMenu()")
     expect(main).toContain("zlog-desktop-command")
     expect(main).toContain("window.__zlogDesktopShell === true")
+    expect(main).toContain("devTools: !app.isPackaged")
     expect(main).toMatch(/if \(menuLang !== currentLang\) installApplicationMenu\(\)/)
   })
 

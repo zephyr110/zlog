@@ -52,6 +52,13 @@ describe("clampWindowBounds", () => {
     ).toEqual({ x: 0, y: 0, width: 1280, height: 800 })
   })
 
+  it("工作区小于最小可见量时不把窗口推出屏幕", () => {
+    const tiny = { x: 0, y: 0, width: 80, height: 60 }
+    expect(
+      clampWindowBounds({ x: 0, y: 0, width: 900, height: 700 }, [tiny], tiny)
+    ).toEqual({ x: 0, y: 0, width: 80, height: 60 })
+  })
+
   it("非法数值按默认尺寸处理", () => {
     const result = clampWindowBounds(
       { x: Number.NaN, y: 100, width: Number.POSITIVE_INFINITY, height: 700 },
@@ -81,16 +88,34 @@ describe("WindowStateStore", () => {
     expect(store.load()).toEqual(state)
   })
 
-  it("损坏或尺寸非法的文件按无状态处理", () => {
+  it("损坏或含非有限数的文件按无状态处理", () => {
     dir = mkdtempSync(join(tmpdir(), "zlog-window-state-"))
     const store = new WindowStateStore(dir)
     writeFileSync(store.filePath, "{not json")
     expect(store.load()).toBeNull()
+    // JSON 里 NaN 会被写成 null
     writeFileSync(
       store.filePath,
-      JSON.stringify({ bounds: { x: 0, y: 0, width: 10, height: 10 } })
+      JSON.stringify({ bounds: { x: 0, y: 0, width: Number.NaN, height: 10 } })
     )
     expect(store.load()).toBeNull()
+  })
+
+  it("过小的窗口尺寸可读回，由 clamp 兜底放大", () => {
+    dir = mkdtempSync(join(tmpdir(), "zlog-window-state-"))
+    const store = new WindowStateStore(dir)
+    const small = {
+      bounds: { x: 100, y: 80, width: 200, height: 150 },
+      maximized: false,
+    }
+    store.save(small)
+    expect(store.load()).toEqual(small)
+    expect(clampWindowBounds(small.bounds, [PRIMARY], PRIMARY)).toEqual({
+      x: 100,
+      y: 80,
+      width: 320,
+      height: 240,
+    })
   })
 })
 

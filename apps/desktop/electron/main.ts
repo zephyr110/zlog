@@ -409,6 +409,7 @@ async function main() {
         buildAppMenuTemplate({
           lang: currentLang,
           platform: process.platform,
+          devTools: !app.isPackaged,
           actions: {
             navigate: (command) => runAppNav(command),
             openSettings: () => openSettingsWindow(),
@@ -438,6 +439,7 @@ async function main() {
       return
     }
     const win = mainWindow
+    if (win.isMinimized()) win.restore()
     win.show()
     win.focus()
     const fallback = () => {
@@ -454,22 +456,12 @@ async function main() {
       .catch(fallback)
   }
 
-  /** 「在浏览器中打开当前页」：只放行本地服务 origin，避免把任意 URL 交给系统。 */
+  /** 「在浏览器中打开当前页」：只放行本地服务地址，避免把任意 URL 交给系统。 */
   function openCurrentPageInBrowser(): void {
     const win = mainWindow
-    if (!win || win.isDestroyed()) return
-    void win.webContents
-      .executeJavaScript("location.href")
-      .then((raw: unknown) => {
-        if (typeof raw !== "string" || serverManager.port <= 0) return
-        try {
-          if (new URL(raw).origin !== new URL(serverManager.url).origin) return
-          void shell.openExternal(raw)
-        } catch {
-          // 非法 URL 不打开
-        }
-      })
-      .catch(() => {})
+    if (!win || win.isDestroyed() || serverManager.port <= 0) return
+    const current = win.webContents.getURL()
+    if (isDesktopLocalUrl(current, serverManager.url)) void shell.openExternal(current)
   }
 
   // ── 评论未读轮询 → 系统通知 / Dock 角标 ──
@@ -553,7 +545,12 @@ async function main() {
       return { ok: false, error: "代理格式应为 http://主机:端口 或 socks5://主机:端口" }
     }
     if (!config) {
-      const passwordHash = bcrypt.hashSync(String(cfg.password ?? ""), 10)
+      // 首启只能由向导建号；设置窗口不显示账号字段，空密码会留下永远登不进的 admin。
+      const password = String(cfg.password ?? "")
+      if (password.length < 6) {
+        return { ok: false, error: "请先完成首次设置：管理员密码至少 6 位" }
+      }
+      const passwordHash = bcrypt.hashSync(password, 10)
       config = {
         adminUsername: String(cfg.username || "admin"),
         adminPasswordHash: passwordHash,

@@ -22,3 +22,9 @@ export function isDesktopNavCommand(value: unknown): value is DesktopNavCommand 
     Object.prototype.hasOwnProperty.call(DESKTOP_NAV_PATHS, value)
   )
 }
+
+/** 桌面内导航前的未保存确认：编辑器把脏状态挂在 window.__zlogEditorDirty。
+ *  返回 true 表示可以继续导航。 */
+export function confirmDesktopNavigation(message: string): boolean {
+  return !window.__zlogEditorDirty || window.confirm(message)
+}

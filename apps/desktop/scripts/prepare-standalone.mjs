@@ -28,8 +28,8 @@ try {
     const res = spawnSync("pnpm", ["--filter", "@zlog/web", "build"], {
       cwd: repoRoot,
       // NEXT_DESKTOP 必须与 next.config 的 === "true" 判断一致（Task 2 修正）；
-      // NEXT_PUBLIC_DESKTOP 是客户端可见的桌面能力开关，Web 构建不设置
-      env: { ...process.env, NEXT_DESKTOP: "true", NEXT_PUBLIC_DESKTOP: "1" },
+      // NEXT_PUBLIC_DESKTOP 由 next.config 从它派生并构建期内联，这里不要重复设置
+      env: { ...process.env, NEXT_DESKTOP: "true" },
       stdio: "inherit",
       // Windows 上 pnpm 是 .cmd shim：无 shell 时 spawnSync 无法启动，
       // 返回空对象（status undefined）→ 上方 ?? 1 会静默失败（Task 12 CI 实测）

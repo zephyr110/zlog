@@ -47,6 +47,9 @@ interface Copy {
   zoomIn: string
   zoomOut: string
   fullscreen: string
+  reload: string
+  forceReload: string
+  devTools: string
   window: string
   minimize: string
   zoom: string
@@ -83,6 +86,9 @@ const COPY: Record<ResolvedLang, Copy> = {
     zoomIn: "放大",
     zoomOut: "缩小",
     fullscreen: "全屏",
+    reload: "重新载入",
+    forceReload: "强制重新载入",
+    devTools: "开发者工具",
     window: "窗口",
     minimize: "最小化",
     zoom: "缩放",
@@ -116,6 +122,9 @@ const COPY: Record<ResolvedLang, Copy> = {
     zoomIn: "Zoom In",
     zoomOut: "Zoom Out",
     fullscreen: "Full Screen",
+    reload: "Reload",
+    forceReload: "Force Reload",
+    devTools: "Toggle Developer Tools",
     window: "Window",
     minimize: "Minimize",
     zoom: "Zoom",
@@ -133,6 +142,8 @@ const COPY: Record<ResolvedLang, Copy> = {
 export function buildAppMenuTemplate(opts: {
   lang: ResolvedLang
   platform: NodeJS.Platform
+  /** 自定义菜单会顶掉 Electron 的默认菜单，开发期需要显式补回调试项。 */
+  devTools?: boolean
   actions: AppMenuActions
 }): MenuItemConstructorOptions[] {
   const t = COPY[opts.lang]
@@ -203,6 +214,14 @@ export function buildAppMenuTemplate(opts: {
       { label: t.zoomOut, role: "zoomOut" },
       { type: "separator" },
       { label: t.fullscreen, role: "togglefullscreen" },
+      ...(opts.devTools
+        ? [
+            { type: "separator" as const },
+            { label: t.reload, role: "reload" as const },
+            { label: t.forceReload, role: "forceReload" as const },
+            { label: t.devTools, role: "toggleDevTools" as const },
+          ]
+        : []),
     ],
   }
 
@@ -210,8 +229,14 @@ export function buildAppMenuTemplate(opts: {
     label: t.window,
     submenu: [
       { label: t.minimize, role: "minimize" },
-      { label: t.zoom, role: "zoom" },
-      ...(isMac ? [{ type: "separator" as const }, { role: "front" as const }] : []),
+      // zoom 角色只在 macOS 存在
+      ...(isMac
+        ? [
+            { label: t.zoom, role: "zoom" as const },
+            { type: "separator" as const },
+            { role: "front" as const },
+          ]
+        : []),
     ],
   }
 

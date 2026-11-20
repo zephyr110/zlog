@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { BookOpen, PenLine } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { isDesktopBuild } from "@/lib/desktop"
+import { confirmDesktopNavigation } from "@/lib/desktop-commands"
 import { useT } from "@/components/layout/trans"
 
 const LAST_WRITING_KEY = "zlog.desktop.lastWritingPath"
@@ -13,7 +14,15 @@ const DEFAULT_WRITING_PATH = "/admin/dashboard"
 function lastWritingPath(): string {
   try {
     const stored = localStorage.getItem(LAST_WRITING_KEY)
-    if (stored?.startsWith("/admin") && stored !== "/admin/login") return stored
+    if (stored) {
+      // 编辑页靠 ?slug= 定位；只存路径会把用户打回 /admin/posts
+      const url = new URL(stored, "http://localhost")
+      const isAdmin =
+        url.pathname === "/admin" || url.pathname.startsWith("/admin/")
+      if (isAdmin && url.pathname !== "/admin/login") {
+        return url.pathname + url.search
+      }
+    }
   } catch {}
   return DEFAULT_WRITING_PATH
 }
@@ -31,14 +40,16 @@ export function DesktopModeSwitch({ className }: { className?: string }) {
   useEffect(() => {
     if (!isDesktopBuild() || !writing || !pathname) return
     try {
-      localStorage.setItem(LAST_WRITING_KEY, pathname)
+      localStorage.setItem(LAST_WRITING_KEY, pathname + window.location.search)
     } catch {}
   }, [pathname, writing])
 
   if (!isDesktopBuild()) return null
 
   const enterReading = () => {
-    if (writing) router.push("/")
+    if (!writing) return
+    if (!confirmDesktopNavigation(t("site.desktopLeaveUnsaved"))) return
+    router.push("/")
   }
   const enterWriting = () => {
     if (writing) return

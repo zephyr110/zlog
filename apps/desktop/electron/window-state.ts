@@ -82,15 +82,16 @@ export function clampWindowBounds(
         y: Math.round(target.y + (target.height - fitHeight) / 2),
       }
 
+  // 工作区比最小可见量还小时上下界会倒挂，clamp 会把窗口推出屏幕，退回工作区原点
+  const xLo = target.x - fitWidth + MIN_VISIBLE
+  const xHi = target.x + target.width - MIN_VISIBLE
+  const yLo = target.y
+  const yHi = target.y + target.height - MIN_VISIBLE
   return {
     width: fitWidth,
     height: fitHeight,
-    x: Math.round(
-      clamp(anchored.x, target.x - fitWidth + MIN_VISIBLE, target.x + target.width - MIN_VISIBLE)
-    ),
-    y: Math.round(
-      clamp(anchored.y, target.y, target.y + target.height - MIN_VISIBLE)
-    ),
+    x: Math.round(xLo > xHi ? target.x : clamp(anchored.x, xLo, xHi)),
+    y: Math.round(yLo > yHi ? target.y : clamp(anchored.y, yLo, yHi)),
   }
 }
 
@@ -112,9 +113,7 @@ export class WindowStateStore {
         !isFiniteNumber(b.x) ||
         !isFiniteNumber(b.y) ||
         !isFiniteNumber(b.width) ||
-        !isFiniteNumber(b.height) ||
-        b.width < MIN_SAVED_WIDTH ||
-        b.height < MIN_SAVED_HEIGHT
+        !isFiniteNumber(b.height)
       ) {
         return null
       }

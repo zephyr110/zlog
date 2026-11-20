@@ -24,6 +24,8 @@ test("desktop shell: mode switch and native menu navigate in-app", async () => {
 
   try {
     const win = await app.firstWindow()
+    // 首个窗口先是 about:blank，等主进程把本地服务地址载入后再取 base
+    await win.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 30_000 })
     await win.waitForLoadState("domcontentloaded")
     const base = win.url().replace(/\/$/, "")
 
@@ -39,8 +41,8 @@ test("desktop shell: mode switch and native menu navigate in-app", async () => {
       "aria-pressed",
       "true"
     )
-    // 根壳已挂载（主进程据此决定是否退回整页跳转）
-    expect(await win.evaluate(() => window.__zlogDesktopShell)).toBe(true)
+    // 根壳已挂载（主进程据此决定是否退回整页跳转）；等待水合完成
+    await win.waitForFunction(() => window.__zlogDesktopShell === true)
 
     // 视图 → 阅读模式：站内跳转，不整页刷新
     const clickedReading = await app.evaluate(({ Menu }) => {
@@ -78,7 +80,8 @@ test("desktop shell: mode switch and native menu navigate in-app", async () => {
     expect(clickedPosts).toBe(true)
     await win.waitForURL(/\/admin\/posts$/, { timeout: 15_000 })
   } finally {
-    await app.close()
+    // 启动失败时 app 可能没起来；清理失败不能盖掉真实错误
+    await app.close().catch(() => {})
     rmSync(userData, { recursive: true, force: true })
   }
 })
