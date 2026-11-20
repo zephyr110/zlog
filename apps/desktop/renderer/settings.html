@@ -233,7 +233,6 @@
 
     /* ── 首启模式的品牌头部（设置模式隐藏） ─────────────────────── */
     .brand {
-      position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -255,38 +254,6 @@
     }
     .brand .subtitle { text-align: center; }
     body.mode-settings .brand { display: none; }
-    /* 首启语言切换放右上角，不把语言面板塞回向导 */
-    .firstrun-lang {
-      position: absolute;
-      top: 0;
-      right: 0;
-      display: flex;
-      gap: 2px;
-      padding: 2px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      background: var(--muted);
-    }
-    .firstrun-lang button {
-      height: 26px;
-      padding: 0 10px;
-      font: inherit;
-      font-size: 12px;
-      color: var(--muted-foreground);
-      background: transparent;
-      border: 0;
-      border-radius: calc(var(--radius-md) - 2px);
-      cursor: pointer;
-    }
-    .firstrun-lang button[aria-pressed="true"] {
-      color: var(--foreground);
-      background: var(--card);
-      box-shadow: 0 1px 2px oklch(0 0 0 / 0.06);
-    }
-    .firstrun-lang button:focus-visible {
-      outline: 2px solid var(--ring);
-      outline-offset: 1px;
-    }
 
     /* ── 分区分隔（首启模式） ────────────────────────────────────── */
     .divider {
@@ -324,34 +291,6 @@
       color: var(--muted-foreground);
     }
     .block-title .opt.req { color: var(--destructive); }
-    /* 首启把同步折叠成摘要行；设置模式由侧栏承担标题，摘要隐藏 */
-    .sync-summary {
-      align-items: center;
-      cursor: pointer;
-      list-style: none;
-      user-select: none;
-    }
-    .sync-summary::-webkit-details-marker { display: none; }
-    .sync-summary-hint {
-      margin-left: 6px;
-      font-size: 12px;
-      font-weight: 400;
-      color: var(--muted-foreground);
-    }
-    .sync-chevron {
-      margin-left: auto;
-      transition: transform 0.15s ease;
-    }
-    .sync-group[open] .sync-chevron { transform: rotate(180deg); }
-    .sync-summary:focus-visible {
-      border-radius: var(--radius-sm);
-      outline: 2px solid var(--ring);
-      outline-offset: 2px;
-    }
-    body.mode-settings .sync-summary { display: none; }
-    @media (prefers-reduced-motion: reduce) {
-      .sync-chevron { transition: none; }
-    }
     .block {
       display: flex;
       flex-direction: column;
@@ -855,10 +794,6 @@
   <main class="content">
     <!-- 首启模式品牌头部 -->
     <header class="brand">
-      <div class="firstrun-lang" id="firstRunLang" role="group" aria-label="语言">
-        <button type="button" data-lang-choice="zh" aria-pressed="false">中文</button>
-        <button type="button" data-lang-choice="en" aria-pressed="false">English</button>
-      </div>
       <img class="brand-logo" src="../assets/tray.png" alt="" />
       <h1 id="title" data-i18n="firstrun.title">Zlog 首次设置</h1>
       <p class="subtitle" id="subtitle" data-i18n="firstrun.subtitle">
@@ -907,13 +842,9 @@
         </div>
       </div>
 
-      <details class="group sync-group" id="syncDetails" open>
-        <!-- 摘要行仅首启需要（设置模式页头已是「同步设置」）。 -->
-        <summary class="block-title panel-title sync-summary">
-          <span data-i18n="sync.title">同步设置</span><span class="opt" data-i18n="tag.optional">（可选）</span>
-          <span class="sync-summary-hint" data-i18n="firstrun.syncHint">稍后可在设置中补充</span>
-          <svg class="icon sync-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-        </summary>
+      <div class="group">
+        <!-- 块标题仅首启需要（设置模式页头已是「同步设置」）。 -->
+        <h2 class="block-title panel-title"><span data-i18n="sync.title">同步设置</span><span class="opt" data-i18n="tag.optional">（可选）</span></h2>
         <div class="block">
         <div class="field">
           <label for="syncUrl" data-i18n="sync.url">数据库 URL</label>
@@ -965,7 +896,7 @@
           </li>
         </ol>
         </div>
-      </details>
+      </div>
     </section>
 
     <!-- 面板：线上部署（一键部署 + 手动步骤；外链走系统浏览器） -->
