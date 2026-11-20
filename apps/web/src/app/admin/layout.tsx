@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
 import { Search } from "lucide-react"
 import { IconButton } from "@/components/ui/icon-button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { DesktopModeSwitch } from "@/components/desktop/desktop-mode-switch"
 import { type AuthUser } from "@zlog/auth"
 import type { TranslationPath } from "@/lib/i18n"
 
@@ -221,6 +222,8 @@ export default function AdminLayout({
               </kbd>
             </TooltipContent>
           </Tooltip>
+          {/* 桌面端：阅读/写作切换（Web 构建下渲染为 null） */}
+          <DesktopModeSwitch />
           {/* Page primary actions portaled in via <HeaderActions /> */}
           <div
             id="admin-header-actions"

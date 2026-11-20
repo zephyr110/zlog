@@ -5,6 +5,11 @@ const isExport = process.env.NEXT_EXPORT === "true"
 const isDesktop = process.env.NEXT_DESKTOP === "true"
 
 const nextConfig: NextConfig = {
+  // 桌面开关的唯一来源：NEXT_PUBLIC_* 只在构建期内联，运行时注入影响不到
+  // SSR/客户端；从 NEXT_DESKTOP 派生，避免 prepare-standalone 与根 build:desktop 漂移。
+  env: {
+    NEXT_PUBLIC_DESKTOP: isDesktop ? "1" : "0",
+  },
   ...(isExport
     ? {
         output: "export" as const,
