@@ -19,6 +19,7 @@ const I18N = {
     "nav.about": "关于",
     "firstrun.title": "Zlog 首次设置",
     "firstrun.subtitle": "创建管理员账号；同步可稍后在设置中补充",
+    "firstrun.syncHint": "稍后可在设置中补充",
     "settings.title": "Zlog 设置",
     "sync.title": "同步设置",
     "sync.subtitle": "配置 Turso 双向同步，未配置则纯本地运行",
@@ -147,6 +148,7 @@ const I18N = {
     "status.fillUsername": "请填写用户名",
     "status.passwordRule": "密码至少 6 位，且两次输入一致",
     "status.syncUrlInvalid": "数据库 URL 需以 libsql:// 开头，如 libsql://your-db.turso.io",
+    "status.syncPairRequired": "数据库 URL 和 Token 需要同时填写，或都留空",
     "status.httpsProxyInvalid": "代理格式应为 http://主机:端口 或 socks5://主机:端口",
     "status.sync": "同步",
     "status.configured": "已配置",
@@ -170,6 +172,7 @@ const I18N = {
     "nav.about": "About",
     "firstrun.title": "Zlog First-Time Setup",
     "firstrun.subtitle": "Create an admin account; sync can be added later in Settings",
+    "firstrun.syncHint": "You can add this later in Settings",
     "settings.title": "Zlog Settings",
     "sync.title": "Sync",
     "sync.subtitle": "Configure Turso two-way sync; without it the app runs fully local",
@@ -298,6 +301,7 @@ const I18N = {
     "status.fillUsername": "Please enter a username",
     "status.passwordRule": "Password must be at least 6 characters and match the confirmation",
     "status.syncUrlInvalid": "Database URL must start with libsql://, e.g. libsql://your-db.turso.io",
+    "status.syncPairRequired": "Enter both the database URL and token, or leave both empty",
     "status.httpsProxyInvalid": "Proxy must look like http://host:port or socks5://host:port",
     "status.sync": "Sync",
     "status.configured": "Configured",
@@ -325,6 +329,12 @@ function t(key) {
 function applyLang() {
   document.documentElement.lang = lang
   document.title = t(isFirstRun ? "firstrun.title" : "settings.title")
+  // 首启语言分段按钮跟随生效语言（system 已在主进程解析，不是偏好值）
+  const firstRunLang = document.getElementById("firstRunLang")
+  if (firstRunLang) firstRunLang.setAttribute("aria-label", t("lang.title"))
+  for (const btn of document.querySelectorAll("[data-lang-choice]")) {
+    btn.setAttribute("aria-pressed", String(btn.dataset.langChoice === lang))
+  }
   for (const el of document.querySelectorAll("[data-i18n]")) {
     el.textContent = t(el.dataset.i18n)
   }
@@ -477,6 +487,8 @@ if (isFirstRun) {
   document.getElementById("panel-publish").style.display = "none"
   document.getElementById("panel-about").style.display = "none"
   document.getElementById("contentHeader").style.display = "none"
+  // 同步是可选能力，首启默认折叠；保存校验失败时会重新展开
+  document.getElementById("syncDetails").open = false
   document.getElementById("username").focus()
 } else {
   document.getElementById("passwordFields").style.display = "none"
@@ -583,6 +595,21 @@ for (const item of langPopup.querySelectorAll(".select-item")) {
       applyLang()
     }
     setLangPopupOpen(false)
+  })
+}
+// 首启头部的中/英切换：写入全局语言偏好，窗口内立即重渲染
+for (const btn of document.querySelectorAll("[data-lang-choice]")) {
+  btn.addEventListener("click", async () => {
+    const pref = btn.dataset.langChoice
+    let res
+    try {
+      res = await zlogApi?.setLang?.(pref)
+    } catch {
+      res = null
+    }
+    currentPref = pref
+    lang = res && res.ok && res.state ? res.state.resolved : pref
+    applyLang()
   })
 }
 
@@ -711,7 +738,12 @@ async function doSave() {
   const username = document.getElementById("username")
   const password = document.getElementById("password")
   const password2 = document.getElementById("password2")
-  for (const el of [username, password, password2]) el.removeAttribute("aria-invalid")
+  const syncUrl = document.getElementById("syncUrl")
+  const syncToken = document.getElementById("syncToken")
+  const syncDetails = document.getElementById("syncDetails")
+  for (const el of [username, password, password2, syncUrl, syncToken]) {
+    el.removeAttribute("aria-invalid")
+  }
   if (isFirstRun) {
     if (!cfg.username) {
       username.setAttribute("aria-invalid", "true")
@@ -730,10 +762,19 @@ async function doSave() {
   // 同步 URL 格式校验：填错（如误填用户名）会让 libsql 解析 panic 崩溃。
   // 与主进程 validate.ts 保持一致（渲染层无法 import，需同步维护）
   if (cfg.syncUrl && !/^libsql:\/\//.test(cfg.syncUrl)) {
-    const syncUrl = document.getElementById("syncUrl")
+    syncDetails.open = true
     syncUrl.setAttribute("aria-invalid", "true")
     syncUrl.focus()
     showStatus(t("status.syncUrlInvalid"), true)
+    return
+  }
+  // URL 与 Token 必须成对：只填一个会得到「连不上云端」的隐晦错误
+  if (!!cfg.syncUrl !== !!cfg.syncToken) {
+    const missing = cfg.syncUrl ? syncToken : syncUrl
+    syncDetails.open = true
+    missing.setAttribute("aria-invalid", "true")
+    missing.focus()
+    showStatus(t("status.syncPairRequired"), true)
     return
   }
   const httpsProxyEl = document.getElementById("httpsProxy")

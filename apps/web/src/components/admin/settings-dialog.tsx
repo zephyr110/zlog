@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator"
 import { SiteInfoForm } from "@/components/admin/site-info-form"
 import { AppearanceForm } from "@/components/admin/appearance-form"
 import { ChangePasswordForm } from "@/components/admin/change-password-form"
-import { apiFetch } from "@/lib/api-client"
+import { RecoveryKeyPanel } from "@/components/admin/recovery-key-panel"
 import { useT } from "@/components/layout/trans"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -30,43 +30,21 @@ interface SettingsDialogProps {
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { t } = useT()
   const [panel, setPanel] = useState<SettingsPanel>("site")
-  // Newly generated recovery key — shown once until confirmed saved.
-  const [newRecoveryKey, setNewRecoveryKey] = useState<string | null>(null)
-  const [generatingKey, setGeneratingKey] = useState(false)
+  // 新密钥在确认保存前保持可见；明文归面板所有，弹窗只需要知道能否关闭。
+  const [hasUnsavedKey, setHasUnsavedKey] = useState(false)
 
-  async function handleGenerateRecoveryKey() {
-    setGeneratingKey(true)
-    try {
-      // apiFetch already redirects to login on 401, so no manual handling
-      // is needed here (unlike change-password, which is exempt).
-      const res = await apiFetch("/api/auth/recovery", { method: "POST" })
-      const data = await res.json()
-      if (res.ok) {
-        setNewRecoveryKey(data.recoveryKey)
-      } else {
-        toast.error(data.error || t("admin.recoveryKeyGenerateFailed"))
-      }
-    } catch {
-      toast.error(t("admin.networkError"))
-    } finally {
-      setGeneratingKey(false)
-    }
-  }
-
-  // Closing the dialog with a fresh key still on screen: the server has
-  // already replaced the old key, so warn (the plaintext is shown only
-  // once — it will be gone) and clear it to keep the once-only guarantee.
+  // 带未保存密钥关闭：服务端已替换旧密钥，明文只显示一次，提醒后随弹窗卸载丢弃。
   function handleOpenChange(next: boolean) {
-    if (!next && newRecoveryKey) {
+    if (!next && hasUnsavedKey) {
       toast.warning(t("admin.recoveryKeyCloseWarning"))
-      setNewRecoveryKey(null)
+      setHasUnsavedKey(false)
     }
     if (!next) setPanel("site")
     onOpenChange(next)
   }
 
   function selectPanel(next: SettingsPanel) {
-    if (next !== "account" && newRecoveryKey) {
+    if (next !== "account" && hasUnsavedKey) {
       toast.warning(t("admin.recoveryKeyOnceOnly"))
       return
     }
@@ -168,66 +146,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   </section>
                   <Separator />
                   <section>
-                    {newRecoveryKey ? (
-                      <div className="space-y-3">
-                        <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                          {t("admin.recoveryKeyOnceOnly")}
-                        </p>
-                        <div className="rounded-lg border bg-muted/50 px-3 py-2.5">
-                          <p className="select-all break-all text-center font-mono text-sm font-semibold tracking-[0.12em]">
-                            {newRecoveryKey}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              navigator.clipboard
-                                .writeText(newRecoveryKey)
-                                .then(() =>
-                                  toast.success(t("admin.keyCopied"))
-                                )
-                                .catch(() =>
-                                  toast.error(t("admin.copyFailed"))
-                                )
-                            }}
-                          >
-                            {t("admin.copyRecoveryKey")}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => setNewRecoveryKey(null)}
-                          >
-                            {t("admin.recoveryKeySaved")}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium">
-                            {t("admin.recoveryKey")}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {t("admin.recoveryKeyHint")}
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={generatingKey}
-                          onClick={handleGenerateRecoveryKey}
-                        >
-                          {generatingKey
-                            ? t("admin.generatingKey")
-                            : t("admin.generateRecoveryKey")}
-                        </Button>
-                      </div>
-                    )}
+                    <RecoveryKeyPanel
+                      onGenerated={() => setHasUnsavedKey(true)}
+                      onSaved={() => setHasUnsavedKey(false)}
+                    />
                   </section>
                 </div>
               </>
