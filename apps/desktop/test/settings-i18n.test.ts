@@ -124,6 +124,19 @@ describe("settings i18n coverage", () => {
     expect(html).not.toContain("guide-step-head")
   })
 
+  it("首启语言切换与可选同步折叠", () => {
+    expect(zh).toContain("firstrun.syncHint")
+    expect(en).toContain("firstrun.syncHint")
+    expect(zh).toContain("status.syncPairRequired")
+    expect(en).toContain("status.syncPairRequired")
+    expect(html).toContain('id="firstRunLang"')
+    expect(html).toContain('data-lang-choice="zh"')
+    expect(html).toContain('data-lang-choice="en"')
+    expect(html).toMatch(/<details[^>]*id="syncDetails"[^>]*open/)
+    expect(js).toContain('getElementById("syncDetails").open = false')
+    expect(js).toContain('t("status.syncPairRequired")')
+  })
+
   it("英文侧栏文案不含汉字，且短到单行放得下", () => {
     const enBlock = js.match(/en: \{([\s\S]*?)\n  \},\n\}/)![1]
     const nav: Record<string, string> = {}

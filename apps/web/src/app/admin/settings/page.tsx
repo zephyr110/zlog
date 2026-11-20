@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Separator } from "@/components/ui/separator"
 import { SiteInfoForm } from "@/components/admin/site-info-form"
 import { ChangePasswordForm } from "@/components/admin/change-password-form"
+import { RecoveryKeyPanel } from "@/components/admin/recovery-key-panel"
 import { apiFetch } from "@/lib/api-client"
 import { useT } from "@/components/layout/trans"
 
@@ -54,6 +55,17 @@ export default function AdminSettingsPage() {
         </CardHeader>
         <CardContent>
           <ChangePasswordForm idPrefix="page-pw" className="max-w-sm" />
+        </CardContent>
+      </Card>
+
+      {/* Recovery Key */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("admin.recoveryKey")}</CardTitle>
+          <CardDescription>{t("admin.recoveryKeyHint")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RecoveryKeyPanel showHeading={false} />
         </CardContent>
       </Card>
 
