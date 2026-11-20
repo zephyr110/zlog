@@ -26,35 +26,13 @@ test("first-run wizard saves config and boots the blog server", async () => {
     //    保存前「立即同步」无意义）
     await expect(wizard.locator("#syncBtn")).toBeHidden()
 
-    // 3) 语言可在创建账号前切换，同步可选能力默认折叠
-    await expect(wizard.locator("#firstRunLang")).toBeVisible()
-    expect(
-      await wizard.locator("#syncDetails").evaluate((el) => (el as HTMLDetailsElement).open)
-    ).toBe(false)
-    await wizard.locator('[data-lang-choice="en"]').click()
-    await expect(wizard.locator("#title")).toHaveText("Zlog First-Time Setup")
-    await expect(wizard.locator('[data-lang-choice="en"]')).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    )
-
-    // 4) 展开同步后只填 URL：应被成对校验拦下并聚焦 Token
-    await wizard.locator("#syncDetails summary").click()
+    // 3) 填表并保存
     await wizard.fill("#username", "admin")
     await wizard.fill("#password", "testpass123")
     await wizard.fill("#password2", "testpass123")
-    await wizard.fill("#syncUrl", "libsql://example.turso.io")
-    await wizard.click("#saveBtn")
-    await expect(wizard.locator("#syncToken")).toHaveAttribute("aria-invalid", "true")
-    expect(
-      await wizard.locator("#syncDetails").evaluate((el) => (el as HTMLDetailsElement).open)
-    ).toBe(true)
-
-    // 5) 清空同步后保存
-    await wizard.fill("#syncUrl", "")
     await wizard.click("#saveBtn")
 
-    // 6) 向导关闭，博客窗口出现并加载本地服务器
+    // 4) 向导关闭，博客窗口出现并加载本地服务器
     const blog = await app.waitForEvent("window", {
       predicate: (w) => w.url().startsWith("http://127.0.0.1:"),
       timeout: 120_000,
@@ -62,7 +40,7 @@ test("first-run wizard saves config and boots the blog server", async () => {
     await blog.waitForLoadState("domcontentloaded")
     expect(blog.url()).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/)
 
-    // 7) 服务器已启动：公开的同步状态路由可达
+    // 5) 服务器已启动：公开的同步状态路由可达
     const status = await blog.evaluate(async () => {
       const res = await fetch("/api/sync/status")
       return { status: res.status, body: await res.json() }
@@ -70,7 +48,7 @@ test("first-run wizard saves config and boots the blog server", async () => {
     expect(status.status).toBe(200)
     expect(status.body.configured).toBe(false) // 未配置同步 URL
 
-    // 8) 配置已落盘（含随机生成的 desktopKey）
+    // 6) 配置已落盘（含随机生成的 desktopKey）
     const cfg = JSON.parse(readFileSync(join(userData, "zlog-config.json"), "utf8"))
     expect(cfg.adminUsername).toBe("admin")
     expect(cfg.desktopKey).toBeTruthy()

@@ -18,7 +18,6 @@ import { useCommentUnread } from "@/components/admin/comment-unread"
 import { cn } from "@/lib/utils"
 import { FileText, PenLine, Clock, Tag, MessageSquare } from "lucide-react"
 import { AdminBlockEmpty } from "@/components/admin/admin-block-empty"
-import { OnboardingChecklist } from "@/components/admin/onboarding-checklist"
 import { type PostSummary } from "@zlog/database"
 
 export default function AdminDashboardPage() {
@@ -228,9 +227,6 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="flex flex-col gap-8 md:gap-10">
-      {/* 首次登录引导；关闭或完成后自行隐藏。 */}
-      <OnboardingChecklist />
-
       {/* Statistics — stat cards + contribution calendar */}
       <section className="flex flex-col gap-5 md:gap-6">
         <h2 className="text-xl font-semibold tracking-tight">
