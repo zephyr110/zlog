@@ -18,6 +18,8 @@ node_modules/
 *.db
 *.db-wal
 *.db-shm
+*.sqlite-wal
+*.sqlite-shm
 
 # worktrees
 .claude/worktrees/

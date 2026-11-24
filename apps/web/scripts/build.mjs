@@ -4,10 +4,16 @@ import { createRequire } from "node:module"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { isDatabaseUnavailable } from "./db-availability.mjs"
+import {
+  shouldBuildFromSnapshot,
+  snapshotBuildEnv,
+  withSnapshotCopy,
+} from "./build-snapshot.mjs"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const webDir = join(here, "..")
 const repoRoot = join(webDir, "..", "..")
+const snapshotDb = join(webDir, "fallback", "public-snapshot.sqlite")
 const localNext = join(
   webDir,
   "node_modules",
@@ -98,6 +104,21 @@ function runNextBuild(env) {
 }
 
 /**
+ * 远端不可用时用仓库内置快照预渲染公开页（ISR）。运行时仍连远端：
+ * 配额恢复后首次 revalidate 就会换回线上数据；被挡期间继续发旧页面。
+ */
+function runSnapshotBuild(reason) {
+  return withSnapshotCopy(snapshotDb, (dbPath) => {
+    console.warn(
+      `[build] database not usable (${reason}); ` +
+        "prerendering public pages from the bundled snapshot\n" +
+        "[build] pages refresh through ISR once the database accepts reads again"
+    )
+    return runNextBuild(snapshotBuildEnv(process.env, dbPath))
+  })
+}
+
+/**
  * 远端不可用时本次构建不预热任何读库页面：注入 force-dynamic，并用
  * ZLOG_BUILD_NO_DB 让动态路由的 generateStaticParams 返回空（force-dynamic
  * 本身不跳过该阶段）。构建后无条件还原源码，失败也不能污染工作树。
@@ -128,6 +149,20 @@ if (process.env.NEXT_DESKTOP !== "true") {
       `[build] database preflight failed (configuration error): ${probe.error?.message ?? probe.error}`
     )
     process.exit(1)
+  }
+
+  if (
+    shouldBuildFromSnapshot({
+      status: probe.status,
+      snapshotExists: existsSync(snapshotDb),
+      env: process.env,
+    })
+  ) {
+    const reason =
+      probe.status === "missing"
+        ? "no database configured for this deployment"
+        : probe.error?.message ?? "unknown error"
+    process.exit(runSnapshotBuild(reason))
   }
 
   if (probe.status === "unavailable") {
