@@ -23,10 +23,12 @@ exports.default = async function afterPack(context) {
 
   const appName = context.packager.appInfo.productFilename
   const appPath = path.join(appOutDir, `${appName}.app`)
-  // 已签名（真实证书——electron-builder 的正式签名在 afterPack 之后执行，
-  // 但也可能来自机器钥匙串自动检出）→ 跳过 ad-hoc，避免覆盖正式签名
+  // 已签名且有效（真实证书——electron-builder 的正式签名在 afterPack 之后执行，
+  // 但也可能来自机器钥匙串自动检出）→ 跳过 ad-hoc，避免覆盖正式签名。
+  // 必须 --verify：打包改动了 Electron 自带 ad-hoc 签名的内容，-dv 只查是否存在，
+  // 会把这种失效签名误判成"已签名"而跳过。
   try {
-    execFileSync("codesign", ["-dv", appPath], { stdio: "ignore" })
+    execFileSync("codesign", ["--verify", "--deep", "--strict", appPath], { stdio: "ignore" })
     console.log(`[after-pack] already signed, skipping ad-hoc: ${appPath}`)
     return
   } catch {
