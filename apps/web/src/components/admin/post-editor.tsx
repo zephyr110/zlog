@@ -256,6 +256,16 @@ export function PostEditor({ initialPost, isNew = false }: PostEditorProps) {
     return () => window.removeEventListener("beforeunload", handler)
   }, [hasUnsavedChanges])
 
+  // 桌面根壳在站内跳转前读这个标记做确认（主窗口没有 beforeunload 的拦截权）。
+  // 依赖布尔值而非 hasUnsavedChanges：保存后 ref 更新但 state 未变时 callback 身份不变，标记会停在 true。
+  const dirty = hasUnsavedChanges()
+  useEffect(() => {
+    window.__zlogEditorDirty = dirty
+    return () => {
+      window.__zlogEditorDirty = false
+    }
+  }, [dirty])
+
   // Keep a ref to the latest savePost so the keyboard shortcut doesn't
   // re-register on every render or close over stale state.
   const savePostRef = useRef(savePost)

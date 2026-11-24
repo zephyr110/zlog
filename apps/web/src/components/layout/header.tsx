@@ -14,6 +14,7 @@ import { Menu, X, ChevronDown } from "lucide-react"
 import { categoryMeta } from "@/lib/categories"
 import { SearchInput } from "@/components/layout/search-input"
 import { MobileNav } from "@/components/layout/mobile-nav"
+import { DesktopModeSwitch } from "@/components/desktop/desktop-mode-switch"
 import type { NavCategory } from "@/lib/nav-links"
 
 export function Header({ categories }: { categories: NavCategory[] }) {
@@ -192,6 +193,9 @@ export function Header({ categories }: { categories: NavCategory[] }) {
             {/* Utility — search stays last at the far right; theme and
                 language live in the footer and mobile menu. */}
             <SearchInput />
+
+            {/* 桌面端：阅读/写作切换（Web 构建下渲染为 null） */}
+            <DesktopModeSwitch className="ml-1" />
 
             {/* Mobile menu toggle */}
             <IconButton
