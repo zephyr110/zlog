@@ -1,14 +1,22 @@
-/* Shared rehype pipeline for article content — the ONE place that
+/* Shared remark/rehype pipeline for article content — the ONE place that
    encodes plugin order. Consumed by the public post page (MDXRenderer,
    next-mdx-remote/rsc) and the admin editor preview (serialize +
    MDXRemote on the client), so both surfaces render identically.
 
    Order matters: rehypeMermaidBlock must run BEFORE rehype-pretty-code
    (it empties mermaid pres, which pretty-code would otherwise treat as
-   block code and highlight as plaintext). */
+   block code and highlight as plaintext). remark-math turns $/$$ into
+   math nodes so MDX stops parsing the LaTeX braces as JSX expressions;
+   rehype-katex renders those nodes last. Content still using \(...\)/
+   \[...\] goes through normalizeMathDelimiters before MDX sees it. */
 
+import remarkGfm from "remark-gfm"
+import remarkMath from "remark-math"
+import rehypeKatex from "rehype-katex"
 import rehypePrettyCode, { type Options } from "rehype-pretty-code"
 import { rehypeMermaidBlock } from "@/lib/rehype-mermaid-block"
+
+export const blogRemarkPlugins = [remarkGfm, remarkMath] as never[]
 
 const rehypePrettyCodeOptions: Options = {
   // Dual themes: every token span gets `--shiki-light`/`--shiki-dark` CSS
@@ -33,4 +41,5 @@ const rehypePrettyCodeOptions: Options = {
 export const blogRehypePlugins = [
   rehypeMermaidBlock,
   [rehypePrettyCode, rehypePrettyCodeOptions] as never,
+  rehypeKatex,
 ] as never[]

@@ -272,6 +272,12 @@
   .code-block [data-highlighted-line]::before {
     color: #71717a;
   }
+  /* 块级公式（$$）比正文列宽时在公式内部横向滚动，而不是撑破版面。 */
+  .prose .katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.25em 0;
+  }
 }
 /* Banner grid: percentage cells end on a whole cell on both axes at any
    viewport; the per-breakpoint counts keep cells near 56px. */
