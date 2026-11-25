@@ -46,7 +46,7 @@ const LOGIN_SUBMIT_CLASSES =
    50px cells. X phase puts a line on the card's left edge (450px = 9
    cells, so the right edge too). Y phase centres the tiles and backs off
    half the card height, putting a line on the card's top edge; the card
-   is centred and both heights (400/500) are whole cells, so the bottom
+   is centred and both heights (350/500) are whole cells, so the bottom
    edge lands on a line as well. Percentages in background-position
    resolve against (container − tile), hence the +25px half-cell
    correction; without it every line sits 25px off the card.
@@ -193,7 +193,7 @@ export default function AdminLoginPage() {
     <div
       className={cn(
         "relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12 [--card-w:450px]",
-        mode === "login" ? "[--card-h:400px]" : "[--card-h:500px]"
+        mode === "login" ? "[--card-h:350px]" : "[--card-h:500px]"
       )}
     >
       {/* Top glow — a FLAT ellipse sliced along its horizontal axis, the
@@ -281,7 +281,7 @@ export default function AdminLoginPage() {
         <Card
           className={cn(
             "w-full gap-0 py-0 ring-foreground/10 shadow-xl shadow-foreground/[0.04] dark:shadow-black/30 animate-in fade-in slide-in-from-bottom-3 duration-500 fill-mode-both [animation-delay:80ms]",
-            // Whole grid cells (400/500) so both edges land on lines. Only
+            // Whole grid cells (350/500) so both edges land on lines. Only
             // pinned where the brand above still fits; short viewports keep
             // the natural height and give up edge alignment instead of
             // clipping.
@@ -291,12 +291,12 @@ export default function AdminLoginPage() {
           <CardContent
             className={cn(
               "flex h-full flex-col justify-center",
-              mode === "login" ? "p-7 sm:p-8" : "p-6 sm:p-7"
+              mode === "login" ? "p-7" : "p-6 sm:p-7"
             )}
           >
             {mode === "login" ? (
               <form onSubmit={handleSubmit} className="flex flex-1 flex-col">
-                <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-5">
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="username">{t("admin.username")}</Label>
                     <Input
@@ -307,7 +307,7 @@ export default function AdminLoginPage() {
                       onChange={(e) => setUsername(e.target.value)}
                       autoComplete="username"
                       required
-                      className="h-11 px-3"
+                      className="h-10 px-3"
                     />
                   </div>
 
@@ -321,7 +321,7 @@ export default function AdminLoginPage() {
                         onChange={(e) => setPassword(e.target.value)}
                         autoComplete="current-password"
                         required
-                        className="h-11 px-3 pr-10"
+                        className="h-10 px-3 pr-10"
                       />
                       <button
                         type="button"
@@ -341,7 +341,7 @@ export default function AdminLoginPage() {
 
                 <Button
                   type="submit"
-                  className={cn(LOGIN_SUBMIT_CLASSES, "mt-8")}
+                  className={cn(LOGIN_SUBMIT_CLASSES, "mt-6")}
                   disabled={loading}
                 >
                   {loading ? (
