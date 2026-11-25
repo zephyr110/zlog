@@ -9,7 +9,7 @@ export default function HomeLoading() {
       {/* Hero skeleton — avoid "0 articles" flash */}
       <section
         className={cn(
-          "relative flex flex-col overflow-hidden border-b bg-background",
+          "relative flex flex-col overflow-hidden bg-background",
           pageBannerMinClass
         )}
       >

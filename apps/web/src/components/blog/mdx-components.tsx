@@ -120,7 +120,7 @@ export const mdxComponents = {
     <img
       src={src}
       alt={alt || ""}
-      className="rounded-xl shadow-lg border border-border/60"
+      className="rounded-xl border border-border/60 transition-shadow duration-200 hover:shadow-lg"
       loading="lazy"
       {...props}
     />
@@ -197,7 +197,7 @@ export const mdxComponents = {
 
   // Tables - clean, minimal with hover rows
   table: ({ children, ...props }: React.TableHTMLAttributes<HTMLTableElement>) => (
-    <div className="overflow-x-auto my-8 rounded-xl border border-border/60 shadow-sm">
+    <div className="overflow-x-auto my-8 rounded-xl border border-border/60">
       <table className="w-full text-sm" {...props}>
         {children}
       </table>

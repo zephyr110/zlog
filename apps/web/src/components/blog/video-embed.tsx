@@ -20,7 +20,7 @@ export function VideoEmbed({ provider, id, title }: VideoEmbedProps) {
     (provider === "bilibili" ? "Bilibili video" : "YouTube video")
 
   return (
-    <div className="my-6 w-full overflow-hidden rounded-xl border border-border/60 shadow-lg">
+    <div className="my-6 w-full overflow-hidden rounded-xl border border-border/60 transition-shadow duration-200 hover:shadow-lg">
       <div className="relative aspect-video w-full bg-muted">
         {active ? (
           <iframe

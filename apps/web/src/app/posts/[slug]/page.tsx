@@ -119,7 +119,7 @@ export default async function PostPage({ params }: PostPageProps) {
         {/* Hero Header */}
         <header
           className={cn(
-            "relative flex flex-col overflow-hidden border-b bg-background",
+            "relative flex flex-col overflow-hidden bg-background",
             pageBannerMinClass
           )}
         >
