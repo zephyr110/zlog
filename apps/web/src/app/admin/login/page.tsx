@@ -46,7 +46,7 @@ const LOGIN_SUBMIT_CLASSES =
    50px cells. X phase puts a line on the card's left edge (450px = 9
    cells, so the right edge too). Y phase centres the tiles and backs off
    half the card height, putting a line on the card's top edge; the card
-   is centred and both heights (350/500) are whole cells, so the bottom
+   is centred and both heights (300/500) are whole cells, so the bottom
    edge lands on a line as well. Percentages in background-position
    resolve against (container − tile), hence the +25px half-cell
    correction; without it every line sits 25px off the card.
@@ -193,7 +193,7 @@ export default function AdminLoginPage() {
     <div
       className={cn(
         "relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12 [--card-w:450px]",
-        mode === "login" ? "[--card-h:350px]" : "[--card-h:500px]"
+        mode === "login" ? "[--card-h:300px]" : "[--card-h:500px]"
       )}
     >
       {/* Top glow — a FLAT ellipse sliced along its horizontal axis, the
@@ -281,7 +281,7 @@ export default function AdminLoginPage() {
         <Card
           className={cn(
             "w-full gap-0 py-0 ring-foreground/10 shadow-xl shadow-foreground/[0.04] dark:shadow-black/30 animate-in fade-in slide-in-from-bottom-3 duration-500 fill-mode-both [animation-delay:80ms]",
-            // Whole grid cells (350/500) so both edges land on lines. Only
+            // Whole grid cells (300/500) so both edges land on lines. Only
             // pinned where the brand above still fits; short viewports keep
             // the natural height and give up edge alignment instead of
             // clipping.
@@ -291,12 +291,12 @@ export default function AdminLoginPage() {
           <CardContent
             className={cn(
               "flex h-full flex-col justify-center",
-              mode === "login" ? "p-7" : "p-6 sm:p-7"
+              mode === "login" ? "p-6" : "p-6 sm:p-7"
             )}
           >
             {mode === "login" ? (
               <form onSubmit={handleSubmit} className="flex flex-1 flex-col">
-                <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="username">{t("admin.username")}</Label>
                     <Input
@@ -341,7 +341,7 @@ export default function AdminLoginPage() {
 
                 <Button
                   type="submit"
-                  className={cn(LOGIN_SUBMIT_CLASSES, "mt-6")}
+                  className={cn(LOGIN_SUBMIT_CLASSES, "mt-5")}
                   disabled={loading}
                 >
                   {loading ? (
@@ -357,7 +357,7 @@ export default function AdminLoginPage() {
                 {/* Secondary links sit at the card's bottom edge; the
                     pt-2 keeps their old 8px gap when the viewport is too
                     short to pin the card height. */}
-                <div className="mt-auto flex flex-col gap-2 pt-2">
+                <div className="mt-auto flex justify-center pt-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -370,13 +370,6 @@ export default function AdminLoginPage() {
                   >
                     {t("admin.forgotPassword")}
                   </button>
-                  <Link
-                    href="/"
-                    className="inline-flex h-8 items-center justify-center gap-1.5 self-center text-xs text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <ArrowLeft size={13} />
-                    {t("admin.backToSite")}
-                  </Link>
                 </div>
               </form>
             ) : (
@@ -458,7 +451,10 @@ export default function AdminLoginPage() {
                   )}
                 </Button>
 
-                <div className="mt-auto flex flex-col gap-2 pt-2">
+                {/* pb-4 balances the flexible gap above: with the 500px
+                    card the leftover space is 120px, so 32px button +
+                    44/44 above/below reads even. */}
+                <div className="mt-auto flex justify-center pt-2 pb-4">
                   <button
                     type="button"
                     onClick={() => {
@@ -475,18 +471,24 @@ export default function AdminLoginPage() {
                   >
                     {t("admin.backToLogin")}
                   </button>
-                  <Link
-                    href="/"
-                    className="inline-flex h-8 items-center justify-center gap-1.5 self-center text-xs text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <ArrowLeft size={13} />
-                    {t("admin.backToSite")}
-                  </Link>
                 </div>
               </form>
             )}
           </CardContent>
         </Card>
+        </div>
+
+        {/* Back to site — outside the card, centred under it. Absolute so
+            the card stays the only in-flow child and its centre keeps the
+            four-edge alignment with the 50px grid. */}
+        <div className="absolute inset-x-0 top-full mt-8 flex justify-center animate-in fade-in duration-500 fill-mode-both [animation-delay:160ms]">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft size={14} />
+            {t("admin.backToSite")}
+          </Link>
         </div>
       </div>
 

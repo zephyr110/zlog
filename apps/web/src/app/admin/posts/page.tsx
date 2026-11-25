@@ -111,14 +111,15 @@ function SelectionCheckbox({
   )
 }
 
-/** Draft / scheduled / published badge, plus a hidden marker — shared by
+/** Draft / scheduled / published badge, plus a hidden badge — shared by
  *  the mobile card and desktop table so the status palette can't drift
- *  between the variants. */
+ *  between the variants. Hidden mirrors the published pill (same filled
+ *  shape) but in rose, so "visible" and "hidden" read as one pair. */
 function StatusBadge({ post }: { post: PostSummary }) {
   const { t } = useT()
   const scheduled = !post.draft && isScheduled(post.publishAt)
   return (
-    <span className="inline-flex flex-wrap items-center gap-1">
+    <span className="inline-flex flex-nowrap items-center gap-1">
       <Badge
         variant={post.draft ? "secondary" : "default"}
         className={
@@ -136,8 +137,10 @@ function StatusBadge({ post }: { post: PostSummary }) {
             : (t("admin.publishedStatus"))}
       </Badge>
       {!post.visible ? (
-        <Badge variant="outline" className="gap-1 text-muted-foreground">
-          <EyeOff className="size-3" />
+        <Badge
+          variant={post.draft ? "secondary" : "default"}
+          className="bg-rose-100 text-rose-700 hover:bg-rose-100 dark:bg-rose-900/30 dark:text-rose-400"
+        >
           {t("admin.hidden")}
         </Badge>
       ) : null}
@@ -851,7 +854,7 @@ function AdminPostsContent() {
                   <TableHead className="w-[32%] min-w-0">
                     {t("admin.title")}
                   </TableHead>
-                  <TableHead className="w-36">{t("admin.status")}</TableHead>
+                  <TableHead className="w-44">{t("admin.status")}</TableHead>
                   <TableHead className="w-16 text-center">
                     {t("admin.pin")}
                   </TableHead>
