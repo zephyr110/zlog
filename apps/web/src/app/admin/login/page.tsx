@@ -38,15 +38,18 @@ type LoginMode = "login" | "reset"
 // Base colors come from Button's primary variant; only layout and the
 // color-mix press theming (which no variant provides) are re-specified.
 const LOGIN_SUBMIT_CLASSES =
-  "h-10 w-full shadow-sm shadow-primary/25 transition-all duration-200 hover:shadow-md hover:shadow-primary/30 focus-visible:ring-primary/40 " +
+  "h-11 w-full shadow-sm shadow-primary/25 transition-all duration-200 hover:shadow-md hover:shadow-primary/30 focus-visible:ring-primary/40 " +
   "hover:bg-[color-mix(in_oklab,var(--primary),white_8%)] active:bg-[color-mix(in_oklab,var(--primary),black_6%)] " +
   "dark:hover:bg-[color-mix(in_oklab,var(--primary),black_10%)] dark:active:bg-[color-mix(in_oklab,var(--primary),black_18%)]"
 
 /* ── Layer: square line grid ──
-   50px cells (divides the 400px card width evenly). Phase is pinned so
-   a vertical line lands exactly on the card's left edge
-   (center − card-w/2); subsequent lines then land on center − 150,
-   −100, …, +200 — so the right edge coincides with a grid line too.
+   50px cells. X phase puts a line on the card's left edge (450px = 9
+   cells, so the right edge too). Y phase centres the tiles and backs off
+   half the card height, putting a line on the card's top edge; the card
+   is centred and both heights (400/500) are whole cells, so the bottom
+   edge lands on a line as well. Percentages in background-position
+   resolve against (container − tile), hence the +25px half-cell
+   correction; without it every line sits 25px off the card.
    LoginCellsSweep uses the same size + phase so the sweep tracks these
    cells instead of drifting across a second, misaligned grid. */
 function LoginGridLayer() {
@@ -61,7 +64,8 @@ function LoginGridLayer() {
         `,
         backgroundSize: "50px 50px",
         // Tile origin at the card's left edge → lines frame the form.
-        backgroundPosition: "calc(50% - (var(--card-w) / 2)) top",
+        backgroundPosition:
+          "calc(50% + 25px - (var(--card-w) / 2)) calc(50% + 25px - (var(--card-h) / 2))",
         maskImage:
           "radial-gradient(ellipse 70% 60% at 50% 50%, black 20%, transparent 72%)",
         WebkitMaskImage:
@@ -81,7 +85,8 @@ function LoginCellsSweep() {
       style={{
         backgroundImage: `conic-gradient(from 90deg at 2px 2px, transparent 90deg, oklch(0.6 0.2 ${bannerHue(33)}) 0)`,
         backgroundSize: "50px 50px",
-        backgroundPosition: "calc(50% - (var(--card-w) / 2)) top",
+        backgroundPosition:
+          "calc(50% + 25px - (var(--card-w) / 2)) calc(50% + 25px - (var(--card-h) / 2))",
         maskImage:
           "linear-gradient(90deg, transparent 30%, black 42%, black 58%, transparent 70%)",
         WebkitMaskImage:
@@ -185,7 +190,12 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-12 [--card-w:400px]">
+    <div
+      className={cn(
+        "relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12 [--card-w:450px]",
+        mode === "login" ? "[--card-h:400px]" : "[--card-h:500px]"
+      )}
+    >
       {/* Top glow — a FLAT ellipse sliced along its horizontal axis, the
           cut sitting exactly on the page's top edge. Only the lower half
           of the ellipse is visible, so the light is brightest right at
@@ -231,9 +241,11 @@ export default function AdminLoginPage() {
         ))}
       </div>
 
-      <div className="relative z-10 flex w-full max-w-[var(--card-w)] flex-col items-center">
-        {/* Brand lockup — mark + wordmark on one line, then sign-in copy */}
-        <div className="mb-8 flex flex-col items-center text-center animate-in fade-in slide-in-from-bottom-3 duration-500">
+      <div className="relative z-10 w-full max-w-[var(--card-w)]">
+        {/* Brand lockup — mark + wordmark on one line, then sign-in copy.
+            Absolute so the card is the only in-flow child and its centre
+            stays on the grid's centre line (four-edge alignment). */}
+        <div className="absolute inset-x-0 bottom-full mb-8 flex flex-col items-center text-center animate-in fade-in slide-in-from-bottom-3 duration-500">
           <Link
             href="/"
             className="inline-flex items-center gap-3 rounded-xl transition-opacity hover:opacity-80"
@@ -268,13 +280,23 @@ export default function AdminLoginPage() {
         >
         <Card
           className={cn(
-            "w-full gap-0 py-0 ring-foreground/10 shadow-xl shadow-foreground/[0.04] dark:shadow-black/30 animate-in fade-in slide-in-from-bottom-3 duration-500 fill-mode-both [animation-delay:80ms]"
+            "w-full gap-0 py-0 ring-foreground/10 shadow-xl shadow-foreground/[0.04] dark:shadow-black/30 animate-in fade-in slide-in-from-bottom-3 duration-500 fill-mode-both [animation-delay:80ms]",
+            // Whole grid cells (400/500) so both edges land on lines. Only
+            // pinned where the brand above still fits; short viewports keep
+            // the natural height and give up edge alignment instead of
+            // clipping.
+            "[@media(min-height:760px)]:h-[var(--card-h)]"
           )}
         >
-          <CardContent className="p-7 sm:p-8">
+          <CardContent
+            className={cn(
+              "flex h-full flex-col justify-center",
+              mode === "login" ? "p-7 sm:p-8" : "p-6 sm:p-7"
+            )}
+          >
             {mode === "login" ? (
-              <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-                <div className="flex flex-col gap-5">
+              <form onSubmit={handleSubmit} className="flex flex-col gap-8">
+                <div className="flex flex-col gap-6">
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="username">{t("admin.username")}</Label>
                     <Input
@@ -285,7 +307,7 @@ export default function AdminLoginPage() {
                       onChange={(e) => setUsername(e.target.value)}
                       autoComplete="username"
                       required
-                      className="h-10 px-3"
+                      className="h-11 px-3"
                     />
                   </div>
 
@@ -299,7 +321,7 @@ export default function AdminLoginPage() {
                         onChange={(e) => setPassword(e.target.value)}
                         autoComplete="current-password"
                         required
-                        className="h-10 px-3 pr-10"
+                        className="h-11 px-3 pr-10"
                       />
                       <button
                         type="button"
@@ -344,11 +366,18 @@ export default function AdminLoginPage() {
                   >
                     {t("admin.forgotPassword")}
                   </button>
+                  <Link
+                    href="/"
+                    className="inline-flex h-8 items-center justify-center gap-1.5 self-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <ArrowLeft size={13} />
+                    {t("admin.backToSite")}
+                  </Link>
                 </div>
               </form>
             ) : (
-              <form onSubmit={handleResetSubmit} className="flex flex-col gap-6">
-                <div className="flex flex-col gap-5">
+              <form onSubmit={handleResetSubmit} className="flex flex-col gap-5">
+                <div className="flex flex-col gap-3 sm:gap-4">
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="reset-username">{t("admin.username")}</Label>
                     <Input
@@ -441,20 +470,19 @@ export default function AdminLoginPage() {
                   >
                     {t("admin.backToLogin")}
                   </button>
+                  <Link
+                    href="/"
+                    className="inline-flex h-8 items-center justify-center gap-1.5 self-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <ArrowLeft size={13} />
+                    {t("admin.backToSite")}
+                  </Link>
                 </div>
               </form>
             )}
           </CardContent>
         </Card>
         </div>
-
-        <Link
-          href="/"
-          className="mt-8 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground animate-in fade-in duration-500 fill-mode-both [animation-delay:160ms]"
-        >
-          <ArrowLeft size={14} />
-          {t("admin.backToSite")}
-        </Link>
       </div>
 
     </div>
