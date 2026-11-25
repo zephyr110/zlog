@@ -1,8 +1,8 @@
 import { MDXRemote } from "next-mdx-remote/rsc"
-import remarkGfm from "remark-gfm"
 import { type Post } from "@zlog/database"
 import { mdxComponents } from "@/components/blog/mdx-components"
-import { blogRehypePlugins } from "@/lib/mdx-pipeline"
+import { normalizeMathDelimiters } from "@/lib/mdx-math"
+import { blogRemarkPlugins, blogRehypePlugins } from "@/lib/mdx-pipeline"
 
 interface MDXRendererProps {
   post: Post
@@ -13,11 +13,11 @@ interface MDXRendererProps {
 export function MDXRenderer({ post }: MDXRendererProps) {
   return (
     <MDXRemote
-      source={post.content}
+      source={normalizeMathDelimiters(post.content)}
       options={{
         parseFrontmatter: false,
         mdxOptions: {
-          remarkPlugins: [remarkGfm],
+          remarkPlugins: blogRemarkPlugins,
           rehypePlugins: blogRehypePlugins,
         },
       }}

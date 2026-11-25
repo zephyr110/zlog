@@ -3,9 +3,9 @@
 import { useDeferredValue, useEffect, useState } from "react"
 import { serialize } from "next-mdx-remote/serialize"
 import { MDXRemote, type MDXRemoteSerializeResult } from "next-mdx-remote"
-import remarkGfm from "remark-gfm"
 import { mdxComponents } from "@/components/blog/mdx-components"
-import { blogRehypePlugins } from "@/lib/mdx-pipeline"
+import { normalizeMathDelimiters } from "@/lib/mdx-math"
+import { blogRemarkPlugins, blogRehypePlugins } from "@/lib/mdx-pipeline"
 import { useT } from "@/components/layout/trans"
 import { cn } from "@/lib/utils"
 import { POST_PROSE_CLASSES } from "@/lib/prose"
@@ -47,10 +47,10 @@ export function MarkdownPreview({ content }: MarkdownPreviewProps) {
     let cancelled = false
     setCompileError(false)
 
-    serialize(text, {
+    serialize(normalizeMathDelimiters(text), {
       parseFrontmatter: false,
       mdxOptions: {
-        remarkPlugins: [remarkGfm],
+        remarkPlugins: blogRemarkPlugins,
         rehypePlugins: blogRehypePlugins,
       },
     })

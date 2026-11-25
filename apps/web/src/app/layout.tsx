@@ -16,6 +16,7 @@ import { defaultLocale } from "@/lib/i18n"
 import { getAllTags } from "@zlog/database"
 import { unstable_cache } from "next/cache"
 import { categoryKeys } from "@/lib/categories"
+import "katex/dist/katex.min.css"
 import "./globals.css"
 import "./theme-colors.generated.css"
 
