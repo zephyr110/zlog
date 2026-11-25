@@ -172,6 +172,8 @@ analyticsRangePick: "选择日期段",
 analyticsEffectiveRange: (s: string, e: string) => `数据覆盖 ${s} – ${e}`,
 analyticsBackfilling: (n: number) =>
   `正在回填 ${n} 个月的历史归档，数据会逐步完整`,
+analyticsVercelMissingMonths: (n: number) =>
+  `${n} 个月份已超出 Vercel 30 天保留期，无法补回`,
 analyticsSource: "数据源",
 analyticsUsers: "访客",
 analyticsPageViews: "浏览量",
@@ -627,6 +629,8 @@ analyticsRangePick: "Pick a range",
 analyticsEffectiveRange: (s: string, e: string) => `Range: ${s} – ${e}`,
 analyticsBackfilling: (n: number) =>
   `Backfilling ${n} months of history — data will fill in over time`,
+analyticsVercelMissingMonths: (n: number) =>
+  `${n} month(s) fell outside Vercel's 30-day retention and can't be recovered`,
 analyticsSource: "Data source",
 analyticsUsers: "Visitors",
 analyticsPageViews: "Page views",

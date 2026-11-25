@@ -5,7 +5,7 @@ import { ensureVercelArchives } from "@/lib/vercel-analytics"
  * 后台归档回填（fire-and-forget，所有错误吞掉并记录）。
  *
  * - GA4：最多 14 个月 × 每批 3 个月 → 至多 ~5 批；幂等，一批没有新归档即停。
- * - Vercel：单月（3 天宽限窗口内的上个月），一次即完。
+ * - Vercel：归档仍在 30 天保留期内、尚未归档的过去月份，一次即完。
  *
  * 调用点：桌面端启动（instrumentation.ts，TURSO_SYNC_URL guard）。
  * 托管端（Vercel）不做 boot 回填 —— serverless 冷启动频繁且函数会被

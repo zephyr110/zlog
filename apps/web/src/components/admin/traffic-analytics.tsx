@@ -818,15 +818,18 @@ export function TrafficAnalytics() {
                   state.data.customRange.start,
                   state.data.customRange.end
                 )}
-                {state.data.source === "ga" &&
-                  state.data.missingMonths.length > 0 && (
-                    <>
-                      {" · "}
-                      {t("admin.analyticsBackfilling")(
-                        state.data.missingMonths.length
-                      )}
-                    </>
-                  )}
+                {state.data.missingMonths.length > 0 && (
+                  <>
+                    {" · "}
+                    {state.data.source === "ga"
+                      ? t("admin.analyticsBackfilling")(
+                          state.data.missingMonths.length
+                        )
+                      : t("admin.analyticsVercelMissingMonths")(
+                          state.data.missingMonths.length
+                        )}
+                  </>
+                )}
               </p>
             )}
         </div>

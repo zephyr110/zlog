@@ -114,6 +114,16 @@ export function minusDays(day: string, n: number): string {
   return new Date(Date.parse(day) - n * DAY_MS).toISOString().slice(0, 10)
 }
 
+/** ISO instant → UTC midnight after its own day. Vercel's /visits/count
+ *  treats `until` as exclusive at day granularity (23:59:59.999 collapses
+ *  to the same day's 00:00 and drops the day); pass this as its `until`. */
+export function nextUtcDayStart(iso: string): string {
+  const d = new Date(iso)
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1)
+  ).toISOString()
+}
+
 /** Inclusive day count in [a, b] (a <= b), e.g. same day → 1. */
 export function daysBetween(a: string, b: string): number {
   return Math.floor((Date.parse(b) - Date.parse(a)) / DAY_MS) + 1
@@ -163,6 +173,28 @@ export function monthSnapRange(
     effective: { start: monthStartDay(fromMonth), end: c.end },
     missingMonths: missing,
   }
+}
+
+/** Vercel 只保留最近 30 天（滚动窗口），过去月份最多只能归档仍保留的
+ *  尾部几天。返回「还有保留日、且尚未归档」的月份及其可取日界——应用
+ *  在月初宽限期没运行时靠它补回可见部分，而不是整月丢失。 */
+export function vercelArchiveCandidates(
+  archivedMonths: string[],
+  today: string,
+  retentionDays = 30
+): { month: string; start: string; end: string }[] {
+  const lastMonth = addMonths(monthOfDay(today), -1)
+  const retainedFrom = minusDays(today, retentionDays - 1)
+  const out: { month: string; start: string; end: string }[] = []
+  for (const month of monthsBetween(monthOfDay(retainedFrom), lastMonth)) {
+    if (archivedMonths.includes(month)) continue
+    const start =
+      monthStartDay(month) > retainedFrom ? monthStartDay(month) : retainedFrom
+    const end = monthEndDay(month) < today ? monthEndDay(month) : today
+    if (start > end) continue
+    out.push({ month, start, end })
+  }
+  return out
 }
 
 /** Merge ranked rows across months (DB) + live window: union by key,
