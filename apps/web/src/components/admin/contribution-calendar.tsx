@@ -350,18 +350,20 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
-            {t("admin.postsCalendar")}
-          </CardTitle>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+            <CardTitle className="text-base">
+              {t("admin.postsCalendar")}
+            </CardTitle>
+            <span aria-hidden className="h-4 w-px shrink-0 bg-border" />
+            <div className="h-4 w-64 animate-pulse rounded-sm bg-muted/70" />
+          </div>
           <CardAction>{yearFilter}</CardAction>
         </CardHeader>
         <CardContent>
-          {/* Match dashboard page skeleton totals (streak row +
-              month-label row + heatmap): phones ~90px grid, md+ ~118px,
-              so hydrate doesn't collapse under the page-level
-              placeholder. */}
+          {/* Month-label row + heatmap (streaks now live in the header):
+              phones ~90px grid, md+ ~118px, so hydrate doesn't collapse
+              under the page-level placeholder. */}
           <div className="flex flex-col gap-1.5">
-            <div className="mb-3 h-4 w-64 animate-pulse rounded-sm bg-muted/70" />
             <div className="h-3.5 animate-pulse rounded-sm bg-muted/70" />
             <div className="h-[90px] animate-pulse rounded-md bg-muted md:h-[118px]" />
           </div>
@@ -373,28 +375,33 @@ export function ContributionCalendar({ posts }: ContributionCalendarProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">
-          {t("admin.postsCalendar")}
-        </CardTitle>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+          <CardTitle className="text-base">
+            {t("admin.postsCalendar")}
+          </CardTitle>
+          <span aria-hidden className="h-4 w-px shrink-0 bg-border" />
+          {/* Writing streak — current / longest / active-day counts derived
+              from the same posts array the grid counts. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+              <Flame size={14} className="text-orange-500" />
+              {t("admin.streakCurrent")(streaks.current)}
+            </span>
+            <span aria-hidden className="h-3.5 w-px shrink-0 bg-border" />
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+              <Trophy size={14} className="text-amber-500" />
+              {t("admin.streakLongest")(streaks.longest)}
+            </span>
+            <span aria-hidden className="h-3.5 w-px shrink-0 bg-border" />
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+              <CalendarCheck size={14} className="text-(--chart-2)" />
+              {t("admin.streakActive")(streaks.activeDays)}
+            </span>
+          </div>
+        </div>
         <CardAction>{yearFilter}</CardAction>
       </CardHeader>
       <CardContent>
-      {/* Writing streak — current / longest / active-day counts derived
-          from the same posts array the grid counts. */}
-      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-          <Flame size={14} className="text-orange-500" />
-          {t("admin.streakCurrent")(streaks.current)}
-        </span>
-        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-          <Trophy size={14} className="text-amber-500" />
-          {t("admin.streakLongest")(streaks.longest)}
-        </span>
-        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-          <CalendarCheck size={14} className="text-(--chart-2)" />
-          {t("admin.streakActive")(streaks.activeDays)}
-        </span>
-      </div>
       {/* Scrollport — phones get a swipeable year; wide cards still fill.
           Edge fades replace the hidden scrollbar as a scroll affordance. */}
       <div className="relative">

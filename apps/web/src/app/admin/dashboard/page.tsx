@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Card, CardAction, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { PostStats } from "@/components/admin/post-stats"
 import { TrafficAnalytics, TrafficSkeleton } from "@/components/admin/traffic-analytics"
 import { PostTrafficPanel } from "@/components/admin/post-traffic-panel"
@@ -343,9 +344,11 @@ export default function AdminDashboardPage() {
                       <FormattedDate date={post.date} month="short" /> ·{" "}
                       {t("post.minRead")(post.readingTime)}
                       {post.draft && (
-                        <span className="ml-2 font-medium text-amber-600">
+                        // Same amber pill as the posts table so drafts read
+                        // identically on both admin surfaces.
+                        <Badge className="ml-2 bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400">
                           {t("admin.draft")}
-                        </span>
+                        </Badge>
                       )}
                       {!post.draft && isScheduled(post.publishAt) && (
                         <span className="ml-2 font-medium text-sky-600">
