@@ -205,7 +205,7 @@ export function Mermaid({ code }: { code: string }) {
   // Rendered for every state (loading, empty fence, failure, success) so
   // the block height is stable and the copy button never drifts.
   const frame = (content: ReactNode) => (
-    <div className="my-8 overflow-hidden rounded-xl border border-border shadow-sm dark:border-zinc-800">
+    <div className="my-8 overflow-hidden rounded-xl border border-border transition-shadow duration-200 hover:shadow-sm focus-within:shadow-sm dark:border-zinc-800">
       <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/50 px-4 py-2.5 dark:border-zinc-800 dark:bg-zinc-900/80">
         <span className="inline-flex items-center rounded-md border border-border/60 bg-muted px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
           mermaid

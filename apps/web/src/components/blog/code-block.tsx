@@ -21,7 +21,7 @@ export function CodeBlock({
   const lang = dataLanguage || undefined
 
   return (
-    <div className="my-8 rounded-xl border border-border dark:border-zinc-800 overflow-hidden shadow-sm">
+    <div className="my-8 rounded-xl border border-border dark:border-zinc-800 overflow-hidden transition-shadow duration-200 hover:shadow-sm focus-within:shadow-sm">
       {/* Header bar */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/50 dark:border-zinc-800 dark:bg-zinc-900/80">
         <div className="flex items-center gap-2 min-w-0">
