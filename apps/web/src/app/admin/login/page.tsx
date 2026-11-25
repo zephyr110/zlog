@@ -295,7 +295,7 @@ export default function AdminLoginPage() {
             )}
           >
             {mode === "login" ? (
-              <form onSubmit={handleSubmit} className="flex flex-col gap-8">
+              <form onSubmit={handleSubmit} className="flex flex-1 flex-col">
                 <div className="flex flex-col gap-6">
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="username">{t("admin.username")}</Label>
@@ -339,21 +339,25 @@ export default function AdminLoginPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  <Button
-                    type="submit"
-                    className={LOGIN_SUBMIT_CLASSES}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Spinner size="sm" className="text-primary-foreground" />
-                        {t("admin.signingIn")}
-                      </span>
-                    ) : (
-                      (t("admin.signIn"))
-                    )}
-                  </Button>
+                <Button
+                  type="submit"
+                  className={cn(LOGIN_SUBMIT_CLASSES, "mt-8")}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Spinner size="sm" className="text-primary-foreground" />
+                      {t("admin.signingIn")}
+                    </span>
+                  ) : (
+                    (t("admin.signIn"))
+                  )}
+                </Button>
+
+                {/* Secondary links sit at the card's bottom edge; the
+                    pt-2 keeps their old 8px gap when the viewport is too
+                    short to pin the card height. */}
+                <div className="mt-auto flex flex-col gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -376,7 +380,7 @@ export default function AdminLoginPage() {
                 </div>
               </form>
             ) : (
-              <form onSubmit={handleResetSubmit} className="flex flex-col gap-5">
+              <form onSubmit={handleResetSubmit} className="flex flex-1 flex-col">
                 <div className="flex flex-col gap-3 sm:gap-4">
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="reset-username">{t("admin.username")}</Label>
@@ -439,21 +443,22 @@ export default function AdminLoginPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  <Button
-                    type="submit"
-                    className={LOGIN_SUBMIT_CLASSES}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Spinner size="sm" className="text-primary-foreground" />
-                        {t("admin.resetting")}
-                      </span>
-                    ) : (
-                      (t("admin.resetPassword"))
-                    )}
-                  </Button>
+                <Button
+                  type="submit"
+                  className={cn(LOGIN_SUBMIT_CLASSES, "mt-5")}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Spinner size="sm" className="text-primary-foreground" />
+                      {t("admin.resetting")}
+                    </span>
+                  ) : (
+                    (t("admin.resetPassword"))
+                  )}
+                </Button>
+
+                <div className="mt-auto flex flex-col gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => {
