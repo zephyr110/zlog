@@ -199,7 +199,7 @@ describe("默认零回归（Neutral 与 globals.css :root/.dark 除图表色外�
   const rootVars = cssVarsOf(rootBlock)
   const darkVars = cssVarsOf(darkBlock)
 
-  it(":root：除 chart-1..5 外逐键相等（仅允许自定义 --login-glow / --banner-hue / --header-h）", () => {
+  it(":root：除 chart-1..5 外逐键相等（仅允许自定义 --login-glow / --banner-hue / --header-h / --band）", () => {
     expect(rootBlock).not.toBe("")
     for (const [key, value] of Object.entries(catalog.bases.neutral.light)) {
       if (CHART_SITE_KEYS.includes(key)) continue
@@ -214,10 +214,11 @@ describe("默认零回归（Neutral 与 globals.css :root/.dark 除图表色外�
     for (const k of CHART_SITE_KEYS) {
       expect(rootVars[k]).toBe(GRAY_LIGHT[k])
     }
-    // 手工变量：登录页光晕、banner 粒子/扫光色相基准、共享 header 高度。
+    // 手工变量：登录页光晕、banner 粒子/扫光色相基准、共享 header 高度、
+    // banner/footer 共用的 band 底色。
     expect(
       Object.keys(rootVars).filter((k) => !(k in catalog.bases.neutral.light))
-    ).toEqual(["login-glow", "banner-hue", "header-h"])
+    ).toEqual(["login-glow", "banner-hue", "header-h", "band"])
   })
 
   it(".dark：同上（差异集合恰为 chart-1..5，图表值 == gray.dark）", () => {

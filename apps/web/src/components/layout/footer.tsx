@@ -15,8 +15,8 @@ import { hasAdminSession } from "@/lib/api-client"
 
 /**
  * Site footer — brand block + three link columns (navigate / links /
- * settings), sitting on the muted panel tone that separates it from the
- * page background. The admin entry sits in the links column as a quiet
+ * settings), sitting on the same soft band tone as the page banners. The
+ * admin entry sits in the links column as a quiet
  * row: sign-in when signed out, dashboard when signed in.
  */
 export function Footer() {
@@ -38,7 +38,7 @@ export function Footer() {
   if (pathname?.startsWith("/admin")) return null
 
   return (
-    <footer className="bg-muted">
+    <footer className="bg-band">
       <div className="container mx-auto max-w-5xl px-4 pb-8 pt-16 2xl:max-w-7xl">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           {/* Brand */}

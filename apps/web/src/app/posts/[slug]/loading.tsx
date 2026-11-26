@@ -22,7 +22,7 @@ export default function PostLoading() {
       {/* Hero header */}
       <header
         className={cn(
-          "relative flex flex-col overflow-hidden bg-background",
+          "relative flex flex-col overflow-hidden bg-band",
           pageBannerMinClass
         )}
       >
