@@ -59,6 +59,10 @@ const {
   path: LAND_PATH,
 } = WORLD_LAND_MAP
 
+/** The dialog map spans the dialog width at its natural ratio, so the
+ *  dialog's width cap is derived from the viewport height (see below). */
+const MAP_ASPECT = MAP_WIDTH / MAP_HEIGHT
+
 /** Invisible hit target floor — map coords are tiny; without this, phone
  *  taps miss the pin core entirely. */
 const PIN_HIT_MIN = 2.2
@@ -265,18 +269,19 @@ function CountryMapView({
 
   return (
     <div
-      className={cn(
-        "flex min-w-0 flex-col gap-3",
-        // Compact card: fill stretched xl row height so chips sit on the
-        // floor instead of floating above a void.
-        legend === "scroll" && "min-h-0 flex-1"
-      )}
+      // Fill the card / dialog body so the list can take the leftover
+      // height (compact chips sit on the floor, the dialog list scrolls).
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-3"
       data-country-map
     >
       <div
         className={cn(
-          "relative min-w-0",
-          legend === "scroll" && "flex min-h-0 flex-1 items-center"
+          "relative w-full min-w-0",
+          legend === "scroll"
+            ? "flex min-h-0 flex-1 items-center"
+            : // The map keeps its ratio and full width; the list shrinks
+              // and scrolls when the dialog hits its max height.
+              "shrink-0"
         )}
       >
         <svg
@@ -412,8 +417,9 @@ function CountryMapView({
           })}
         </ul>
       ) : (
-        /* Expanded dialog: wrap grid so every country is visible at once. */
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        /* Expanded dialog: the map stays pinned above; this wrap grid
+           scrolls on its own when it outgrows the remaining height. */
+        <ul className="grid min-h-0 flex-1 grid-cols-1 content-start gap-2 overflow-y-auto overscroll-contain [scrollbar-width:thin] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {localizedCountries.map((c, i) => {
             const selected = tooltip?.name === c.name
             const pct = Math.round((c.users / totalUsers) * 1000) / 10
@@ -515,14 +521,23 @@ export function CountriesPanel({
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex max-h-[min(calc(100dvh-2rem),56rem)] w-full max-w-[min(56rem,100%)] flex-col gap-0 overflow-hidden p-0 xl:max-h-[min(calc(100dvh-2rem),68rem)] xl:max-w-[min(72rem,100%)] 2xl:max-w-[min(84rem,100%)]">
+        <DialogContent
+          className="flex max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden p-0"
+          // Width follows the viewport but is height-budgeted: the
+          // full-width map (height = width / ratio) must still leave the
+          // list a few rows inside the viewport.
+          style={{
+            maxWidth: `min(96rem, 100%, calc((100dvh - min(21rem, 60dvh)) * ${MAP_ASPECT} + 2rem))`,
+          }}
+        >
           <DialogHeader className="shrink-0 space-y-1 border-b px-4 py-3 pr-12 text-left">
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
               {t("admin.analyticsExpandCountriesDesc")}
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
+          {/* Map stays pinned; only the card list below it scrolls. */}
+          <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
             <CountryMapView
               countries={countries}
               usersLabel={usersLabel}
