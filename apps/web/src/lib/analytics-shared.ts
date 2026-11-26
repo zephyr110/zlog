@@ -166,12 +166,12 @@ export function monthSnapRange(
 }
 
 /** Merge ranked rows across months (DB) + live window: union by key,
- *  sum users/views, sort desc, cap. `sortBy` defaults to users —
- *  pass "views" for page lists which rank by page views. */
+ *  sum users/views, sort desc, then cap (omit for the full list).
+ *  `sortBy` defaults to users — pass "views" for page lists. */
 export function mergeRowLists<R extends { users: number; views: number }>(
   lists: R[][],
   keyOf: (r: R) => string,
-  cap: number,
+  cap?: number,
   sortBy: "users" | "views" = "users"
 ): R[] {
   const byKey = new Map<string, R>()
@@ -186,9 +186,8 @@ export function mergeRowLists<R extends { users: number; views: number }>(
       }
     }
   }
-  return [...byKey.values()]
-    .sort((x, y) => y[sortBy] - x[sortBy])
-    .slice(0, cap)
+  const merged = [...byKey.values()].sort((x, y) => y[sortBy] - x[sortBy])
+  return cap === undefined ? merged : merged.slice(0, cap)
 }
 
 // ── Merged (DB months + live window) part shapes — shared by ga/vercel ──
@@ -242,9 +241,10 @@ export function dbAggToParts(
   }
 }
 
-/** Union-merge DB parts with the live partial-month report, capped at the
- *  panel depth (10). Countries merge by countryId so folded entries from
- *  both sides collapse into one; the live name wins. */
+/** Union-merge DB parts with the live partial-month report; top-N
+ *  dimensions cap at 10. Countries merge by countryId, uncapped — a cap
+ *  made `all` drop 1-user tails that wider presets still listed — and the
+ *  first name seen (DB) is kept. */
 export function mergeParts(
   db: AnalyticsMergedParts,
   live: AnalyticsReport | null
@@ -296,8 +296,7 @@ export function mergeParts(
         db.countries.map((c) => ({ ...c, views: 0 })),
         (live?.countries ?? []).map((c) => ({ ...c, views: 0 })),
       ],
-      (c) => c.countryId,
-      10
+      (c) => c.countryId
     ).map(({ country, countryId, users }) => ({ country, countryId, users })),
   }
 }

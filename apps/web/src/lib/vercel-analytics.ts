@@ -26,6 +26,10 @@ import {
 } from "@zlog/database"
 
 const CACHE_TTL_MS = 10 * 60 * 1000
+
+/** Countries go past the top-10 panels up to the endpoint's max of 100;
+ *  anything beyond is folded into "Others" and dropped. */
+const COUNTRY_FETCH_LIMIT = "100"
 const VISITS_COUNT = "https://api.vercel.com/v1/query/web-analytics/visits/count"
 const VISITS_AGG =
   "https://api.vercel.com/v1/query/web-analytics/visits/aggregate"
@@ -185,7 +189,8 @@ type VercelDimensions = {
 async function fetchVercelDimensions(
   since: string,
   until: string,
-  limit: string
+  limit: string,
+  countryLimit: string
 ): Promise<VercelDimensions> {
   const [
     totalsRes,
@@ -235,7 +240,7 @@ async function fetchVercelDimensions(
       since,
       until,
       by: "country",
-      limit,
+      limit: countryLimit,
     }),
   ])
 
@@ -386,7 +391,12 @@ export async function ensureVercelArchives(): Promise<number> {
   const end = minDate(monthEndDay(last), todayKey())
   const w = dayWindow(start)
   const u = dayWindow(end)
-  const d = await fetchVercelDimensions(w.since, u.until, "25")
+  const d = await fetchVercelDimensions(
+    w.since,
+    u.until,
+    "25",
+    COUNTRY_FETCH_LIMIT
+  )
   await upsertMonthlyAnalytics("vercel", last, dimensionsToRows(d))
   return 1
 }
@@ -425,7 +435,12 @@ export async function fetchVercelAnalyticsReport(
   const now = todayKey()
   const start =
     range === "today" ? now : range === "7d" ? minusDays(now, 6) : minusDays(now, 29)
-  const d = await fetchVercelDimensions(since, until, "10")
+  const d = await fetchVercelDimensions(
+    since,
+    until,
+    "10",
+    COUNTRY_FETCH_LIMIT
+  )
   const report = liveToReport(
     d,
     range,
@@ -480,7 +495,12 @@ async function fetchVercelMergedReport(
         : effective.start
     const w = dayWindow(liveStart)
     const u = dayWindow(effective.end)
-    const d = await fetchVercelDimensions(w.since, u.until, "10")
+    const d = await fetchVercelDimensions(
+      w.since,
+      u.until,
+      "10",
+      COUNTRY_FETCH_LIMIT
+    )
     live = liveToReport(d, range, effective, availableFrom, missingMonths)
   }
 
