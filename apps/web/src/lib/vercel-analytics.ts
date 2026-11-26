@@ -27,8 +27,8 @@ import {
 
 const CACHE_TTL_MS = 10 * 60 * 1000
 
-/** Countries are listed in full (unlike the top-10 panels); 100 is the
- *  aggregate endpoint's per-query maximum. */
+/** Countries go past the top-10 panels up to the endpoint's max of 100;
+ *  anything beyond is folded into "Others" and dropped. */
 const COUNTRY_FETCH_LIMIT = "100"
 const VISITS_COUNT = "https://api.vercel.com/v1/query/web-analytics/visits/count"
 const VISITS_AGG =
@@ -190,7 +190,7 @@ async function fetchVercelDimensions(
   since: string,
   until: string,
   limit: string,
-  countryLimit: string = limit
+  countryLimit: string
 ): Promise<VercelDimensions> {
   const [
     totalsRes,

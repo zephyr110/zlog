@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  dbAggToParts,
   mergeParts,
   type AnalyticsMergedParts,
   type AnalyticsReport,
@@ -84,5 +85,42 @@ describe("mergeParts — countries are a full list, not a top-N panel", () => {
     }))
     const merged = mergeParts({ ...EMPTY_PARTS, sources }, null)
     expect(merged.sources).toHaveLength(10)
+  })
+
+  it("keeps more than 100 countries (merge is uncapped)", () => {
+    const many = Array.from({ length: 150 }, (_, i) => ({
+      country: `C${i}`,
+      countryId: `C${i}`,
+      users: 150 - i,
+    }))
+    const merged = mergeParts({ ...EMPTY_PARTS, countries: many }, null)
+    expect(merged.countries).toHaveLength(150)
+  })
+
+  it("sums archived composite keys with live rows by countryId", () => {
+    const db = dbAggToParts(
+      new Map([
+        [
+          "countries",
+          [
+            { itemKey: "US|United States", users: 10, views: 0 },
+            { itemKey: "CN|China", users: 7, views: 0 },
+          ],
+        ],
+      ])
+    )
+    const merged = mergeParts(
+      db,
+      liveReport([
+        { country: "US", countryId: "US", users: 5 },
+        { country: "CN", countryId: "CN", users: 3 },
+        { country: "AT", countryId: "AT", users: 1 },
+      ])
+    )
+    expect(merged.countries).toEqual([
+      { country: "United States", countryId: "US", users: 15 },
+      { country: "China", countryId: "CN", users: 10 },
+      { country: "AT", countryId: "AT", users: 1 },
+    ])
   })
 })

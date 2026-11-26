@@ -311,11 +311,12 @@ async function batchRunReports(
 }
 
 /** Build the 7 panel requests for an arbitrary date window. `limit`
- *  controls per-dimension depth (10 for live display, 25 for archives). */
+ *  controls the top-N dimensions (10 live, 25 archives); countries use
+ *  `countryLimit` so the list stays complete. */
 function buildRequests(
   dateRange: { startDate: string; endDate: string },
   limit: string,
-  countryLimit: string = limit
+  countryLimit: string
 ): RunReportRequest[] {
   return [
     {
