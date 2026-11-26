@@ -3,14 +3,14 @@ import {
   addMonths,
   currentMonthKey,
   dbAggToParts,
-  daysBetween,
   mergeParts,
   minusDays,
-  monthEndDay,
   monthOfDay,
   monthSnapRange,
   monthStartDay,
+  nextUtcDayStart,
   todayKey,
+  vercelArchiveCandidates,
   type AnalyticsCustomRange,
   type AnalyticsRange,
   type AnalyticsReport,
@@ -31,10 +31,8 @@ const VISITS_AGG =
   "https://api.vercel.com/v1/query/web-analytics/visits/aggregate"
 
 /** Vercel Hobby retention is a 30-day rolling window — a calendar month is
- *  never fully fetchable. We archive the last complete month within a short
- *  grace window after rollover and store whatever retention still has
- *  (the month head, ~2-3 days, is already gone by then). */
-export const VERCEL_ARCHIVE_GRACE_DAYS = 3
+ *  never fully fetchable, so archives store only the tail still retained. */
+export const VERCEL_RETENTION_DAYS = 30
 
 type CacheEntry = { expires: number; report: AnalyticsReport }
 const reportCache = new Map<string, CacheEntry>()
@@ -85,14 +83,6 @@ function rangeWindow(
 /** 'YYYY-MM-DD' day → Vercel API ISO instants (whole day, UTC). */
 function dayWindow(day: string): { since: string; until: string } {
   return { since: `${day}T00:00:00.000Z`, until: `${day}T23:59:59.999Z` }
-}
-
-function maxDate(a: string, b: string): string {
-  return a >= b ? a : b
-}
-
-function minDate(a: string, b: string): string {
-  return a <= b ? a : b
 }
 
 function classifyVercelError(err: unknown): AnalyticsFetchError {
@@ -196,7 +186,9 @@ async function fetchVercelDimensions(
     osRes,
     countriesRes,
   ] = await Promise.all([
-    vercelGet(VISITS_COUNT, { since, until }),
+    // count 的 until 不含当日：聚合维度包含尾日，总数也必须包含，
+    // 否则「今日」恒为 0、地图与总数自相矛盾（尾日只在聚合里）。
+    vercelGet(VISITS_COUNT, { since, until: nextUtcDayStart(until) }),
     vercelGet(VISITS_AGG, {
       since,
       until,
@@ -370,25 +362,27 @@ function liveToReport(
   }
 }
 
-/** Archive the last complete month while it's still inside the 30-day
- *  retention window (3-day grace after month rollover). Vercel never keeps
- *  a full calendar month, so we store whatever retention still has.
- *  Returns 1 when a month was written. Idempotent. */
+/** Archive every past month that still has days inside the 30-day
+ *  retention window. Archiving only within a post-rollover grace window
+ *  meant an app that was closed those days lost the whole month from
+ *  All time. Days already aged out are gone for good. Returns how many
+ *  months were written. Idempotent. */
 export async function ensureVercelArchives(): Promise<number> {
-  const last = addMonths(currentMonthKey(), -1)
-  if (daysBetween(monthEndDay(last), todayKey()) > VERCEL_ARCHIVE_GRACE_DAYS) {
-    return 0
+  const archived = await listArchivedMonths("vercel")
+  let done = 0
+  const candidates = vercelArchiveCandidates(
+    archived,
+    todayKey(),
+    VERCEL_RETENTION_DAYS
+  )
+  for (const c of candidates) {
+    const w = dayWindow(c.start)
+    const u = dayWindow(c.end)
+    const d = await fetchVercelDimensions(w.since, u.until, "25")
+    await upsertMonthlyAnalytics("vercel", c.month, dimensionsToRows(d))
+    done++
   }
-  const archived = new Set(await listArchivedMonths("vercel"))
-  if (archived.has(last)) return 0
-  // 保留期墙：只取 still 在 30 天滚动窗口内的那部分（月末头几天已流失）。
-  const start = maxDate(monthStartDay(last), minusDays(todayKey(), 29))
-  const end = minDate(monthEndDay(last), todayKey())
-  const w = dayWindow(start)
-  const u = dayWindow(end)
-  const d = await fetchVercelDimensions(w.since, u.until, "25")
-  await upsertMonthlyAnalytics("vercel", last, dimensionsToRows(d))
-  return 1
+  return done
 }
 
 /** Earliest date the picker should allow: the first archived month, or

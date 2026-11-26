@@ -16,7 +16,9 @@ import {
   monthSnapRange,
   monthStartDay,
   monthsBetween,
+  nextUtcDayStart,
   todayKey,
+  vercelArchiveCandidates,
   type AnalyticsReport,
 } from "../../apps/web/src/lib/analytics-shared"
 
@@ -46,6 +48,13 @@ describe("月历工具（UTC 字符串）", () => {
     expect(daysBetween("2026-08-01", "2026-08-01")).toBe(1)
     expect(daysBetween("2026-08-01", "2026-08-31")).toBe(31)
     expect(monthsBetween(twoAgo, cur)).toEqual([twoAgo, last, cur])
+  })
+
+  it("nextUtcDayStart：日内任意时刻 → 次日零点（含月末/年末进位）", () => {
+    expect(nextUtcDayStart("2026-11-25T23:59:59.999Z")).toBe("2026-11-26T00:00:00.000Z")
+    expect(nextUtcDayStart("2026-11-25T08:30:00.000Z")).toBe("2026-11-26T00:00:00.000Z")
+    expect(nextUtcDayStart("2026-11-30T23:59:59.999Z")).toBe("2026-12-01T00:00:00.000Z")
+    expect(nextUtcDayStart("2026-12-31T00:00:00.000Z")).toBe("2027-01-01T00:00:00.000Z")
   })
 })
 
@@ -110,6 +119,32 @@ describe("monthSnapRange（覆盖窗口 + 缺失月份）", () => {
     const { effective, missingMonths } = monthSnapRange("all", null, [], FALLBACK)
     expect(effective).toEqual(FALLBACK)
     expect(missingMonths).toEqual([])
+  })
+})
+
+describe("vercelArchiveCandidates（30 天保留期内可归档的月份）", () => {
+  it("月中：上半月已流失，只取保留期覆盖的尾部几天", () => {
+    expect(vercelArchiveCandidates([], "2026-11-25")).toEqual([
+      { month: "2026-10", start: "2026-10-27", end: "2026-10-31" },
+    ])
+  })
+
+  it("月初刚过：补回上个月仍保留的大部分", () => {
+    expect(vercelArchiveCandidates([], "2026-12-02")).toEqual([
+      { month: "2026-11", start: "2026-11-03", end: "2026-11-30" },
+    ])
+  })
+
+  it("保留期跨两个月界：两天各归档一天", () => {
+    expect(vercelArchiveCandidates([], "2026-03-01")).toEqual([
+      { month: "2026-01", start: "2026-01-31", end: "2026-01-31" },
+      { month: "2026-02", start: "2026-02-01", end: "2026-02-28" },
+    ])
+  })
+
+  it("已归档的月份跳过；整月流失后无候选", () => {
+    expect(vercelArchiveCandidates(["2026-10"], "2026-11-25")).toEqual([])
+    expect(vercelArchiveCandidates([], "2026-11-30")).toEqual([])
   })
 })
 
