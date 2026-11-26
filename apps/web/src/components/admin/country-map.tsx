@@ -277,11 +277,7 @@ function CountryMapView({
       <div
         className={cn(
           "relative w-full min-w-0",
-          legend === "scroll"
-            ? "flex min-h-0 flex-1 items-center"
-            : // The map keeps its ratio and full width; the list shrinks
-              // and scrolls when the dialog hits its max height.
-              "shrink-0"
+          legend === "scroll" ? "flex min-h-0 flex-1 items-center" : "shrink-0"
         )}
       >
         <svg
@@ -417,9 +413,7 @@ function CountryMapView({
           })}
         </ul>
       ) : (
-        /* Expanded dialog: the map stays pinned above; this wrap grid
-           scrolls on its own when it outgrows the remaining height. */
-        <ul className="grid min-h-0 flex-1 grid-cols-1 content-start gap-2 overflow-y-auto overscroll-contain [scrollbar-width:thin] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <ul className="grid min-h-16 flex-1 grid-cols-1 content-start gap-2 overflow-y-auto overscroll-contain [scrollbar-width:thin] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {localizedCountries.map((c, i) => {
             const selected = tooltip?.name === c.name
             const pct = Math.round((c.users / totalUsers) * 1000) / 10
@@ -438,9 +432,12 @@ function CountryMapView({
                 >
                   <CountryFlag code={c.code} size="lg" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">
+                    <TruncateTooltip
+                      nativeTitle
+                      className="block text-sm font-medium"
+                    >
                       {c.name}
-                    </span>
+                    </TruncateTooltip>
                     <span className="mt-0.5 flex items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
                       <span>
                         {usersLabel} {c.users.toLocaleString()}
@@ -536,8 +533,9 @@ export function CountriesPanel({
               {t("admin.analyticsExpandCountriesDesc")}
             </DialogDescription>
           </DialogHeader>
-          {/* Map stays pinned; only the card list below it scrolls. */}
-          <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
+          {/* Body scrolls only as a fallback: on extremely short viewports
+              the pinned map leaves the list no room. */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4 py-4">
             <CountryMapView
               countries={countries}
               usersLabel={usersLabel}
