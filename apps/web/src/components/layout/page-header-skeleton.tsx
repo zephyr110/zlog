@@ -16,7 +16,7 @@ export function PageHeaderSkeleton({
   return (
     <section
       className={cn(
-        "relative flex flex-col overflow-hidden bg-background",
+        "relative flex flex-col overflow-hidden bg-band",
         pageBannerMinClass
       )}
     >

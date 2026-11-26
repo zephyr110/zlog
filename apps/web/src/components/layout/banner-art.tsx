@@ -55,7 +55,7 @@ export function BannerArt({ className }: { className?: string }) {
           <HeroParticle key={`float-${i}`} p={p} className="hero-particle" />
         ))}
       </div>
-      <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-band to-transparent" />
     </div>
   )
 }
