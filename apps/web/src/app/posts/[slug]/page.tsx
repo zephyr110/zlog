@@ -131,7 +131,7 @@ export default async function PostPage({ params }: PostPageProps) {
                 alt=""
                 className="absolute inset-0 h-full w-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/55 to-background/25" />
+              <div className="absolute inset-0 bg-gradient-to-t from-band via-band/55 to-band/25" />
             </>
           ) : (
             <BannerArt />
