@@ -62,6 +62,10 @@ export const GA_RETENTION_MONTHS = 14
  *  still sum into the year's top-10). */
 const GA_ARCHIVE_LIMIT = "25"
 
+/** Countries are listed in full (not a top-N card); GA allows large row
+ *  limits, so keep every country in reports and monthly archives. */
+const GA_COUNTRY_LIMIT = "1000"
+
 /** Inline backfill cap per request — first paint stays fast; the rest is
  *  filled by the desktop boot trigger and subsequent visits. */
 const MAX_ARCHIVE_MONTHS_PER_CALL = 3
@@ -310,7 +314,8 @@ async function batchRunReports(
  *  controls per-dimension depth (10 for live display, 25 for archives). */
 function buildRequests(
   dateRange: { startDate: string; endDate: string },
-  limit: string
+  limit: string,
+  countryLimit: string = limit
 ): RunReportRequest[] {
   return [
     {
@@ -386,7 +391,7 @@ function buildRequests(
       dimensions: [{ name: "country" }, { name: "countryId" }],
       metrics: [{ name: "activeUsers" }],
       orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
-      limit,
+      limit: countryLimit,
     },
   ]
 }
@@ -550,7 +555,8 @@ export async function ensureGaArchives(): Promise<number> {
       property,
       buildRequests(
         { startDate: monthStartDay(month), endDate: monthEndDay(month) },
-        GA_ARCHIVE_LIMIT
+        GA_ARCHIVE_LIMIT,
+        GA_COUNTRY_LIMIT
       )
     )
     const dims = batchToDimensionRows(batch)
@@ -615,7 +621,10 @@ async function fetchPresetReport(
   if (hit && hit.expires > Date.now()) return hit.report
 
   const property = `properties/${process.env.GA_PROPERTY_ID!.trim()}`
-  const batch = await batchRunReports(property, buildRequests(PRESET_RANGES[range], "10"))
+  const batch = await batchRunReports(
+    property,
+    buildRequests(PRESET_RANGES[range], "10", GA_COUNTRY_LIMIT)
+  )
   const now = todayKey()
   const start =
     range === "today" ? now : range === "7d" ? minusDays(now, 6) : minusDays(now, 29)
@@ -675,7 +684,11 @@ async function fetchMergedReport(
     const property = `properties/${process.env.GA_PROPERTY_ID!.trim()}`
     const batch = await batchRunReports(
       property,
-      buildRequests({ startDate: liveStart, endDate: effective.end }, "10")
+      buildRequests(
+        { startDate: liveStart, endDate: effective.end },
+        "10",
+        GA_COUNTRY_LIMIT
+      )
     )
     live = batchToLiveReport(batch, range, effective, availableFrom, missingMonths)
   }

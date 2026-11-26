@@ -242,9 +242,14 @@ export function dbAggToParts(
   }
 }
 
+/** Countries are not a top-N card (the chip row scrolls, the dialog wraps
+ *  every country), so keep the full set — a 10-row cap made `all` drop the
+ *  1-user tail that 7d/30d still listed. */
+const COUNTRY_MERGE_DEPTH = 100
+
 /** Union-merge DB parts with the live partial-month report, capped at the
  *  panel depth (10). Countries merge by countryId so folded entries from
- *  both sides collapse into one; the live name wins. */
+ *  both sides collapse into one; the first name seen (DB) is kept. */
 export function mergeParts(
   db: AnalyticsMergedParts,
   live: AnalyticsReport | null
@@ -297,7 +302,7 @@ export function mergeParts(
         (live?.countries ?? []).map((c) => ({ ...c, views: 0 })),
       ],
       (c) => c.countryId,
-      10
+      COUNTRY_MERGE_DEPTH
     ).map(({ country, countryId, users }) => ({ country, countryId, users })),
   }
 }
